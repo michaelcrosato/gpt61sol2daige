@@ -17,7 +17,7 @@ JSON are committed under <code>docs/evidence/</code>. Full test traces
 and generated output stay in ignored local artifact directories.</p>
 <h2 id="reproduction-gates">Reproduction gates</h2>
 <p>Version 1.1 passes <strong>26 headless tests</strong>, TypeScript,
-lint/format checks, the production build, and <strong>9 browser
+lint/format checks, the production build, and <strong>10 browser
 scenarios</strong>. These cover desktop gameplay, mobile controls,
 actual eight-player co-op, independent guest view budgets, settings
 persistence, native fullscreen, fullscreen denial, browser-initiated
@@ -365,7 +365,17 @@ measured. Browser audio verification checks activation plus generated
 PCM correctness; there was no human listening panel. The active NPC pool
 recycles dormant entities, while terrain and quest/resource edits
 persist. These limitations are explained in the architecture and design
-report.</p></main>
+report.</p>
+<h2 id="join-recovery">Join recovery</h2>
+<p>Transport diagnostics exposed a connected WebRTC peer that had not
+completed application admission. The game now reconciles already-open
+native channels with PeerJS, acknowledges client readiness with repeated
+hello/welcome messages, and makes up to three bounded attempts after a
+transient initial connection failure. Full rooms, incompatible versions
+and invalid data still fail explicitly. Generation guards keep canceled
+attempts from replacing a newer session. A browser test closes the first
+real native data channel deliberately, then verifies that a fresh real
+connection joins successfully.</p></main>
 <footer>Fern · A world engine built for agents · <a href="https://github.com/michaelcrosato/gpt61sol2daige">Source on GitHub</a></footer>
 </body>
 </html>

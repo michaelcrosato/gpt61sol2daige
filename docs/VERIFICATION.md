@@ -4,7 +4,7 @@ The evidence here distinguishes tested behavior from operating limits. Source te
 
 ## Reproduction gates
 
-Version 1.1 passes **26 headless tests**, TypeScript, lint/format checks, the production build, and **9 browser scenarios**. These cover desktop gameplay, mobile controls, actual eight-player co-op, independent guest view budgets, settings persistence, native fullscreen, fullscreen denial, browser-initiated exits, landscape touch controls, full-size world saves and legacy-save compatibility. The original release was also verified on GitHub Actions and against production, including public signaling; one earlier public connection attempt timed out before the subsequent complete eight-client rerun succeeded.
+Version 1.1 passes **26 headless tests**, TypeScript, lint/format checks, the production build, and **10 browser scenarios**. These cover desktop gameplay, mobile controls, actual eight-player co-op, independent guest view budgets, settings persistence, native fullscreen, fullscreen denial, browser-initiated exits, landscape touch controls, full-size world saves and legacy-save compatibility. The original release was also verified on GitHub Actions and against production, including public signaling; one earlier public connection attempt timed out before the subsequent complete eight-client rerun succeeded.
 
 ```bash
 npm ci
@@ -88,3 +88,7 @@ The final 300-frame browser measurement includes both Canvas rendering and live 
 ## Scope limits
 
 The physics tests cover circles, static terrain and the reference game's interactions. They do not establish arbitrary-polygon rigid-body behavior. Eight contexts prove real transport and shared-state operation on the tested host; they are not eight remote households behind different NATs. No cross-region latency or TURN fleet capacity has been measured. Browser audio verification checks activation plus generated PCM correctness; there was no human listening panel. The active NPC pool recycles dormant entities, while terrain and quest/resource edits persist. These limitations are explained in the architecture and design report.
+
+## Join recovery
+
+Transport diagnostics exposed a connected WebRTC peer that had not completed application admission. The game now reconciles already-open native channels with PeerJS, acknowledges client readiness with repeated hello/welcome messages, and makes up to three bounded attempts after a transient initial connection failure. Full rooms, incompatible versions and invalid data still fail explicitly. Generation guards keep canceled attempts from replacing a newer session. A browser test closes the first real native data channel deliberately, then verifies that a fresh real connection joins successfully.

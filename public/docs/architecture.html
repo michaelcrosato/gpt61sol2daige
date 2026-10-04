@@ -260,7 +260,17 @@ asynchronously through a different authority. When the session becomes
 solo, recording starts from the received checkpoint. CLI checkpoints
 preserve all players; browser loads choose one local traveler and resume
 solo. The browser lab is a QA console, not an editor that future agents
-must operate.</p></main>
+must operate.</p>
+<h3 id="join-lifecycle">Join lifecycle</h3>
+<p>A guest requests a welcome until the first valid world snapshot is
+received. The host admits an already-open native channel idempotently
+and rate-limits repeated welcome responses. A transient failure during
+admission recreates the connection, with handshake timeouts of 6, 10 and
+22 seconds across at most three attempts. Explicit full-room/version
+rejection and invalid snapshots are not retried. Generation and request
+identifiers prevent callbacks from canceled attempts from mutating a new
+session. The native connection still carries every byte; no test
+substitutes a fake transport.</p></main>
 <footer>Fern · A world engine built for agents · <a href="https://github.com/michaelcrosato/gpt61sol2daige">Source on GitHub</a></footer>
 </body>
 </html>

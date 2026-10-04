@@ -20,6 +20,7 @@ export type NetworkStatus = {
   sent: number;
   population: number;
 };
+class RetryableJoinError extends Error {}
 export class Coop {
   readonly status: NetworkStatus = {
     role: "solo",
@@ -45,6 +46,7 @@ export class Coop {
   private sequence = 0;
   private lastSent = 0;
   private generation = 0;
+  private joinRequest = 0;
   constructor(
     getSim: () => Simulation,
     replaceSim: (sim: Simulation) => void,
@@ -87,6 +89,7 @@ export class Coop {
       });
     });
     peer.on("error", (error) => {
+      if (this.peer !== peer) return;
       this.status.message =
         error.type === "peer-unavailable"
           ? "That expedition has ended or the room code is incorrect."
@@ -94,7 +97,7 @@ export class Coop {
       this.changed();
     });
     peer.on("disconnected", () => {
-      if (!peer.destroyed) {
+      if (this.peer === peer && !peer.destroyed) {
         this.status.message = "Signaling interrupted. Existing travelers remain connected.";
         this.changed();
         peer.reconnect();
@@ -123,7 +126,16 @@ export class Coop {
   }
   private accept(conn: DataConnection): void {
     conn.on("error", () => conn.close());
-    conn.on("open", () => {
+    let welcomeAt = -Infinity;
+    const welcome = () => {
+      const now = performance.now();
+      if (now - welcomeAt < 250) return;
+      welcomeAt = now;
+      conn.send({ type: "welcome", id: conn.peer, version: PROTOCOL_VERSION });
+      conn.send(encodeSnapshot(this.getSim(), conn.peer));
+    };
+    const admit = () => {
+      if (!this.channelOpen(conn) || this.connections.get(conn.peer) === conn) return;
       if (
         this.status.role !== "host" ||
         conn.metadata?.version !== PROTOCOL_VERSION ||
@@ -147,13 +159,21 @@ export class Coop {
       this.getSim().addPlayer(conn.peer, `Wayfarer ${this.getSim().players.size + 1}`);
       this.lastInput.set(conn.peer, performance.now());
       this.status.peers = this.connections.size;
-      conn.send({ type: "welcome", id: conn.peer, version: PROTOCOL_VERSION });
-      conn.send(encodeSnapshot(this.getSim(), conn.peer));
+      welcome();
       this.changed();
-    });
+    };
+    conn.on("open", admit);
+    // The channel may already be open when PeerJS exposes the incoming connection.
+    conn.peerConnection?.addEventListener("datachannel", () => queueMicrotask(admit));
     conn.on("data", (raw) => {
-      if (!this.connections.has(conn.peer) || !raw || typeof raw !== "object") return;
+      if (!raw || typeof raw !== "object") return;
       const data = raw as Record<string, unknown>;
+      if (data.type === "hello" && data.version === PROTOCOL_VERSION) {
+        admit();
+        if (this.connections.get(conn.peer) === conn && conn.open) welcome();
+        return;
+      }
+      if (this.connections.get(conn.peer) !== conn) return;
       if (
         data.type !== "input" ||
         typeof data.seq !== "number" ||
@@ -202,6 +222,13 @@ export class Coop {
       this.status.peers = this.connections.size;
       this.changed();
     });
+    admit();
+  }
+  private channelOpen(conn: DataConnection): boolean {
+    // Reconcile PeerJS with an already-open native channel if its initial notification raced setup.
+    if (!conn.open && conn.dataChannel?.readyState === "open")
+      conn.dataChannel.dispatchEvent(new Event("open"));
+    return conn.open;
   }
   async join(rawRoom: string): Promise<void> {
     let room = rawRoom.trim();
@@ -214,7 +241,24 @@ export class Coop {
     }
     if (!/^fern-[a-f0-9-]{36}$/.test(room))
       throw new Error("Enter the full room code or invite link");
-    this.disconnect();
+    const request = ++this.joinRequest;
+    for (const [attempt, timeout] of [6000, 10000, 22000].entries()) {
+      try {
+        await this.joinOnce(room, timeout);
+        return;
+      } catch (error) {
+        if (request !== this.joinRequest) throw new Error("Connection canceled");
+        if (!(error instanceof RetryableJoinError) || attempt === 2) throw error;
+        this.status.state = "connecting";
+        this.status.message = `Retrying the connection (${attempt + 2}/3)…`;
+        this.changed();
+        await new Promise<void>((resolve) => setTimeout(resolve, 300));
+        if (request !== this.joinRequest) throw new Error("Connection canceled");
+      }
+    }
+  }
+  private async joinOnce(room: string, timeout: number): Promise<void> {
+    this.disconnect(false);
     const generation = this.generation;
     try {
       const peer = await this.open();
@@ -230,22 +274,36 @@ export class Coop {
       await new Promise<void>((resolve, reject) => {
         let welcomed = false,
           completed = false;
-        const timer = setTimeout(
-          () =>
-            reject(
-              new Error(
-                "Could not reach the host. They must keep their expedition open. Some networks require a TURN relay.",
-              ),
+        const hello = () => {
+          if (generation !== this.generation) {
+            clearTimers();
+            reject(new Error("Connection canceled"));
+            return;
+          }
+          if (this.channelOpen(conn) && !completed)
+            conn.send({ type: "hello", version: PROTOCOL_VERSION });
+        };
+        const welcomeTimer = setInterval(hello, 500);
+        const clearTimers = () => {
+          clearTimeout(timer);
+          clearInterval(welcomeTimer);
+        };
+        const timer = setTimeout(() => {
+          clearTimers();
+          reject(
+            new RetryableJoinError(
+              "Could not reach the host. They must keep their expedition open. Some networks require a TURN relay.",
             ),
-          22000,
-        );
+          );
+        }, timeout);
         const done = () => {
           if (completed) return;
           completed = true;
-          clearTimeout(timer);
+          clearTimers();
           resolve();
         };
         conn.on("data", (raw) => {
+          if (generation !== this.generation) return;
           try {
             if (raw instanceof ArrayBuffer || ArrayBuffer.isView(raw)) {
               if (!welcomed) return;
@@ -271,40 +329,49 @@ export class Coop {
                 this.localId = peer.id;
                 welcomed = true;
               } else if (data.type === "error") {
-                clearTimeout(timer);
+                clearTimers();
                 reject(new Error(String(data.message).slice(0, 200)));
               }
             }
           } catch (error) {
-            clearTimeout(timer);
+            clearTimers();
             reject(error);
             if (completed) {
-              this.disconnect();
+              this.disconnect(false);
               this.fail(error);
             }
           }
         });
         conn.on("error", (error) => {
-          clearTimeout(timer);
-          reject(error);
+          clearTimers();
+          reject(completed ? error : new RetryableJoinError(error.message));
         });
         conn.on("close", () => {
-          clearTimeout(timer);
-          if (!completed) reject(new Error("The host closed the connection."));
+          clearTimers();
+          if (!completed) {
+            reject(
+              new RetryableJoinError("The host closed the connection before joining completed."),
+            );
+            return;
+          }
           if (generation === this.generation) {
-            this.disconnect();
+            this.disconnect(false);
             this.status.message = "The host left. You can keep exploring solo.";
             this.changed();
           }
         });
         peer.once("error", (error) => {
-          clearTimeout(timer);
+          clearTimers();
           reject(error);
         });
+        conn.on("open", hello);
+        hello();
       });
     } catch (error) {
-      this.disconnect();
-      this.fail(error);
+      if (generation === this.generation) {
+        this.disconnect(false);
+        this.fail(error);
+      }
       throw error;
     }
   }
@@ -349,7 +416,8 @@ export class Coop {
         this.status.sent += packet.byteLength;
       }
   }
-  disconnect(): void {
+  disconnect(cancelJoin = true): void {
+    if (cancelJoin) this.joinRequest++;
     this.generation++;
     for (const conn of this.connections.values()) conn.close();
     this.connections.clear();

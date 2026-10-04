@@ -144,6 +144,46 @@ async function traveler(
   });
   return { context, page };
 }
+
+test("joining recovers after the first native data channel is interrupted", async ({
+  browser,
+  baseURL,
+}) => {
+  const host = await traveler(browser, baseURL!);
+  const context = await browser.newContext({ viewport: { width: 800, height: 640 } });
+  try {
+    const page = await context.newPage();
+    await page.addInitScript(() => {
+      const create = RTCPeerConnection.prototype.createDataChannel;
+      let interrupted = false;
+      RTCPeerConnection.prototype.createDataChannel = function (...args) {
+        const channel = create.apply(this, args);
+        if (args[0] !== "_PEERJSTEST" && !interrupted) {
+          interrupted = true;
+          queueMicrotask(() => channel.close());
+        }
+        return channel;
+      };
+    });
+    await page.goto(baseURL!);
+    await page.waitForFunction(() => !!window.fern);
+    await page.evaluate(() => {
+      window.fern.command({ op: "population", count: 64 });
+      window.fern.view("lab");
+    });
+    const room = await host.page.evaluate(() => window.fern.network.host());
+    await page.evaluate((code) => window.fern.network.join(code), room);
+    await expect
+      .poll(async () => (await host.page.evaluate(() => window.fern.observe())).players.length)
+      .toBe(2);
+    await expect
+      .poll(async () => (await page.evaluate(() => window.fern.observe())).network.state)
+      .toBe("connected");
+  } finally {
+    await context.close();
+    await host.context.close();
+  }
+});
 test("real WebRTC joins eight isolated clients, syncs movement and quest, rejects ninth, releases slots", async ({
   browser,
   baseURL,
