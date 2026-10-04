@@ -906,6 +906,12 @@ export function validatePhysicsSnapshot(snapshot: PhysicsSnapshot): void {
     if (!entry) throw new Error("Invalid physics body registry");
     validateBody(entry.recipe, snapshot.version === 3);
     if (
+      entry.recipe.actorKind &&
+      ["player", "monster", "boss", "ambient"].includes(entry.recipe.actorKind) &&
+      !entry.motor
+    )
+      throw new Error("Missing saved actor motor");
+    if (
       snapshot.version >= 2 &&
       (typeof entry.frozen !== "boolean" ||
         typeof entry.reactivationBlocked !== "boolean" ||

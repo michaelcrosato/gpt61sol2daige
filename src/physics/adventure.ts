@@ -63,6 +63,7 @@ export interface AdventurePhysicsSnapshot {
   archives: LandArchive[];
   navigation: NavigationState[];
   appliedTransition: number;
+  pendingTerrain: boolean;
 }
 function layout(sim: Simulation): PolicyLayout {
   const s = sim.adventure.state,
@@ -342,6 +343,10 @@ export class AdventurePhysics {
         this.ambient.delete(slot);
       }
   }
+  removeActor(id: string): void {
+    this.world.remove(id);
+    this.actors.delete(id);
+  }
   ambientIntent(sim: Simulation, slot: number, x: number, y: number): void {
     this.world.motor(ambientBodyId(slot, sim.generation[slot]), x, y, 0.035);
   }
@@ -463,8 +468,7 @@ export class AdventurePhysics {
         );
         this.actors.add(enemyBodyId(e.id));
       }
-    for (const e of sim.adventure.state.enemies)
-      if (e.hp <= 0) this.world.remove(enemyBodyId(e.id));
+    for (const e of sim.adventure.state.enemies) if (e.hp <= 0) this.removeActor(enemyBodyId(e.id));
     this.synchronizeTerrain(sim);
     const contacts = this.world.contacts;
     this.world.step(true);
@@ -557,6 +561,7 @@ export class AdventurePhysics {
       archives: structuredClone([...this.archives.values()]),
       navigation: structuredClone([...this.navigation.values()]),
       appliedTransition: this.appliedTransition,
+      pendingTerrain: this.terrain.pending(this.sourceWorld),
     };
   }
   static restore(sim: Simulation, snapshot: AdventurePhysicsSnapshot): AdventurePhysics {
@@ -568,7 +573,12 @@ export class AdventurePhysics {
       result.landId = snapshot.landId;
       result.run = snapshot.run;
       result.seed = snapshot.seed;
-      result.terrain.restore(sim.world, result.world, snapshot.terrainChunks);
+      result.terrain.restore(
+        sim.world,
+        result.world,
+        snapshot.terrainChunks,
+        snapshot.pendingTerrain,
+      );
       result.ambient = new Map(snapshot.ambient.map((s) => [s.slot, structuredClone(s)]));
       result.archives = new Map(snapshot.archives.map((s) => [s.id, structuredClone(s)]));
       result.navigation = new Map(snapshot.navigation.map((s) => [s.id, structuredClone(s)]));
@@ -578,7 +588,7 @@ export class AdventurePhysics {
       );
       for (const id of result.world.ids()) {
         const pose = result.world.pose(id);
-        if (pose.role === "terrain") {
+        if (pose.role === "terrain" && !snapshot.pendingTerrain) {
           const tx = Math.floor(pose.x / 16),
             ty = Math.floor(pose.y / 16),
             expected = terrainRecipe(
@@ -599,7 +609,10 @@ export class AdventurePhysics {
         }
       }
       if (snapshot.appliedTransition === sim.adventure.state.transition) {
-        const expected = new Map<string, { x: number; y: number }>();
+        const expected = new Map<
+          string,
+          { x: number; y: number; radius: number; boss?: boolean }
+        >();
         for (const p of sim.players.values()) expected.set(playerBodyId(p.id), p);
         for (const e of sim.adventure.state.enemies)
           if (e.hp > 0) expected.set(enemyBodyId(e.id), e);
@@ -608,6 +621,14 @@ export class AdventurePhysics {
         for (const [id, entity] of expected) {
           if (!result.world.has(id)) throw new Error("Missing physical actor");
           const pose = result.world.pose(id);
+          const kind = id.startsWith("player-") ? "player" : entity.boss ? "boss" : "monster";
+          if (
+            pose.role !== "actor" ||
+            pose.actorKind !== kind ||
+            pose.shape.kind !== "circle" ||
+            pose.shape.radius !== entity.radius
+          )
+            throw new Error("Physical/game actor blueprint mismatch");
           if (Math.hypot(pose.x - entity.x, pose.y - entity.y) > 0.001)
             throw new Error("Physical/game actor pose mismatch");
         }
@@ -644,7 +665,11 @@ export function validateAdventurePhysics(
   )
     throw new Error("Invalid adventure physics envelope");
   validatePhysicsSnapshot(snapshot.world);
-  if (!Number.isInteger(snapshot.appliedTransition) || snapshot.appliedTransition < -1)
+  if (
+    !Number.isInteger(snapshot.appliedTransition) ||
+    snapshot.appliedTransition < -1 ||
+    typeof snapshot.pendingTerrain !== "boolean"
+  )
     throw new Error("Invalid physical transition sample");
   const entries = new Map(snapshot.world.bodies.map((entry) => [entry.recipe.id, entry]));
   const controller = new PolicyController(snapshot.world.policies);

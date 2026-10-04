@@ -535,14 +535,14 @@ remains absolute across land changes. A new run clears the old run’s
 archive.</p>
 <p>The outer save remains version 1. <code>actorPhysics</code> version 1
 includes backend/land identity, world snapshot v3, occupied chunks,
-ambient ownership samples, navigation/stuck recovery, land archives and
-applied transition. Gameplay transitions pending the next physics
-boundary remain explicit; synchronized actor poses must match the game
-envelope. Restore validates binary mappings, shapes, mass, locked
-rotations, collision masks, freeze state, policy provenance, ownership
-and terrain recipes before replacing the old simulation. Legacy saves
-without this member get fresh physics while retaining progression;
-pre-M03 playground v2 imports explicitly.
+ambient ownership samples, navigation/stuck recovery, land archives,
+applied transition and pending terrain boundary. Gameplay transitions
+pending the next physics boundary remain explicit; synchronized actor
+poses must match the game envelope. Restore validates binary mappings,
+shapes, mass, locked rotations, collision masks, freeze state, policy
+provenance, ownership and terrain recipes before replacing the old
+simulation. Legacy saves without this member get fresh physics while
+retaining progression; pre-M03 playground v2 imports explicitly.
 <code>PhysicalEntityState</code> defines stable IDs, land/area,
 blueprint revision/shape, solved pose/velocity, status, consequences and
 membership for M04. It is not a replicated wire section yet.</p>
@@ -553,7 +553,12 @@ connecting. Disconnect retains the received hero/world for solo
 continuation and initializes local physics. This deliberate rollout
 transition is distinct from master-off; shared prop
 persistence/replication is M04. Wire version stays 3 and actual
-eight-client WebRTC coverage remains mandatory.</p></main>
+eight-client WebRTC coverage remains mandatory.</p>
+<p>Paused tile edits save the old valid collider registry plus an
+explicit pending-terrain flag. Restore retains that boundary and
+rebuilds from the saved seed/patch recipes before the next motion step;
+it neither rejects a legitimate unstepped brush nor publishes new
+movement against stale obstacles.</p></main>
 <footer>Fern · A world engine built for agents · <a href="https://github.com/michaelcrosato/gpt61sol2daige">Source on GitHub</a></footer>
 </body>
 </html>

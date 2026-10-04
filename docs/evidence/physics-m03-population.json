@@ -15,5 +15,14 @@
     "informational": true
   },
   "saveContinuation": true,
-  "sameBuildReplay": true
+  "sameBuildReplay": true,
+  "finalCheckpoint": {
+    "population": 65536,
+    "liveAmbientBodies": 65536,
+    "finite": true,
+    "firstTickMs": 4381.840959,
+    "saveContinuation": true,
+    "pendingTerrain": false,
+    "informational": true
+  }
 }

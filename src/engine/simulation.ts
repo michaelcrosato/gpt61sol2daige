@@ -191,6 +191,7 @@ export class Simulation {
     return p;
   }
   removePlayer(id: string): void {
+    this.physical?.removeActor(playerBodyId(id));
     this.players.delete(id);
     this.adventure.removePlayer(id);
   }

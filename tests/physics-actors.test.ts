@@ -370,12 +370,42 @@ test("optional swept policy changes real prop CCD and synchronized pose corrupti
       { type: "override", scope: "area", id: "area-1", values: { sweptCollision: true } },
     ]);
     assert.equal(physical.world.pose("crate-1-0").ccdEnabled, true);
+    const missingMotor = sim.save();
+    delete missingMotor.actorPhysics!.world.bodies.find(
+      (b) => b.recipe.id === playerBodyId("local"),
+    )!.motor;
+    assert.throws(() => Simulation.restore(missingMotor), /Missing saved actor motor/);
     const corrupted = sim.save();
     corrupted.players[0].x += 100;
     assert.throws(() => Simulation.restore(corrupted), /pose mismatch/);
     const restored = Simulation.restore(sim.save());
     try {
       assert.equal(restored.stateHash(), sim.stateHash());
+    } finally {
+      restored.dispose();
+    }
+  } finally {
+    sim.dispose();
+  }
+});
+
+test("paused terrain edits remain complete checkpoints before their next collision boundary", () => {
+  const sim = scene();
+  try {
+    sim.step();
+    const p = sim.players.get("local")!,
+      tx = Math.floor(p.x / 16) + 3,
+      ty = Math.floor(p.y / 16);
+    sim.world.paint(tx, ty, 1, 1, Terrain.DeepWater);
+    const saved = sim.save();
+    assert.equal(saved.actorPhysics!.pendingTerrain, true);
+    const restored = Simulation.restore(saved);
+    try {
+      assert.equal(restored.stateHash(), sim.stateHash());
+      sim.step();
+      restored.step();
+      assert.deepEqual(restored.save(), sim.save());
+      assert.ok(sim.physical!.world.ids().some((id) => id.endsWith(`${tx}-${ty}-water`)));
     } finally {
       restored.dispose();
     }

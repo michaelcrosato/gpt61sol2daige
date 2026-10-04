@@ -63,6 +63,9 @@ export function terrainRecipe(
 export class TerrainRegistry {
   private chunks = new Map<string, string[]>();
   private revision = -1;
+  pending(world: World): boolean {
+    return this.revision !== world.revision;
+  }
   synchronize(
     world: World,
     physical: PhysicsWorld,
@@ -99,7 +102,7 @@ export class TerrainRegistry {
       .map((key) => key.split(",").map(Number) as ChunkCoordinate)
       .sort((a, b) => a[0] - b[0] || a[1] - b[1]);
   }
-  restore(world: World, physical: PhysicsWorld, chunks: ChunkCoordinate[]): void {
+  restore(world: World, physical: PhysicsWorld, chunks: ChunkCoordinate[], pending = false): void {
     this.chunks.clear();
     for (const chunk of chunks) this.chunks.set(chunk.join(","), []);
     for (const id of physical.ids()) {
@@ -110,6 +113,6 @@ export class TerrainRegistry {
       if (!list) throw new Error("Terrain body outside occupied chunks");
       list.push(id);
     }
-    this.revision = world.revision;
+    this.revision = pending ? -1 : world.revision;
   }
 }
