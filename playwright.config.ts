@@ -19,6 +19,11 @@ export default defineConfig({
         "--disable-renderer-backgrounding",
         "--disable-backgrounding-occluded-windows",
         "--autoplay-policy=no-user-gesture-required",
+        // The CI container cannot reliably route multicast mDNS between isolated contexts.
+        // Only its same-machine tests use direct host candidates; production keeps browser defaults.
+        ...(process.env.CI && !process.env.BASE_URL
+          ? ["--disable-features=WebRtcHideLocalIpsWithMdns"]
+          : []),
       ],
     },
   },
