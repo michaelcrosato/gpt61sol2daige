@@ -274,6 +274,7 @@ test("page disposal cancels queued animation before releasing the physics world"
   const before = await page.evaluate(async () => {
     window.fern.command({ op: "physics", action: "reset" });
     window.dispatchEvent(new PageTransitionEvent("pagehide", { persisted: false }));
+    window.dispatchEvent(new PageTransitionEvent("pagehide", { persisted: false }));
     const tick = window.fern.observe().tick;
     for (let n = 0; n < 5; n++) await new Promise(requestAnimationFrame);
     return { tick, after: window.fern.observe().tick, scene: window.fern.observe().playground };

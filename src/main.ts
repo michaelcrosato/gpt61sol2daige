@@ -112,6 +112,7 @@ const physicsUI = mountPhysicsUI({
   world: () => runtime.sim.playground,
   adventure: () => runtime.sim.physical,
   solo: () => net.status.role === "solo" && net.status.state !== "connecting",
+  host: () => net.status.role === "host",
   execute,
   pause: setPaused,
   paused: () => paused,
@@ -338,27 +339,37 @@ function execute(command: Command): unknown {
     );
   if (
     !["observe", "describe", "inspect", "save", "catalog"].includes(command.op) &&
+    !(
+      command.op === "actors" &&
+      ["inspect", "body", "policy"].includes(String(command.action ?? "inspect"))
+    ) &&
     !(command.op === "adventure" && !command.action)
   )
     ensureAuthority();
   if (
     net.status.role !== "solo" &&
-    ["reset", "restore", "join", "leave", "step", "teleport", "physics", "actors"].includes(
-      command.op,
-    )
+    ["reset", "restore", "join", "leave", "step", "teleport", "physics"].includes(command.op)
   )
     throw new Error("Leave the expedition before using this lab command.");
   if (command.op === "restore") {
     const restored = Simulation.restore(command.state as SaveState);
-    const me = restored.players.get("local") ?? restored.players.values().next().value;
-    restored.adventure.retainPlayer(me?.id ?? "local", "local");
-    restored.players.clear();
-    if (me) {
-      me.id = "local";
-      restored.players.set("local", me);
-    } else restored.addPlayer("local");
-    command = { ...command, state: restored.save() };
-    restored.dispose();
+    try {
+      if (!restored.players.size) restored.addPlayer("local");
+      if (restored.players.size === 1 && restored.players.has("local"))
+        command = { ...command, state: restored.save() };
+      else {
+        const local = restored.continueSolo(
+          restored.players.has("local") ? "local" : restored.players.keys().next().value!,
+        );
+        try {
+          command = { ...command, state: local.save() };
+        } finally {
+          local.dispose();
+        }
+      }
+    } finally {
+      restored.dispose();
+    }
   }
   const result = runtime.execute(command);
   if (
@@ -1210,6 +1221,8 @@ const api = {
       inputOverride = { ...idleInput(), ...input };
     },
     localId: () => net.localId,
+    interact: (interaction: import("./physics/interaction.ts").PhysicalInteraction) =>
+      net.interact(interaction),
   },
 };
 declare global {
@@ -1222,7 +1235,7 @@ window.addEventListener("pagehide", (event) => {
   if (!event.persisted) {
     activePage = false;
     cancelAnimationFrame(frameHandle);
-    net.disconnect();
+    net.disconnect(true, false);
     runtime.sim.dispose();
   }
 });

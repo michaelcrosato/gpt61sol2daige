@@ -681,20 +681,24 @@ export class PhysicsWorld {
       hit,
     };
   }
-  save(): PhysicsSnapshot {
+  save(portable = false): PhysicsSnapshot {
     this.alive();
-    const bytes = Array.from(this.world.takeSnapshot());
+    const bytes = portable ? [] : Array.from(this.world.takeSnapshot());
     if (this.scene === "lab" && bytes.length > MAX_SNAPSHOT_BYTES)
       throw new Error("Playground checkpoint exceeds its 4 MB binary bound");
     return {
-      version: this.scene === "adventure" ? 3 : 2,
-      ...(this.scene === "adventure" ? { scene: "adventure" as const } : {}),
+      version: 4,
+      scene: this.scene,
       backend: RAPIER_VERSION,
+      continuation: portable ? "rebuild" : "snapshot",
       units: UNITS,
       tick: this.tick,
       contacts: this.contacts,
       events: structuredClone(this.events),
-      bodies: structuredClone([...this.registry.values()]),
+      bodies: [...this.registry.values()].map((entry) => ({
+        ...structuredClone(entry),
+        state: this.pose(entry.recipe.id),
+      })),
       bytes,
       checksum: checksum(bytes),
       policies: this.policies.save(),
@@ -702,6 +706,11 @@ export class PhysicsWorld {
   }
   static restore(snapshot: PhysicsSnapshot): PhysicsWorld {
     validatePhysicsSnapshot(snapshot);
+    if (
+      snapshot.version === 4 &&
+      (snapshot.backend !== RAPIER_VERSION || snapshot.continuation === "rebuild")
+    )
+      return PhysicsWorld.rebuild(snapshot);
     // M02 version-2 saves predate the new registered controls. Import their applied samples
     // and legacy masks explicitly; do not reinterpret them as a current malformed snapshot.
     const legacyPolicies =
@@ -839,6 +848,11 @@ export class PhysicsWorld {
           )
             throw new Error("Snapshot applied policy/body mismatch");
         }
+        if (
+          entry.state &&
+          JSON.stringify(restored.pose(entry.recipe.id)) !== JSON.stringify(entry.state)
+        )
+          throw new Error("Semantic/binary pose mismatch");
         restored.colliderIds.set(entry.collider, entry.recipe.id);
       }
       restored.tick = snapshot.tick;
@@ -857,6 +871,48 @@ export class PhysicsWorld {
       throw new Error(
         `Invalid physics snapshot: ${error instanceof Error ? error.message : String(error)}`,
       );
+    }
+  }
+  /** Explicit backend migration. Restore every semantic fact; never respawn content recipes. */
+  private static rebuild(snapshot: PhysicsSnapshot): PhysicsWorld {
+    const result = new PhysicsWorld(
+      undefined,
+      snapshot.scene === "adventure"
+        ? { scene: "adventure", policies: snapshot.policies }
+        : undefined,
+    );
+    try {
+      result.policies = new PolicyController(snapshot.policies);
+      for (const saved of snapshot.bodies) {
+        const pose = saved.state!;
+        result.spawn({ ...saved.recipe, x: pose.x, y: pose.y, angle: pose.angle });
+        const entry = result.registry.get(saved.recipe.id)!;
+        const handle = entry.handle,
+          collider = entry.collider;
+        Object.assign(entry, structuredClone(saved), { handle, collider });
+        const body = result.body(saved.recipe.id);
+        body.setBodyType(
+          saved.recipe.motion === "dynamic" && !saved.frozen
+            ? rapier().RigidBodyType.Dynamic
+            : rapier().RigidBodyType.Fixed,
+          false,
+        );
+        body.setTranslation({ x: pose.x / UNITS, y: pose.y / UNITS }, false);
+        body.setRotation(pose.angle, false);
+        body.setLinvel({ x: pose.vx / UNITS, y: pose.vy / UNITS }, false);
+        body.setAngvel(pose.angularVelocity, false);
+        body.enableCcd(pose.ccdEnabled);
+        result.world.getCollider(collider).setCollisionGroups(collisionGroups(entry));
+        if (pose.sleeping && body.isDynamic()) body.sleep();
+      }
+      result.tick = snapshot.tick;
+      result.contacts = snapshot.contacts;
+      result.events = structuredClone(snapshot.events);
+      for (const pose of result.poses()) result.validatePose(pose);
+      return result;
+    } catch (error) {
+      result.dispose();
+      throw error;
     }
   }
   dispose(): void {
@@ -881,20 +937,25 @@ export class PhysicsWorld {
 export function validatePhysicsSnapshot(snapshot: PhysicsSnapshot): void {
   if (
     !snapshot ||
-    ![1, 2, 3].includes(snapshot.version) ||
+    ![1, 2, 3, 4].includes(snapshot.version) ||
     (snapshot.version === 3 && snapshot.scene !== "adventure") ||
-    (snapshot.version !== 3 && snapshot.scene !== undefined) ||
-    snapshot.backend !== RAPIER_VERSION ||
+    (snapshot.version < 3 && snapshot.scene !== undefined) ||
+    (snapshot.version === 4 && !["adventure", "lab"].includes(snapshot.scene!)) ||
+    (snapshot.version < 4 && snapshot.backend !== RAPIER_VERSION) ||
+    (snapshot.version === 4 &&
+      (!/^\d+\.\d+\.\d+$/.test(snapshot.backend) ||
+        !["snapshot", "rebuild"].includes(snapshot.continuation!))) ||
     snapshot.units !== UNITS ||
     !Number.isSafeInteger(snapshot.tick) ||
     snapshot.tick < 0 ||
     !Number.isSafeInteger(snapshot.contacts) ||
     snapshot.contacts < 0 ||
     !Array.isArray(snapshot.bodies) ||
-    (snapshot.version !== 3 && snapshot.bodies.length > MAX_LAB_BODIES) ||
+    (snapshot.scene !== "adventure" && snapshot.bodies.length > MAX_LAB_BODIES) ||
     !Array.isArray(snapshot.bytes) ||
-    snapshot.bytes.length < 32 ||
-    snapshot.bytes.length > (snapshot.version === 3 ? 256_000_000 : MAX_SNAPSHOT_BYTES) ||
+    (snapshot.continuation !== "rebuild" && snapshot.bytes.length < 32) ||
+    (snapshot.continuation === "rebuild" && snapshot.bytes.length !== 0) ||
+    snapshot.bytes.length > (snapshot.scene === "adventure" ? 256_000_000 : MAX_SNAPSHOT_BYTES) ||
     snapshot.bytes.some((byte) => !Number.isInteger(byte) || byte < 0 || byte > 255) ||
     checksum(snapshot.bytes) !== snapshot.checksum ||
     !Array.isArray(snapshot.events) ||
@@ -910,7 +971,7 @@ export function validatePhysicsSnapshot(snapshot: PhysicsSnapshot): void {
     colliders = new Set<number>();
   for (const entry of snapshot.bodies) {
     if (!entry) throw new Error("Invalid physics body registry");
-    validateBody(entry.recipe, snapshot.version === 3);
+    validateBody(entry.recipe, snapshot.scene === "adventure");
     if (
       entry.recipe.actorKind &&
       ["player", "monster", "boss", "ambient"].includes(entry.recipe.actorKind) &&
@@ -935,7 +996,8 @@ export function validatePhysicsSnapshot(snapshot: PhysicsSnapshot): void {
       finite(entry.drive.y, "drive y", 600);
     }
     if (entry.motor) {
-      if (snapshot.version !== 3 || !entry.recipe.actorKind) throw new Error("Invalid saved motor");
+      if (snapshot.scene !== "adventure" || !entry.recipe.actorKind)
+        throw new Error("Invalid saved motor");
       for (const key of ["intentX", "intentY", "x", "y", "externalX", "externalY"] as const)
         finite(entry.motor[key], key, 16000);
       if (
@@ -962,6 +1024,66 @@ export function validatePhysicsSnapshot(snapshot: PhysicsSnapshot): void {
     ids.add(entry.recipe.id);
     handles.add(entry.handle);
     colliders.add(entry.collider);
+  }
+  if (snapshot.version === 4) {
+    const controller = new PolicyController(snapshot.policies);
+    const projected = new PolicyController(snapshot.policies);
+    projected.apply();
+    for (const entry of snapshot.bodies) {
+      const p = entry.state;
+      if (!p) throw new Error("Missing semantic physical state");
+      validateBody(p, snapshot.scene === "adventure");
+      for (const key of ["x", "y"] as const) finite(p[key], key, WORLD_LIMIT);
+      for (const key of ["angle", "vx", "vy", "angularVelocity"] as const) finite(p[key], key);
+      const expectedRecipe = { ...entry.recipe, x: p.x, y: p.y, angle: p.angle };
+      const expectedPolicy = controller.resolve(
+        entry.recipe.areaId ?? "playground",
+        entry.policySample!.x,
+        entry.policySample!.y,
+        entry.policy!.regions,
+      );
+      const recipeKeys = [
+        "id",
+        "motion",
+        "shape",
+        "mass",
+        "friction",
+        "restitution",
+        "damping",
+        "ccd",
+        "role",
+        "actorKind",
+        "areaId",
+        "consequences",
+      ];
+      if (
+        recipeKeys.some(
+          (key) =>
+            JSON.stringify(p[key as keyof BodyPose]) !==
+            JSON.stringify(expectedRecipe[key as keyof BodyRecipe]),
+        ) ||
+        JSON.stringify(expectedPolicy) !== JSON.stringify(entry.policy) ||
+        JSON.stringify(p.policy) !== JSON.stringify(entry.policy) ||
+        typeof p.sleeping !== "boolean" ||
+        typeof p.ccdEnabled !== "boolean" ||
+        p.frozen !== entry.frozen ||
+        p.reactivationBlocked !== entry.reactivationBlocked ||
+        entry.frozen !==
+          (entry.recipe.motion === "dynamic" &&
+            bodyRole(entry.recipe) === "prop" &&
+            (!entry.policy!.effective.dynamicProps || entry.reactivationBlocked)) ||
+        ((entry.frozen || entry.recipe.motion === "fixed") &&
+          (p.vx !== 0 || p.vy !== 0 || p.angularVelocity !== 0)) ||
+        (entry.recipe.actorKind && (p.angle !== 0 || p.angularVelocity !== 0)) ||
+        p.ccdEnabled !==
+          (entry.recipe.actorKind
+            ? true
+            : (entry.recipe.ccd ?? true) &&
+              (bodyRole(entry.recipe) !== "prop" || entry.policy!.effective.sweptCollision))
+      )
+        throw new Error("Invalid semantic physical state/policy");
+      projected.resolve(entry.recipe.areaId ?? "playground", 0, 0);
+    }
   }
   for (const event of snapshot.events)
     if (

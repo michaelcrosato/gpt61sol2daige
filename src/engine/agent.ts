@@ -1,7 +1,10 @@
 import { ARCHETYPES, type AreaRecipe, areaRecipe, MECHANICS, THEMES } from "../game/content.ts";
 import { SKILLS } from "../game/skills.ts";
 import type { AdventureAction } from "../game/types.ts";
+import { adventureAreaAt } from "../physics/adventure.ts";
+import { interactPhysics } from "../physics/interaction.ts";
 import type { PolicyEdit } from "../physics/policies.ts";
+import { PolicyController } from "../physics/policies.ts";
 import { createPlayground } from "../physics/runtime.ts";
 import type { BodyRecipe } from "../physics/types.ts";
 import { ENGINE_VERSION, idleInput, MAX_NPCS, type SaveState, Simulation } from "./simulation.ts";
@@ -34,11 +37,15 @@ export const COMMANDS = {
   actors: {
     action: "inspect (default), body, configure, apply, policy, impulse, place, spawn",
     description:
-      "Solo adventure physical world. Uses the same revisioned policies; active actors, occupied terrain, props and regional ambient handover. Actual co-op uses the supported legacy path until M04.",
+      "Host/solo adventure physical world; guests inspect received bodies and policies. Shared tuning is host-only.",
     values:
       "worldReactions, dynamicProps, propBlocking, crowdContacts, ambientPhysics, sweptCollision: booleans; impulseStrength: 0..10",
     id: "body/impulse/place: player-<player id>, enemy-<id>, ambient-<slot>-<generation>, crate-<area>-<ordinal>, wheel-<area>",
     body: "spawn: prop BodyRecipe with id prefixed prop- and a current areaId",
+  },
+  "interact-physics": {
+    description:
+      "Validated nearby prop impulse: id,x,y (±120), optional atX/atY within 32 of prop. Player identity comes from the host connection online.",
   },
   adventure: {
     action:
@@ -86,7 +93,12 @@ export const COMMANDS = {
     limit: "0..100; default 20",
   },
   save: { description: "Complete versioned checkpoint, safe to persist as JSON" },
-  restore: { state: "a valid version 1 checkpoint" },
+  restore: {
+    state: "a validated version 1 or 2 checkpoint; CLI also accepts file via restore-file",
+  },
+  "restore-file": {
+    file: "CLI only: checkpoint JSON file, including saves larger than the 8 MB JSONL command bound",
+  },
   replay: { description: "Return initial checkpoint and executed command log" },
   describe: { description: "This command schema and engine limits" },
 } as const;
@@ -129,10 +141,48 @@ export class AgentRuntime {
     const player = typeof command.player === "string" ? command.player : this.localId;
     let result: unknown;
     switch (command.op) {
+      case "interact-physics":
+        interactPhysics(this.sim, player, {
+          id: String(command.id),
+          x: num("x", 0),
+          y: num("y", 0),
+          ...(command.atX === undefined ? {} : { atX: num("atX"), atY: num("atY") }),
+        });
+        result = this.sim.observe();
+        break;
       case "actors": {
         const physical = this.sim.physical;
-        if (!physical || this.sim.players.size > 1)
-          throw new Error("Adventure physical controls are solo-only until M04");
+        if (!physical) {
+          const snapshot = this.sim.replicaPhysics;
+          if (!snapshot) throw new Error("No received physical scene");
+          const action = command.action ?? "inspect";
+          if (action === "inspect")
+            return {
+              active: true,
+              replica: true,
+              landId: snapshot.landId,
+              backend: snapshot.backend,
+              bodyCount: snapshot.world.bodies.length,
+              bodies: snapshot.world.bodies.slice(0, 100).map((b) => b.state),
+              props: this.sim.physicalProps(),
+              policies: new PolicyController(snapshot.world.policies).inspect(),
+            };
+          if (action === "body") {
+            const entry = snapshot.world.bodies.find((b) => b.recipe.id === command.id);
+            if (!entry) throw new Error("Unknown physical body");
+            return entry.state;
+          }
+          if (action === "policy")
+            return new PolicyController(snapshot.world.policies).resolve(
+              String(
+                command.areaId ??
+                  adventureAreaAt(this.sim.adventure.state, num("x", 0), num("y", 0)),
+              ),
+              num("x", 0),
+              num("y", 0),
+            );
+          throw new Error("Only the host can change shared physics policies or bodies");
+        }
         const action = command.action ?? "inspect",
           world = physical.world;
         if (action === "inspect") return physical.inspect();
@@ -192,7 +242,8 @@ export class AgentRuntime {
             num("y", 0),
           );
         }
-        if (this.sim.players.size > 1) throw new Error("Physics playground is solo-only until M04");
+        if (this.sim.players.size > 1)
+          throw new Error("The standalone physics playground is solo-only");
         if (action === "reset" || action === "close") {
           const next = action === "reset" ? createPlayground() : null;
           this.sim.playground?.dispose();

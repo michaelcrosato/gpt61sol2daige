@@ -583,15 +583,18 @@ test("applied/off and queued policies survive JSON save, replay, continuation; c
       });
       const snapshot = legacy.save();
       snapshot.version = 1;
+      delete snapshot.scene;
+      delete snapshot.continuation;
       delete snapshot.policies;
       for (const body of snapshot.bodies) {
         delete body.policy;
         delete body.policySample;
         delete body.frozen;
         delete body.reactivationBlocked;
+        delete body.state;
       }
       const migrated = PhysicsWorld.restore(snapshot);
-      assert.equal(migrated.save().version, 2);
+      assert.equal(migrated.save().version, 4);
       assert.equal(
         pose(migrated, "legacy-quiet").frozen,
         true,

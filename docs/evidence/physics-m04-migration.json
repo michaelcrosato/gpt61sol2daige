@@ -1,0 +1,35 @@
+[
+  {
+    "source": "m01",
+    "sha": "59c0c2eab2790769210abc76f5e65cdece094523",
+    "saveBefore": 1,
+    "worldBefore": 1,
+    "saveAfter": 2,
+    "worldAfter": 4,
+    "buildsAndTerrainPreserved": true,
+    "policiesAndQueuePreserved": false,
+    "roundTripContinuation": true
+  },
+  {
+    "source": "m02",
+    "sha": "c2ef7e299575e8716a83f616db613d668f0b74b8",
+    "saveBefore": 1,
+    "worldBefore": 2,
+    "saveAfter": 2,
+    "worldAfter": 4,
+    "buildsAndTerrainPreserved": true,
+    "policiesAndQueuePreserved": true,
+    "roundTripContinuation": true
+  },
+  {
+    "source": "m03",
+    "sha": "c3ae7201aafaf5719bcf0a235dcd5fcd1255b75a",
+    "saveBefore": 1,
+    "worldBefore": 3,
+    "saveAfter": 2,
+    "worldAfter": 4,
+    "buildsAndTerrainPreserved": true,
+    "policiesAndQueuePreserved": true,
+    "roundTripContinuation": true
+  }
+]

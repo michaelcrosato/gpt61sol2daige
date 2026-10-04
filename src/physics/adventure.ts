@@ -2,7 +2,7 @@ import { MAX_NPCS } from "../engine/limits.ts";
 import type { Simulation } from "../engine/simulation.ts";
 import { type TerrainPatch, validatePatches, WORLD_LIMIT, type World } from "../engine/world.ts";
 import { areaRecipe } from "../game/content.ts";
-import type { Enemy } from "../game/types.ts";
+import type { AdventureState, Enemy } from "../game/types.ts";
 import {
   type PolicyCheckpoint,
   PolicyController,
@@ -52,8 +52,8 @@ interface NavigationState {
   turn: number;
 }
 export interface AdventurePhysicsSnapshot {
-  version: 1;
-  backend: typeof RAPIER_VERSION;
+  version: 1 | 2;
+  backend: string;
   landId: string;
   run: number;
   seed: number;
@@ -109,6 +109,47 @@ function freshPolicies(sim: Simulation, previous?: PolicyCheckpoint): PolicyChec
     pending: [],
   };
 }
+export function adventureAreaAt(s: AdventureState, x: number, y: number): string {
+  if (Math.hypot(x, y) < 265) return "town";
+  for (let i = 0; i < 4; i++) {
+    const r =
+      s.mode === "area" && s.recipe.index === s.townLand * 4 + i + 1
+        ? s.recipe
+        : areaRecipe(s.seed, s.townLand * 4 + i + 1);
+    if (Math.hypot(x - r.x, y - r.y) < r.radius + 35) return `area-${r.index}`;
+  }
+  return "wilderness";
+}
+export function validateSemanticTerrain(
+  snapshot: AdventurePhysicsSnapshot,
+  world: World,
+  state: AdventureState,
+): void {
+  if (snapshot.world.version !== 4) return;
+  const chunks = new Set(snapshot.terrainChunks.map((c) => c.join(",")));
+  for (const entry of snapshot.world.bodies) {
+    if (entry.recipe.role !== "terrain") continue;
+    const pose = entry.state!;
+    if (!chunks.has(`${Math.floor(pose.x / 256)},${Math.floor(pose.y / 256)}`))
+      throw new Error("Terrain body outside occupied chunks");
+    if (snapshot.pendingTerrain) continue; // Old valid colliders survive the explicit next-tick patch boundary.
+    const expected = terrainRecipe(
+      world,
+      snapshot.landId,
+      adventureAreaAt(state, Math.floor(pose.x / 16) * 16 + 8, Math.floor(pose.y / 16) * 16 + 8),
+      Math.floor(pose.x / 16),
+      Math.floor(pose.y / 16),
+    );
+    if (
+      !expected ||
+      JSON.stringify(expected) !== JSON.stringify(entry.recipe) ||
+      pose.x !== expected.x ||
+      pose.y !== expected.y ||
+      pose.angle !== 0
+    )
+      throw new Error("Semantic terrain recipe mismatch");
+  }
+}
 /** One land world. Gameplay produces intents; solved poses are copied out exactly once. */
 export class AdventurePhysics {
   world: PhysicsWorld;
@@ -131,16 +172,7 @@ export class AdventurePhysics {
     this.spawnProps(sim);
   }
   areaAt(sim: Simulation, x: number, y: number): string {
-    const s = sim.adventure.state;
-    if (Math.hypot(x, y) < 265) return "town";
-    for (let i = 0; i < 4; i++) {
-      const r =
-        s.mode === "area" && s.recipe.index === s.townLand * 4 + i + 1
-          ? s.recipe
-          : areaRecipe(s.seed, s.townLand * 4 + i + 1);
-      if (Math.hypot(x - r.x, y - r.y) < r.radius + 35) return `area-${r.index}`;
-    }
-    return "wilderness";
+    return adventureAreaAt(sim.adventure.state, x, y);
   }
   private spawnProps(sim: Simulation, archived?: BodyPose[]): void {
     if (archived) {
@@ -548,14 +580,14 @@ export class AdventurePhysics {
       regions: p.policy.regions,
     }));
   }
-  save(): AdventurePhysicsSnapshot {
+  save(portable = false): AdventurePhysicsSnapshot {
     return {
-      version: 1,
+      version: 2,
       backend: RAPIER_VERSION,
       landId: this.landId,
       run: this.run,
       seed: this.seed,
-      world: this.world.save(),
+      world: this.world.save(portable),
       terrainChunks: this.terrain.save(),
       ambient: structuredClone([...this.ambient.values()]),
       archives: structuredClone([...this.archives.values()]),
@@ -649,8 +681,10 @@ export function validateAdventurePhysics(
 ): void {
   if (
     !snapshot ||
-    snapshot.version !== 1 ||
-    snapshot.backend !== RAPIER_VERSION ||
+    ![1, 2].includes(snapshot.version) ||
+    (snapshot.version === 2 && snapshot.world?.version !== 4) ||
+    snapshot.backend !== snapshot.world?.backend ||
+    (snapshot.version === 1 && snapshot.backend !== RAPIER_VERSION) ||
     !/^land-\d+-\d+$/.test(snapshot.landId) ||
     !Number.isSafeInteger(snapshot.run) ||
     snapshot.run < 1 ||

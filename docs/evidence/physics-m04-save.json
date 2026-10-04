@@ -1,0 +1,30 @@
+{
+  "saveVersion": 2,
+  "physicsEnvelope": 2,
+  "worldVersion": 4,
+  "backend": "0.21.0",
+  "movingCrate": {
+    "x": 666.666748046875,
+    "y": 40.55555725097656,
+    "vx": 96.77420043945312,
+    "vy": 32.25806427001953
+  },
+  "actorKnockback": {
+    "externalX": 39.81284713745117,
+    "externalY": 7.238699436187744
+  },
+  "disabledRegion": {
+    "scope": "region",
+    "id": "quiet-1",
+    "values": {
+      "worldReactions": false
+    }
+  },
+  "gold": 80,
+  "skills": {
+    "blade-0": 1
+  },
+  "kills": 0,
+  "exact20TickContinuation": true,
+  "unchangedGoldSkillsRewards": true
+}

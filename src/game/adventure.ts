@@ -206,6 +206,11 @@ export class Adventure {
     };
   }
   configureWorld(sim: Simulation): void {
+    sim.world = this.configureTerrain(sim.world);
+    sim.physical?.synchronizeLand(sim);
+  }
+  /** The same seed/region configuration is used by pre-allocation checkpoint validation. */
+  configureTerrain(world: World): World {
     const s = this.state;
     const seed =
       s.mode === "town"
@@ -213,7 +218,7 @@ export class Adventure {
           ? s.seed
           : areaRecipe(s.seed, s.townLand * 4 + 1).landSeed
         : s.recipe.landSeed;
-    if (sim.world.seed !== seed) sim.world = new World(seed);
+    if (world.seed !== seed) world = new World(seed);
     const town = {
       kind: "town" as const,
       x: 0,
@@ -236,7 +241,7 @@ export class Adventure {
         name: recipe.name,
       };
     });
-    sim.world.setRegions(
+    world.setRegions(
       [town, ...areas],
       s.mode === "town"
         ? town
@@ -249,7 +254,7 @@ export class Adventure {
             name: s.recipe.name,
           },
     );
-    sim.physical?.synchronizeLand(sim);
+    return world;
   }
   onJoin(sim: Simulation, player: Player): void {
     const other = Object.values(this.state.heroes)[0];

@@ -15,9 +15,10 @@
 simulation. Its solo physics playground uses the official Rapier2D
 JavaScript/WASM package behind a local adapter. There is no imported
 game engine, scene editor, rendering framework, artwork pack or audio
-pack. Solo adventure actors use Rapier in M03; ambient wildlife uses an
-explicit regional movement owner. Actual co-op retains its supported
-legacy path until M04 verifies physical replication.</p>
+pack. Adventure actors use Rapier in solo and host-authoritative co-op;
+ambient wildlife uses an explicit regional movement owner. Guests
+consume complete physical replicas without allocating or solving a
+Rapier world per frame.</p>
 <pre class="text"><code>JSONL / browser commands ─── AgentRuntime ─── Simulation (60 Hz)
                                                 │
                            World generation ────┤
@@ -335,17 +336,16 @@ recent effects. Relative float encoding retains subpixel detail far from
 the origin. Total packet size, counts, values and enum ranges are
 validated before state mutation. Both ArrayBuffer and reassembled
 Uint8Array delivery are supported and regression-tested.</p>
-<p>The 2.0 release uses wire protocol 3: up to 65,536 ambient records
-plus at most 512,000 metadata bytes (1,560,584 total bytes). Adventure
-state includes combatants, mechanics, progression and the receiving
-player’s full inventory; other inventories include only equipped items.
-All builds, enum values, numeric fields and collection limits are
-checked before mutation. The 16-bit ambient ID field includes slot
-65,535. Full-capacity packets and small camera budgets are both tested.
-Incompatible older clients must refresh before joining; checkpoint
-format remains version 1 with a versioned adventure member. Older
-checkpoints without that member receive a fresh adventure profile.
-Replays belong to the engine revision that recorded them.</p>
+<p>Wire protocol <strong>4</strong> uses a separate version-1 physical
+channel described below. The bounded observational packet helper remains
+available for tools/tests: up to 65,536 compact ambient records plus
+512,000 metadata bytes (1,560,584 bytes total). It is not a complete
+physical checkpoint or the co-op replication channel. Co-op carries the
+complete selected ambient pool, all physical bodies and all party
+builds; renderer view budgets remain local. Older room clients receive
+an explicit physics-protocol refresh message. Outer checkpoints are
+version 2, with explicit version-1 game/playground/adventure migration.
+Replays belong to their recording engine revision.</p>
 <p>Reliable adventure RPCs carry monotonically increasing action
 sequences. The host supplies player identity, validates skill
 prerequisites, stock, gold and item ownership, and acknowledges success
@@ -429,10 +429,11 @@ to 4,096 and binary snapshots to 4 MB; this is neither an ambient
 physics budget nor an adaptive cutoff.</p>
 <p>The Canvas playground draws solved positions/angles and Rapier’s
 collider lines, with contact impact audio through the existing synth. It
-is solo-only until M04. Opening a room while a scene exists is rejected
-before altering the scene; opening a scene during an online or
-connecting room is also rejected. Protocol 3 rejects playground encoding
-instead of silently sending incomplete physical state. Eight actual
+remains a separate solo laboratory; M04 synchronizes the playable
+adventure scene. Opening a room while a scene exists is rejected before
+altering the scene; opening a scene during an online or connecting room
+is also rejected. The room rejects a standalone playground before
+admission; shared props belong to the adventure scene. Eight actual
 browser clients continue to exercise the ordinary adventure
 protocol.</p>
 <h2 id="m02-regional-policies">M02 regional policies</h2>
@@ -467,10 +468,9 @@ next boundary. Invalid loads retain the existing simulation.
 without claiming an implemented destruction system.</p>
 <p>The lab UI and agent use the same configure/apply/place/drive
 operations. Only collider/region overlays persist in localStorage;
-policies live in simulation checkpoints and replay hashes. The solo-only
-transport boundary and network wire 3 remain unchanged. M04 must
-implement authorized shared physics, not infer it from disabled controls
-or room counts.</p>
+policies live in simulation checkpoints and replay hashes. These
+historical M02 save formats migrate explicitly through the M04 contract
+below.</p>
 <h2 id="m03-adventure-motion-and-terrain">M03 adventure motion and
 terrain</h2>
 <p><code>Simulation.physical</code> owns one
@@ -533,8 +533,8 @@ archives old-land prop poses/motion, consequences, policies and tile
 patches; debug/save return restores mutations. The session master
 remains absolute across land changes. A new run clears the old run’s
 archive.</p>
-<p>The outer save remains version 1. <code>actorPhysics</code> version 1
-includes backend/land identity, world snapshot v3, occupied chunks,
+<p>M03 wrote outer save version 1. Its <code>actorPhysics</code> version
+1 includes backend/land identity, world snapshot v3, occupied chunks,
 ambient ownership samples, navigation/stuck recovery, land archives,
 applied transition and pending terrain boundary. Gameplay transitions
 pending the next physics boundary remain explicit; synchronized actor
@@ -546,19 +546,104 @@ retaining progression; pre-M03 playground v2 imports explicitly.
 <code>PhysicalEntityState</code> defines stable IDs, land/area,
 blueprint revision/shape, solved pose/velocity, status, consequences and
 membership for M04. It is not a replicated wire section yet.</p>
-<p>Hosting/connecting selects the supported legacy actor path. Guests
-decode observations without allocating an authoritative Rapier world for
-each packet. Physical controls are disabled/rejected online or while
-connecting. Disconnect retains the received hero/world for solo
-continuation and initializes local physics. This deliberate rollout
-transition is distinct from master-off; shared prop
-persistence/replication is M04. Wire version stays 3 and actual
-eight-client WebRTC coverage remains mandatory.</p>
+<p>M04 removes M03’s legacy co-op rollout selector after actual
+transport verification. Hosts solve the same physical adventure scene as
+solo. Guest commands inspect received bodies/policies; shared body
+editing and scoped policies are host-only. The standalone playground
+stays separate from a room’s adventure.</p>
 <p>Paused tile edits save the old valid collider registry plus an
 explicit pending-terrain flag. Restore retains that boundary and
 rebuilds from the saved seed/patch recipes before the next motion step;
 it neither rejects a legitimate unstepped brush nor publishes new
-movement against stale obstacles.</p></main>
+movement against stale obstacles.</p>
+<h2 id="m04-saves-replication-and-recovery">M04 saves, replication and
+recovery</h2>
+<p>Outer saves write <strong>2</strong>, adventure physics envelopes
+<strong>2</strong>, and both lab/adventure worlds <strong>4</strong>
+(policy documents remain <strong>1</strong>). Each physical entry
+retains a stable ID/blueprint, solved position/angle/linear and angular
+velocity, sleeping/frozen/blocked/CCD state, applied policy and
+tick-start sample, complete actor intent/controlled/external motor state
+and handle mapping. Saves also retain policies and accepted queues,
+contacts, ambient slot/generation/owner samples, navigation, applied
+transition, pending terrain boundary, land
+archives/patches/consequences, complete builds, progression, delayed
+combat work and bounded observation events (excluded from replay
+hashes). No M05 destruction or reactions are introduced.</p>
+<p>Normal saves include checksummed Rapier bytes and backend
+<code>0.21.0</code> for exact same-build continuation. World v4 declares
+<code>continuation: snapshot|rebuild</code>; an incompatible backend
+version or deliberate portable checkpoint uses the complete semantic
+rebuild. The rebuild restores every saved body, motor, policy
+sample/queue, collider groups, CCD and sleeping state; it does not reset
+props or heroes. Same-build raw continuation is exact. Rebuild rotation
+can drift below 0.00001 radians due to Rapier’s rotation representation;
+solver contact caches are re-created, so subsequent physical
+trajectories use outcome tolerances. Gameplay facts remain exact.
+Corrupt compatible bytes are rejected, not silently replaced with fresh
+content. Original M01 v1 and M02 v2 lab bytes, M03 adventure v1/world
+v3, and pre-physics version-1 games import explicitly; only content
+absent from an old save receives defaults.</p>
+<p><code>validateSave</code>, <code>validatePhysicsSnapshot</code> and
+semantic terrain validation reject invalid identities, motor/policy
+facts, pose mappings, seed/land bindings and recipes before allocating a
+new solver or publishing a replica. Compatible raw restore additionally
+validates binary shape, body properties, groups and registry
+correspondence. <code>Adventure.configureTerrain</code> shares seeded
+region configuration with validation. Pending terrain saves keep the
+previous collider boundary until the next tick, as in M03.</p>
+<p><code>src/net/physical.ts</code> owns physical wire
+<strong>1</strong>, separate from the observational JSON header. A
+<code>physical-start</code> manifest names sequence, scene revision,
+total UTF-8 length, chunk count and checksum.
+<code>physical-chunk</code> payloads are at most <strong>48,000
+bytes</strong>; total transfer is explicitly bounded at
+<strong>256,000,000 bytes</strong>. The payload includes a complete
+portable save and reliable scene/spawn/remove/policy lifecycle events.
+Every selected ambient creature and physical body is carried. A scene
+exceeding that bound reports an export/checkpoint-loading error; no body
+is clipped. Complete frames are shared among recipients at the same
+tick; sending waits for acknowledgement/backpressure without altering
+host simulation or physical eligibility. Large scenes may transmit at
+less than the nominal 10 Hz cadence.</p>
+<p>One receiver stages chunks, accepting equal duplicates and any chunk
+order after its manifest. Missing chunks leave the previous complete
+scene intact. Conflicting duplicates, invalid counts/lengths,
+checksum/schema corruption and old sequences cannot publish a partial
+world. A new transfer supersedes unfinished staging; unacknowledged
+transfers retry after five seconds. The manifest precedes chunks on the
+reliable channel. Both PeerJS ArrayBuffer and Uint8Array chunk forms are
+supported. First baseline publication/acknowledgement precedes guest
+interactions. A pending join retains its old local scene until a
+complete host baseline replaces it.</p>
+<p><code>Simulation.applyReplica</code> validates then reuses game
+arrays/world state, retains the complete semantic scene and interpolates
+prop position and shortest-path angle. Guests never step authoritative
+physics or allocate a Rapier world per snapshot. Changed
+seed/run/transition/land snaps players, enemies, projectiles and props.
+Physical ambient ownership is visible to rendering independently of
+camera budgets. Full party inventories are present in the complete
+replicated checkpoint; the observational packet helper can still omit
+other travelers’ unequipped items.</p>
+<p><code>interact-physics</code> /
+<code>window.fern.network.interact</code> request an impulse to an
+existing movable prop within <strong>96 units</strong>. The host
+supplies the connection’s player identity, rejects unknown/extra fields
+and non-props, bounds each impulse component to <strong>±120</strong>,
+and bounds optional application points to <strong>32 units</strong> from
+the prop. Frozen-region impulses are discarded. Guests have no
+configuration RPC; host UI/agent policy changes use M02’s revision
+queue. Normal guest movement/combat also runs through the host’s M03
+motor and contacts.</p>
+<p>Leave, host loss, canceled joins and browser loads preserve the
+received scene and the chosen traveler’s build. Recovery rekeys that
+player’s body and combat effects to <code>local</code>, removes departed
+actors/references before rekeying contact IDs, rebuilds a local solver,
+and frees replaced worlds/queues. Received ambient arrays preserve the
+actual selected population, even when a guest’s draw budget is small.
+The CLI’s <code>restore-file</code> parses expanded checkpoint files
+outside the unchanged 8 MB JSONL command limit; browser IndexedDB and
+JSON export retain complete saves.</p></main>
 <footer>Fern · A world engine built for agents · <a href="https://github.com/michaelcrosato/gpt61sol2daige">Source on GitHub</a></footer>
 </body>
 </html>

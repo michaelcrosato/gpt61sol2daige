@@ -1,0 +1,336 @@
+{
+  "isolatedBrowsers": 8,
+  "transport": "PeerJS/WebRTC reliable data channels",
+  "guestImpulse": {
+    "beforeX": 35,
+    "frozenX": 52.44708251953125
+  },
+  "hostRegion": "shared-town",
+  "lateJoinReady": true,
+  "incompatibleProtocolRejected": true,
+  "clients": [
+    {
+      "role": "host",
+      "state": "connected",
+      "peers": 7,
+      "message": "Your expedition is open",
+      "rtc": [
+        {
+          "states": [],
+          "candidates": [],
+          "errors": [],
+          "closes": [
+            "Error: Data channel close\n    at channel.close (<anonymous>:30:72)\n    at http://127.0.0.1:5187/node_modules/.vite/deps/peerjs.js?v=7c017c75:4179:17\n    at new $4f4134156c446392$export$f8f26dd395d7e1bd (http://127.0.0.1:5187/node_modules/.vite/deps/peerjs.js?v=7c017c75:4185:4)\n    at http://127.0.0.1:5187/node_modules/.vite/deps/peerjs.js?v=7c017c75:4188:49"
+          ]
+        },
+        {
+          "states": [
+            "new/new/have-remote-offer",
+            "new/new/stable",
+            "new/checking/stable",
+            "connecting/checking/stable",
+            "connecting/connected/stable",
+            "connected/connected/stable"
+          ],
+          "candidates": ["host"],
+          "errors": [],
+          "closes": []
+        },
+        {
+          "states": [
+            "new/new/have-remote-offer",
+            "new/new/stable",
+            "new/checking/stable",
+            "connecting/checking/stable",
+            "connecting/connected/stable",
+            "connected/connected/stable"
+          ],
+          "candidates": ["host"],
+          "errors": [],
+          "closes": []
+        },
+        {
+          "states": [
+            "new/new/have-remote-offer",
+            "new/new/stable",
+            "new/checking/stable",
+            "new/connected/stable",
+            "connecting/connected/stable",
+            "connected/connected/stable"
+          ],
+          "candidates": ["host"],
+          "errors": [],
+          "closes": []
+        },
+        {
+          "states": [
+            "new/new/have-remote-offer",
+            "new/new/stable",
+            "new/checking/stable",
+            "connecting/checking/stable",
+            "connecting/connected/stable",
+            "connected/connected/stable"
+          ],
+          "candidates": ["host"],
+          "errors": [],
+          "closes": []
+        },
+        {
+          "states": [
+            "new/new/have-remote-offer",
+            "new/new/stable",
+            "new/checking/stable",
+            "connecting/checking/stable",
+            "connecting/connected/stable",
+            "connected/connected/stable"
+          ],
+          "candidates": ["host"],
+          "errors": [],
+          "closes": []
+        },
+        {
+          "states": [
+            "new/new/have-remote-offer",
+            "new/new/stable",
+            "new/checking/stable",
+            "connecting/checking/stable",
+            "connecting/connected/stable",
+            "connected/connected/stable"
+          ],
+          "candidates": ["host"],
+          "errors": [],
+          "closes": []
+        },
+        {
+          "states": [
+            "new/new/have-remote-offer",
+            "new/new/stable",
+            "new/checking/stable",
+            "connecting/checking/stable",
+            "connecting/connected/stable",
+            "connected/connected/stable"
+          ],
+          "candidates": ["host"],
+          "errors": ["User-Initiated Abort, reason=Close called"],
+          "closes": []
+        },
+        {
+          "states": [
+            "new/new/have-remote-offer",
+            "new/new/stable",
+            "new/checking/stable",
+            "connecting/checking/stable",
+            "connecting/connected/stable",
+            "connected/connected/stable"
+          ],
+          "candidates": ["host"],
+          "errors": [],
+          "closes": []
+        }
+      ]
+    },
+    {
+      "role": "guest",
+      "state": "connected",
+      "peers": 7,
+      "message": "Wandering together",
+      "rtc": [
+        {
+          "states": [],
+          "candidates": [],
+          "errors": [],
+          "closes": [
+            "Error: Data channel close\n    at channel.close (<anonymous>:30:72)\n    at http://127.0.0.1:5187/node_modules/.vite/deps/peerjs.js?v=7c017c75:4179:17\n    at new $4f4134156c446392$export$f8f26dd395d7e1bd (http://127.0.0.1:5187/node_modules/.vite/deps/peerjs.js?v=7c017c75:4185:4)\n    at http://127.0.0.1:5187/node_modules/.vite/deps/peerjs.js?v=7c017c75:4188:49"
+          ]
+        },
+        {
+          "states": [
+            "new/new/have-local-offer",
+            "new/new/stable",
+            "new/checking/stable",
+            "new/connected/stable",
+            "connecting/connected/stable",
+            "connected/connected/stable"
+          ],
+          "candidates": ["host"],
+          "errors": [],
+          "closes": []
+        }
+      ]
+    },
+    {
+      "role": "guest",
+      "state": "connected",
+      "peers": 7,
+      "message": "Wandering together",
+      "rtc": [
+        {
+          "states": [],
+          "candidates": [],
+          "errors": [],
+          "closes": [
+            "Error: Data channel close\n    at channel.close (<anonymous>:30:72)\n    at http://127.0.0.1:5187/node_modules/.vite/deps/peerjs.js?v=7c017c75:4179:17\n    at new $4f4134156c446392$export$f8f26dd395d7e1bd (http://127.0.0.1:5187/node_modules/.vite/deps/peerjs.js?v=7c017c75:4185:4)\n    at http://127.0.0.1:5187/node_modules/.vite/deps/peerjs.js?v=7c017c75:4188:49"
+          ]
+        },
+        {
+          "states": [
+            "new/new/have-local-offer",
+            "new/new/stable",
+            "new/checking/stable",
+            "connecting/checking/stable",
+            "connecting/connected/stable",
+            "connected/connected/stable"
+          ],
+          "candidates": ["host"],
+          "errors": [],
+          "closes": []
+        }
+      ]
+    },
+    {
+      "role": "guest",
+      "state": "connected",
+      "peers": 7,
+      "message": "Wandering together",
+      "rtc": [
+        {
+          "states": [],
+          "candidates": [],
+          "errors": [],
+          "closes": [
+            "Error: Data channel close\n    at channel.close (<anonymous>:30:72)\n    at http://127.0.0.1:5187/node_modules/.vite/deps/peerjs.js?v=7c017c75:4179:17\n    at new $4f4134156c446392$export$f8f26dd395d7e1bd (http://127.0.0.1:5187/node_modules/.vite/deps/peerjs.js?v=7c017c75:4185:4)\n    at http://127.0.0.1:5187/node_modules/.vite/deps/peerjs.js?v=7c017c75:4188:49"
+          ]
+        },
+        {
+          "states": [
+            "new/new/have-local-offer",
+            "new/new/stable",
+            "new/checking/stable",
+            "new/connected/stable",
+            "connecting/connected/stable",
+            "connected/connected/stable"
+          ],
+          "candidates": ["host"],
+          "errors": [],
+          "closes": []
+        }
+      ]
+    },
+    {
+      "role": "guest",
+      "state": "connected",
+      "peers": 7,
+      "message": "Wandering together",
+      "rtc": [
+        {
+          "states": [],
+          "candidates": [],
+          "errors": [],
+          "closes": [
+            "Error: Data channel close\n    at channel.close (<anonymous>:30:72)\n    at http://127.0.0.1:5187/node_modules/.vite/deps/peerjs.js?v=7c017c75:4179:17\n    at new $4f4134156c446392$export$f8f26dd395d7e1bd (http://127.0.0.1:5187/node_modules/.vite/deps/peerjs.js?v=7c017c75:4185:4)\n    at http://127.0.0.1:5187/node_modules/.vite/deps/peerjs.js?v=7c017c75:4188:49"
+          ]
+        },
+        {
+          "states": [
+            "new/new/have-local-offer",
+            "new/checking/have-local-offer",
+            "new/checking/stable",
+            "new/connected/stable",
+            "connecting/connected/stable",
+            "connected/connected/stable"
+          ],
+          "candidates": ["host"],
+          "errors": [],
+          "closes": []
+        }
+      ]
+    },
+    {
+      "role": "guest",
+      "state": "connected",
+      "peers": 7,
+      "message": "Wandering together",
+      "rtc": [
+        {
+          "states": [],
+          "candidates": [],
+          "errors": [],
+          "closes": [
+            "Error: Data channel close\n    at channel.close (<anonymous>:30:72)\n    at http://127.0.0.1:5187/node_modules/.vite/deps/peerjs.js?v=7c017c75:4179:17\n    at new $4f4134156c446392$export$f8f26dd395d7e1bd (http://127.0.0.1:5187/node_modules/.vite/deps/peerjs.js?v=7c017c75:4185:4)\n    at http://127.0.0.1:5187/node_modules/.vite/deps/peerjs.js?v=7c017c75:4188:49"
+          ]
+        },
+        {
+          "states": [
+            "new/new/have-local-offer",
+            "new/new/stable",
+            "new/checking/stable",
+            "connecting/checking/stable",
+            "connecting/connected/stable",
+            "connected/connected/stable"
+          ],
+          "candidates": ["host"],
+          "errors": [],
+          "closes": []
+        }
+      ]
+    },
+    {
+      "role": "guest",
+      "state": "connected",
+      "peers": 7,
+      "message": "Wandering together",
+      "rtc": [
+        {
+          "states": [],
+          "candidates": [],
+          "errors": [],
+          "closes": [
+            "Error: Data channel close\n    at channel.close (<anonymous>:30:72)\n    at http://127.0.0.1:5187/node_modules/.vite/deps/peerjs.js?v=7c017c75:4179:17\n    at new $4f4134156c446392$export$f8f26dd395d7e1bd (http://127.0.0.1:5187/node_modules/.vite/deps/peerjs.js?v=7c017c75:4185:4)\n    at http://127.0.0.1:5187/node_modules/.vite/deps/peerjs.js?v=7c017c75:4188:49"
+          ]
+        },
+        {
+          "states": [
+            "new/new/have-local-offer",
+            "new/new/stable",
+            "new/checking/stable",
+            "connecting/checking/stable",
+            "connecting/connected/stable",
+            "connected/connected/stable"
+          ],
+          "candidates": ["host"],
+          "errors": [],
+          "closes": []
+        }
+      ]
+    },
+    {
+      "role": "guest",
+      "state": "connected",
+      "peers": 7,
+      "message": "Wandering together",
+      "rtc": [
+        {
+          "states": [],
+          "candidates": [],
+          "errors": [],
+          "closes": [
+            "Error: Data channel close\n    at channel.close (<anonymous>:30:72)\n    at http://127.0.0.1:5187/node_modules/.vite/deps/peerjs.js?v=7c017c75:4179:17\n    at new $4f4134156c446392$export$f8f26dd395d7e1bd (http://127.0.0.1:5187/node_modules/.vite/deps/peerjs.js?v=7c017c75:4185:4)\n    at http://127.0.0.1:5187/node_modules/.vite/deps/peerjs.js?v=7c017c75:4188:49"
+          ]
+        },
+        {
+          "states": [
+            "new/new/have-local-offer",
+            "new/checking/have-local-offer",
+            "new/checking/stable",
+            "connecting/checking/stable",
+            "connecting/connected/stable",
+            "connected/connected/stable"
+          ],
+          "candidates": ["host"],
+          "errors": [],
+          "closes": []
+        }
+      ]
+    }
+  ]
+}

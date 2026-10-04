@@ -49,6 +49,7 @@ export interface BodyEntry {
   reactivationBlocked?: boolean;
   drive?: { x: number; y: number };
   motor?: MotorState;
+  state?: BodyPose;
 }
 export interface MotorState {
   intentX: number;
@@ -69,9 +70,10 @@ export interface ContactEvent {
   started: boolean;
 }
 export interface PhysicsSnapshot {
-  version: 1 | 2 | 3;
-  scene?: "adventure";
-  backend: typeof RAPIER_VERSION;
+  version: 1 | 2 | 3 | 4;
+  scene?: "adventure" | "lab";
+  backend: string;
+  continuation?: "snapshot" | "rebuild";
   units: typeof WORLD_UNITS_PER_METRE;
   tick: number;
   contacts: number;

@@ -14,6 +14,7 @@ export function mountPhysicsUI(options: {
   world: () => PhysicsWorld | null;
   adventure: () => AdventurePhysics | null;
   solo: () => boolean;
+  host: () => boolean;
   execute: (command: Command) => unknown;
   pause: (paused: boolean) => void;
   paused: () => boolean;
@@ -348,7 +349,7 @@ export function mountPhysicsUI(options: {
 
   function draw() {
     const world = selectedWorld(),
-      solo = options.solo(),
+      solo = options.solo() || (scene.value === "adventure" && options.host()),
       poses = world?.poses() ?? [];
     for (const button of panel.querySelectorAll<HTMLButtonElement>("button"))
       button.disabled = !solo || (button.id !== "physics-open" && !world);

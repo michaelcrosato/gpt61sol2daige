@@ -21,9 +21,12 @@ node tools/agent.ts --seed 142 --record artifacts/walk.json &lt; examples/walk.j
 node tools/agent.ts replay artifacts/walk.json</code></pre>
 <p>The command server reads one JSON object per line and returns one
 response per line. Errors are structured and do not terminate the
-session. Keep lines under 8 MB. When supplied, <code>id</code> is echoed
-as the request identifier (the <code>join</code>/<code>leave</code>
-command also uses <code>id</code> as its player identifier).</p>
+session. Keep lines under 8 MB. For larger checkpoints, send
+<code>{"op":"restore-file","file":"artifacts/checkpoint.json"}</code> to
+the Node tool; it validates/imports the file without embedding it in a
+command line. When supplied, <code>id</code> is echoed as the request
+identifier (the <code>join</code>/<code>leave</code> command also uses
+<code>id</code> as its player identifier).</p>
 <pre class="json"><code>{&quot;op&quot;:&quot;input&quot;,&quot;x&quot;:1,&quot;y&quot;:0}
 {&quot;op&quot;:&quot;step&quot;,&quot;ticks&quot;:60}
 {&quot;op&quot;:&quot;observe&quot;}</code></pre>
@@ -138,7 +141,19 @@ patches</td>
 <tr>
 <td><code>restore</code></td>
 <td><code>state</code></td>
-<td>Validates and restores a checkpoint</td>
+<td>Validates and restores version-1 or version-2 checkpoints</td>
+</tr>
+<tr>
+<td><code>restore-file</code></td>
+<td><code>file</code></td>
+<td>Node CLI only: reads a complete checkpoint file, including expanded
+physical saves above 8 MB</td>
+</tr>
+<tr>
+<td><code>interact-physics</code></td>
+<td><code>id,x,y,atX?,atY?,player?</code></td>
+<td>Host/solo validates a nearby movable prop impulse; online guests use
+<code>network.interact</code> with connection-owned identity</td>
 </tr>
 <tr>
 <td><code>replay</code></td>
@@ -312,8 +327,9 @@ transition participates in deterministic replay.</p>
 an explicit <code>pause(true)</code>. Online menus never pause the
 party. Combat observations are bounded; <code>save</code> is the full
 inspectable state. The live-enemy limit is 100, distinct from the 65,536
-ambient-creature pool. Other players’ unequipped inventory items are
-omitted from guest snapshots.</p>
+ambient-creature pool. Complete M04 physical scenes carry all party
+builds; the bounded observational snapshot helper omits other players’
+unequipped items.</p>
 <h2 id="actual-online-sessions">Actual online sessions</h2>
 <pre class="js"><code>const room = await window.fern.network.host();
 // In another independently loaded browser/context:
@@ -391,9 +407,9 @@ playground</strong>, select a body and use <strong>Push right</strong>,
 <strong>Push off center</strong> or <strong>Launch swept body</strong>.
 The collider checkbox is presentation-only. Pause/run and explicit tick
 controls use the same simulation clock. Save trail, Snapshot JSON and
-replay include the physical scene. Close the playground before
-hosting/joining; online and connecting rooms reject playground commands
-until M04.</p>
+replay include the physical scene. Close the standalone playground
+before hosting/joining. Shared physical edits use the playable adventure
+scene.</p>
 <p>The discoverable <code>physics</code> operation supplies these
 actions:</p>
 <table>
@@ -494,16 +510,16 @@ node tools/agent.ts --count 0 &lt; examples/physics-playground.jsonl</code></pre
 <code>initializePhysics()</code> from
 <code>src/physics/bootstrap.ts</code> first; synchronous construction,
 restore, commands and replay follow that barrier. Dispose caller-owned
-<code>Simulation</code> instances when finished. Raw playground
-snapshots identify Rapier 0.21.0 and reject incompatible versions; old
-version-1 saves without this member retain the ordinary adventure path.
-FPS/throughput telemetry is informational, with no FPS acceptance
-threshold.</p>
-<p>M02’s policy document is version 1; the playground member is now
-version 2, with explicit M01 import. The outer save remains version 1
-and network wire remains 3. Shared controls stay solo-only until M04.
-Collider/region overlays are local device preferences, absent from saves
-and hashes.</p>
+<code>Simulation</code> instances when finished. World-v4 checkpoints
+identify the backend and retain complete semantic state for
+incompatible-backend rebuilding; original M01/M02 raw formats import
+explicitly, and old version-1 saves without this member retain their
+builds/terrain with fresh physical content. FPS/throughput telemetry is
+informational, with no FPS acceptance threshold.</p>
+<p>M02’s policy document remains version 1. M04 writes outer save 2,
+adventure envelope 2 and world 4, retaining explicit M01–M03 import.
+Room protocol is 4 with a separate physical channel. Collider/region
+overlays are local device preferences, absent from saves and hashes.</p>
 <p>Each policy edit has <code>type</code> and these fields:</p>
 <table>
 <colgroup>
@@ -617,8 +633,9 @@ to inspect and edit the real run. Select land/area/region, queue crowd
 contacts, ambient physics, prop blocking, prop dynamics, swept collision
 or the master switch, then step/run or apply while paused. The normal
 world renders solved actor/prop poses. Playground remains a separate
-scene. Shared physical controls stay unavailable online/connecting until
-M04; ordinary co-op remains supported.</p>
+scene. Hosts can edit the shared adventure policies/bodies; guests
+inspect their received scene and request nearby prop impulses through
+the host.</p>
 <p><code>actors</code> actions use the same command/replay route:</p>
 <table>
 <colgroup>
@@ -706,7 +723,44 @@ tolerances across runtimes, and use exact replay in the originating
 runtime. <code>node tools/physics-actors.ts</code> produces the M03
 encounter receipt; <code>--population 65536</code> deliberately enables
 every selected creature and reports informational first-tick timing.
-This does not advertise later reaction systems.</p></main>
+This does not advertise later reaction systems.</p>
+<h2 id="m04-physical-co-op-and-checkpoint-import">M04 physical co-op and
+checkpoint import</h2>
+<pre class="js"><code>await window.fern.network.interact({id: &quot;crate-1-0&quot;, x: 100, y: 0});
+window.fern.command({op: &quot;actors&quot;, action: &quot;body&quot;, id: &quot;crate-1-0&quot;});
+window.fern.network.status(); // baselineReady, physicalRevision, population, byte counters</code></pre>
+<p>A guest must finish its complete baseline before interacting.
+Requests accept a prop within 96 units, ±120 impulse components and
+optional paired application coordinates within 32 units of that prop.
+The host supplies identity and rejects policy fields, actor targets,
+unknown objects and excessive/far interactions. Frozen props discard
+impulses. Host <code>actors/configure</code> uses the same
+expectedRevision/atomic edits as solo; guests can read
+<code>inspect</code>, <code>body</code> and <code>policy</code> but
+cannot edit shared physics. The host lab’s Playable adventure controls
+remain available online; explicit paused apply requires a solo
+pause.</p>
+<p>Physical wire 1 uses protocol-4 rooms and reliable 48,000-byte chunks
+with a checked manifest, complete portable scene and lifecycle events.
+Its 256 MB total bound is separate from the observational packet’s 512
+KB header. Missing/duplicate/reversed/stale chunks never publish partial
+state. All selected ambient creatures and physical bodies remain in the
+replica even when local draw settings show fewer. Large scene
+transmission can take longer; it never cuts physical eligibility.
+Portal/land transitions snap interpolation, and leaving/host loss
+retains the received scene and each guest’s build for solo play.</p>
+<pre class="bash"><code>node tools/agent.ts --count 0 &lt;&lt;&#39;JSONL&#39;
+{&quot;op&quot;:&quot;restore-file&quot;,&quot;file&quot;:&quot;artifacts/checkpoint.json&quot;}
+{&quot;op&quot;:&quot;observe&quot;}
+JSONL</code></pre>
+<p>This file path supports expanded saves exceeding the unchanged 8 MB
+JSONL line limit. <code>describe</code> lists <code>restore-file</code>
+as CLI-only. Save 2 includes world-4 semantics, motor/knockback,
+policies/queues, stable IDs, terrain/land mutations, builds/progression
+and backend bytes; incompatible-backend restore rebuilds those facts.
+Original M01–M03 checkpoints migrate explicitly. See <a
+href="ARCHITECTURE.md#m04-saves-replication-and-recovery">save/transport
+contracts</a>.</p></main>
 <footer>Fern · A world engine built for agents · <a href="https://github.com/michaelcrosato/gpt61sol2daige">Source on GitHub</a></footer>
 </body>
 </html>

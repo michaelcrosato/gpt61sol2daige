@@ -117,7 +117,7 @@ export class Renderer {
       const i = this.visible.ids[n];
       if (
         sim.adventure.state.mode === "area" &&
-        !sim.physical?.ownsAmbient(i) &&
+        !sim.ownsPhysicalAmbient(i) &&
         (sim.x[i] - sim.adventure.state.recipe.x) ** 2 +
           (sim.y[i] - sim.adventure.state.recipe.y) ** 2 <
           (sim.adventure.state.recipe.radius + 35) ** 2
@@ -395,7 +395,7 @@ export class Renderer {
           y = lerp(sim.py[i], sim.y[i], alpha);
         if (
           adventure.mode === "area" &&
-          !sim.physical?.ownsAmbient(i) &&
+          !sim.ownsPhysicalAmbient(i) &&
           (x - adventure.recipe.x) ** 2 + (y - adventure.recipe.y) ** 2 <
             (adventure.recipe.radius + 35) ** 2
         )
@@ -440,7 +440,7 @@ export class Renderer {
         variant: 0,
         player: p,
       });
-    for (const prop of sim.physical?.props() ?? [])
+    for (const prop of sim.physicalProps(alpha))
       if (prop.x > left - 40 && prop.x < right + 40 && prop.y > top - 40 && prop.y < bottom + 40)
         items.push({ kind: "physical", x: prop.x, y: prop.y, type: 0, variant: 0, physical: prop });
     items.sort((a, b) => a.y - b.y || a.x - b.x);
