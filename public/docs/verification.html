@@ -240,6 +240,11 @@ tick, 750 creatures near each of eight travelers 10,000 units apart, and
 671 chunks inside the 1,024-chunk limit. <a
 href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/evidence/dispersed-benchmark.json">Dispersed-world
 evidence</a>.</li>
+<li>A broad deployment ignore pattern excluded <code>public/docs</code>
+as well as source documentation. The pattern was removed, and the
+browser suite now requests every documentation page, its stylesheet and
+the generated asset manifest so a successful game build cannot conceal
+missing deliverables.</li>
 </ul>
 <h2 id="scope-limits">Scope limits</h2>
 <p>The physics tests cover circles, static terrain and the reference

@@ -2,6 +2,28 @@ import { type Browser, type BrowserContext, expect, type Page, test } from "@pla
 import { type Replay, replay } from "../src/engine/agent.ts";
 import type { SaveState } from "../src/engine/simulation.ts";
 
+test("documentation and generated assets are served from the deployed package", async ({
+  request,
+}) => {
+  for (const [file, title] of [
+    ["agent-protocol", "Agent protocol"],
+    ["architecture", "Architecture"],
+    ["report", "Design report"],
+    ["verification", "Verification"],
+  ]) {
+    const response = await request.get(`/docs/${file}.html`);
+    expect(response.status()).toBe(200);
+    expect(await response.text()).toContain(`<title>${title} — Fern</title>`);
+  }
+  expect((await request.get("/docs/docs.css")).status()).toBe(200);
+  const manifest = await request.get("/generated/manifest.json");
+  expect(manifest.status()).toBe(200);
+  const assets = await manifest.json();
+  expect(assets.version).toBe(1);
+  expect(assets.sprites).toHaveLength(8);
+  expect(assets.audio).toHaveLength(6);
+});
+
 test("exploration, abilities, atlas, audio, lab commands, saving and deterministic browser replay", async ({
   page,
 }) => {

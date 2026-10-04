@@ -61,6 +61,7 @@ The final 300-frame browser measurement includes both Canvas rendering and live 
 - Replay recording restarts on transition from an online session to solo, and imported browser saves normalize player ownership.
 - Detailed terrain uses a working-set cap so wide zooms switch representation before exceeding the terrain image cache.
 - Wildlife slots now follow stable party anchors, so explorers traveling far from a stationary host receive their share of the population. A separated-traveler test covers this, including save/restore. A 6,000-NPC dispersed benchmark measured a 4.64 ms p95 tick, 750 creatures near each of eight travelers 10,000 units apart, and 671 chunks inside the 1,024-chunk limit. [Dispersed-world evidence](evidence/dispersed-benchmark.json).
+- A broad deployment ignore pattern excluded `public/docs` as well as source documentation. The pattern was removed, and the browser suite now requests every documentation page, its stylesheet and the generated asset manifest so a successful game build cannot conceal missing deliverables.
 
 ## Scope limits
 
