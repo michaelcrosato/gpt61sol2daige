@@ -16,24 +16,23 @@ limits. Source tests are executable; selected captures and benchmark
 JSON are committed under <code>docs/evidence/</code>. Full test traces
 and generated output stay in ignored local artifact directories.</p>
 <h2 id="reproduction-gates">Reproduction gates</h2>
-<p>Version 1.1 passes <strong>26 headless tests</strong>, TypeScript,
-lint/format checks, the production build, and <strong>10 browser
-scenarios</strong>. These cover desktop gameplay, mobile controls,
-actual eight-player co-op, independent guest view budgets, settings
-persistence, native fullscreen, fullscreen denial, browser-initiated
-exits, landscape touch controls, full-size world saves and legacy-save
-compatibility. The original release was also verified on GitHub Actions
-and against production, including public signaling; one earlier public
-connection attempt timed out before the subsequent complete eight-client
-rerun succeeded.</p>
+<p>Version 2.0 passes <strong>41 headless tests</strong> and <strong>14
+browser scenarios</strong>, including the earlier streaming, settings,
+fullscreen and actual WebRTC coverage. The new checks exercise combat,
+skills, shop purchases, equipment, drops, death, outward progression,
+guest action authority, shared party XP/gold, personal respawn and exact
+save/replay continuation. Version 1.1 had 26 headless tests and 10
+browser scenarios; its measurements remain labeled below.</p>
 <pre class="bash"><code>npm ci
 npm run check
 npm run build
 npm run test:e2e
+npm run verify:run
 npm run bench
 # With npm run dev running:
 npm run bench:browser
-npm run bench:quality</code></pre>
+npm run bench:quality
+npm run bench:combat</code></pre>
 <p>The browser suite starts isolated app/signaling processes on ports
 5187 and 9018. <code>BASE_URL</code> targets an existing app, including
 production. No simulated WebRTC adapter is used. Chrome runs headlessly
@@ -52,6 +51,107 @@ of multicast-resolved mDNS names, removing another container-network
 dependency. It still opens real WebRTC data channels between isolated
 contexts. Production testing retains browser defaults and the site’s
 public signaling and ICE configuration.</p>
+<h2 id="version-2.0-adventure-evidence">Version 2.0 adventure
+evidence</h2>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr>
+<th>Requirement</th>
+<th>Acceptance evidence</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Fluid hack-and-slash with the original hero</td>
+<td>Real-time browser controller fights through Brambleburst using
+attack/Whorl/movement/flasks; original sprite stays beneath sword and
+dodge effects</td>
+</tr>
+<tr>
+<td>Deep skills and equipment</td>
+<td>48-node DOM tree; learning changes derived damage; shop purchase
+deducts gold, equipping applies stats; headless prerequisite,
+active-unlock, cleave and respec checks</td>
+</tr>
+<tr>
+<td>XP, gold, rarity and drops</td>
+<td>Browser gains levels and gold, sees a guaranteed rare warden drop,
+collects gear with actual E input; fourth/eighth boss legendary rewards
+tested</td>
+</tr>
+<tr>
+<td>Outward areas, lands and towns</td>
+<td>Input-driven run clears areas 1–9, visits Emberrest after 4 and
+Tideglass Haven after 8, and retains build/loot across transitions</td>
+</tr>
+<tr>
+<td>Optional named mechanics</td>
+<td>Eight distinct authored introductions; an encounter clears with all
+mechanic cooldowns disabled; delayed Echo/linked-effect state survives
+save/restore</td>
+</tr>
+<tr>
+<td>Modular endless continuation</td>
+<td>Procedural ninth area clears; browser previews area 10,001; recipe
+export/validation includes index 1,000,000,000 with bounded
+coordinates</td>
+</tr>
+<tr>
+<td>Difficulty/debug controls</td>
+<td>Browser slider changes authoritative health tuning; headless checks
+verify all six multipliers affect stats, motion or incoming damage</td>
+</tr>
+<tr>
+<td>Monster rigs and procedural effects</td>
+<td>Six distinct shared runtime/export rigs; 80 pose frames exported
+from the example recipe; desktop/mobile screenshots inspected</td>
+</tr>
+<tr>
+<td>Multiplayer progression</td>
+<td>Eight actual clients; guest learns a skill, buys/equips boots,
+fights, shares earned XP with host, cannot tune the room, and retains
+its build after host disconnect</td>
+</tr>
+<tr>
+<td>Recovery and usability</td>
+<td>Death preserves build and takes 10% gold; guest respawn leaves
+others’ fight intact; solo menus/atlas pause and retain manual pause;
+mobile HUD has no horizontal overflow</td>
+</tr>
+</tbody>
+</table>
+<p><code>npm run verify:run</code> uses seed 142 and <strong>2× player
+damage/health</strong>, with the remaining tuning at defaults. It
+finishes all nine areas without death, reaches level 19 with 2,505 gold
+and a full 40-slot satchel. It drives normal combat inputs and
+legitimate skill/equipment actions; it does not mark areas cleared or
+award rewards directly. This smoke test establishes reachable
+progression, not balance across every seed, party or depth. <a
+href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/evidence/adventure-playthrough.json">Raw playthrough</a>.</p>
+<p>The separate combat benchmark measures 300 consecutive frames after
+60 warmup frames in generated area 9, at 1440×1000, normal 1.8× zoom,
+with 2,400 ambient creatures simulated. Its input controller attacks,
+casts Whorl, dashes and heals. It uses 5× player health and 0.1× enemy
+damage to sustain the encounter; outgoing damage and movement stay at
+defaults. The measured result was <strong>60.00 FPS</strong>,
+<strong>16.7 ms p95 frame interval</strong>, <strong>60.00 simulation
+ticks/s</strong>, <strong>11 peak enemies</strong>, and <strong>5
+kills</strong> during the sample. <a
+href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/evidence/combat-benchmark.json">Raw combat benchmark</a>, <a
+href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/evidence/adventure-procedural.png">combat capture</a>. It measures
+a typical encounter, not the 100-live-enemy ceiling.</p>
+<p>Inspected captures: <a href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/evidence/adventure-boss.png">warden
+fight</a>, <a href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/evidence/adventure-skills.png">48-node tree</a>, <a
+href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/evidence/adventure-equipment.png">equipment</a>, <a
+href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/evidence/adventure-town.png">new land’s town</a>, <a
+href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/evidence/adventure-mobile.png">mobile game HUD</a>. The boss
+capture uses increased player health for demonstration; the town capture
+uses the documented area-preview/recall tools. They demonstrate
+rendering, while the executable tests establish progression.</p>
 <h2 id="requirement-to-evidence-map">Requirement-to-evidence map</h2>
 <table>
 <colgroup>
@@ -188,6 +288,59 @@ behavior</td>
 </tr>
 </tbody>
 </table>
+<h2 id="version-2.0-ambient-regression-measurements">Version 2.0 ambient
+regression measurements</h2>
+<p>A fresh run of <code>bench:quality</code> uses the same 300-frame,
+1440×1000, 0.12× game-mode workload as version 1.1, in the safe town
+with no active combat encounter. This verifies that the new adventure
+systems preserve the expanded ambient budget; it is separate from the
+close-up combat sample above.</p>
+<table>
+<colgroup>
+<col style="width: 25%" />
+<col style="width: 25%" />
+<col style="width: 25%" />
+<col style="width: 25%" />
+</colgroup>
+<thead>
+<tr>
+<th>Active and visible ambient creatures</th>
+<th>Mean FPS</th>
+<th>p95 frame interval</th>
+<th>Actual simulation ticks/s</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>6,000</td>
+<td>60.07</td>
+<td>16.7 ms</td>
+<td>60.07</td>
+</tr>
+<tr>
+<td>16,384</td>
+<td>60.08</td>
+<td>16.7 ms</td>
+<td>60.08</td>
+</tr>
+<tr>
+<td>32,768</td>
+<td>60.12</td>
+<td>16.7 ms</td>
+<td>60.12</td>
+</tr>
+<tr>
+<td>65,536</td>
+<td>49.70</td>
+<td>33.4 ms</td>
+<td>49.70</td>
+</tr>
+</tbody>
+</table>
+<p><a href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/evidence/quality-benchmark-v2.json">Raw version 2.0 quality
+benchmark</a>. These are measurements on a shared workstation under the
+load present at capture time; differences from the older run do not
+isolate an individual optimization.</p>
 <h2 id="version-1.1-quality-measurements">Version 1.1 quality
 measurements</h2>
 <p>Each case uses a fresh headless Chrome context, 1440×1000 game mode,

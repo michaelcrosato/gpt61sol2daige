@@ -1,0 +1,528 @@
+{
+  "measuredAt": "2026-10-04T09:58:10.242Z",
+  "cpu": "Intel(R) Core(TM) i7-14700F",
+  "node": "v24.21.0",
+  "browser": "154.0.8037.57",
+  "viewport": [1440, 1000],
+  "method": "60 warmup frames then 300 measured frames in generated area 9, 2400 ambient NPCs, 1.8× zoom, game mode, ordinary attack/Whorl/dash inputs. Player health 5× and enemy damage 0.1× keep combat active; damage and movement remain at defaults.",
+  "frames": 300,
+  "meanFps": 60.001200023928945,
+  "p95FrameMs": 16.700000000000728,
+  "simulationTicksPerSecond": 60.001200023928945,
+  "peakEnemies": 11,
+  "kills": 5,
+  "state": {
+    "version": "2.0.0",
+    "seed": 3298013210,
+    "tick": 365,
+    "hash": "f6e1fdc4",
+    "population": 2400,
+    "players": [
+      {
+        "id": "local",
+        "name": "Wayfarer",
+        "x": 709.8287398898802,
+        "y": -146.06285902387427,
+        "vx": 43.45966388178189,
+        "vy": 22.984205671791607,
+        "energy": 71.54999999999987,
+        "biome": "Ravenous Echo Wells"
+      }
+    ],
+    "quest": {
+      "shards": 18,
+      "lit": [],
+      "total": 3,
+      "complete": false
+    },
+    "streaming": {
+      "resident": 88,
+      "limit": 1024,
+      "generated": 88,
+      "evicted": 0,
+      "editedTiles": 0
+    },
+    "physics": {
+      "contacts": 45,
+      "near": 321,
+      "far": 2079,
+      "stepMs": 1.2999999970197678
+    },
+    "events": [
+      {
+        "tick": 11,
+        "type": "pulse",
+        "x": 490,
+        "y": -24,
+        "player": "local",
+        "message": "The wisps share 5 light shards."
+      },
+      {
+        "tick": 83,
+        "type": "pulse",
+        "x": 549.0580916127873,
+        "y": 33.17920857566205,
+        "player": "local",
+        "message": "The wisps share 4 light shards."
+      },
+      {
+        "tick": 155,
+        "type": "pulse",
+        "x": 556.1520581791308,
+        "y": 23.179020994915973,
+        "player": "local",
+        "message": "A ripple of light through the trees."
+      },
+      {
+        "tick": 227,
+        "type": "pulse",
+        "x": 526.022990226891,
+        "y": -132.8501976796163,
+        "player": "local",
+        "message": "The wisps share 6 light shards."
+      },
+      {
+        "tick": 299,
+        "type": "dash",
+        "x": 559.0972898021025,
+        "y": -217.94591114149057,
+        "player": "local",
+        "message": ""
+      },
+      {
+        "tick": 309,
+        "type": "pulse",
+        "x": 632.2456393290713,
+        "y": -183.90877956688894,
+        "player": "local",
+        "message": "The wisps share 3 light shards."
+      }
+    ],
+    "adventure": {
+      "mode": "area",
+      "area": 9,
+      "land": 2,
+      "town": "Tideglass Haven",
+      "name": "Ravenous Echo Wells",
+      "recipe": {
+        "version": 1,
+        "index": 9,
+        "land": 2,
+        "seed": 1513171851,
+        "landSeed": 3298013210,
+        "name": "Ravenous Echo Wells",
+        "theme": "glass",
+        "layout": "rings",
+        "x": 720,
+        "y": 0,
+        "radius": 350,
+        "signature": "echo",
+        "mechanics": ["echo", "gravity", "bramble"],
+        "combination": {
+          "from": "echo",
+          "into": "gravity"
+        },
+        "behaviors": ["hunter", "summoner", "spitter"],
+        "rigs": ["wraith", "crawler", "brute"],
+        "killGoal": 39,
+        "boss": "Glasswater Usurper",
+        "bossBehavior": "charger",
+        "power": 2.3600000000000003,
+        "procedural": true
+      },
+      "kills": 6,
+      "goal": 39,
+      "cleared": false,
+      "highest": 0,
+      "mechanicUses": 2,
+      "tuning": {
+        "difficulty": 1,
+        "playerDamage": 1,
+        "playerHealth": 5,
+        "playerSpeed": 1,
+        "enemyDamage": 0.1,
+        "enemyHealth": 1,
+        "enemySpeed": 1
+      },
+      "enemies": [
+        {
+          "id": 10,
+          "name": "Briarling",
+          "x": 603.6751221415153,
+          "y": -51.44291093170071,
+          "hp": 75.52000000000001,
+          "maxHp": 75.52000000000001,
+          "phase": "walk",
+          "boss": false,
+          "behavior": "hunter"
+        },
+        {
+          "id": 11,
+          "name": "Rootcaller",
+          "x": 765.8098197989005,
+          "y": 121.80399921356529,
+          "hp": 153.40000000000003,
+          "maxHp": 153.40000000000003,
+          "phase": "walk",
+          "boss": false,
+          "behavior": "summoner"
+        },
+        {
+          "id": 13,
+          "name": "Briarling",
+          "x": 644.9228470417146,
+          "y": -78.54529280330365,
+          "hp": 17.52000000000001,
+          "maxHp": 75.52000000000001,
+          "phase": "walk",
+          "boss": false,
+          "behavior": "hunter"
+        },
+        {
+          "id": 18,
+          "name": "Sporecaster",
+          "x": 623.993695028799,
+          "y": 95.97668761537085,
+          "hp": 63.720000000000006,
+          "maxHp": 63.720000000000006,
+          "phase": "walk",
+          "boss": false,
+          "behavior": "spitter"
+        },
+        {
+          "id": 20,
+          "name": "Rootcaller",
+          "x": 732.1003656868203,
+          "y": -134.28372791050128,
+          "hp": 21.400000000000034,
+          "maxHp": 153.40000000000003,
+          "phase": "walk",
+          "boss": false,
+          "behavior": "summoner"
+        }
+      ],
+      "drops": [
+        {
+          "id": 28,
+          "kind": "item",
+          "x": 572.5006558023221,
+          "y": 40.71877642860713,
+          "amount": 1,
+          "name": "Gilded Windwalkers",
+          "rarity": "magic"
+        },
+        {
+          "id": 49,
+          "kind": "item",
+          "x": 631.5976586928559,
+          "y": -201.57484257968142,
+          "amount": 1,
+          "name": "Hollow Ember Tear",
+          "rarity": "magic"
+        },
+        {
+          "id": 53,
+          "kind": "item",
+          "x": 579.3682874013301,
+          "y": -139.83630297701785,
+          "amount": 1,
+          "name": "Mossweave",
+          "rarity": "common"
+        },
+        {
+          "id": 57,
+          "kind": "item",
+          "x": 744.702513248609,
+          "y": -133.38947187758876,
+          "amount": 1,
+          "name": "Quick Wayblade",
+          "rarity": "rare"
+        }
+      ],
+      "hero": {
+        "level": 3,
+        "xp": 92,
+        "gold": 170,
+        "points": 5,
+        "skills": {},
+        "inventory": [
+          {
+            "id": "starter-blade",
+            "name": "Wayfarer's Edge",
+            "slot": "weapon",
+            "rarity": "common",
+            "level": 1,
+            "power": 15,
+            "affixes": [
+              {
+                "stat": "haste",
+                "value": 0.05
+              }
+            ],
+            "special": "none",
+            "value": 0
+          },
+          {
+            "id": "starter-coat",
+            "name": "The Familiar Cloak",
+            "slot": "armor",
+            "rarity": "common",
+            "level": 1,
+            "power": 7,
+            "affixes": [
+              {
+                "stat": "life",
+                "value": 12
+              }
+            ],
+            "special": "none",
+            "value": 0
+          }
+        ],
+        "equipment": {
+          "weapon": "starter-blade",
+          "armor": "starter-coat"
+        },
+        "hp": 690,
+        "potions": 3,
+        "kills": 10,
+        "deaths": 0,
+        "combo": 2,
+        "comboUntil": 409,
+        "attackAt": 354,
+        "attackUntil": 370,
+        "attackAngle": 0.4864903553297312,
+        "slashReady": 375,
+        "whorlReady": 391,
+        "lanceReady": 0,
+        "novaReady": 0,
+        "potionReady": 0,
+        "invulnerableUntil": 315,
+        "hurtUntil": 0,
+        "dashUntil": 308,
+        "dashAngle": 0.43548384975210125,
+        "lastDash": 299,
+        "burnUntil": 0,
+        "hasteUntil": 0,
+        "bloodUntil": 0,
+        "recallUntil": 0,
+        "lastHit": -1000,
+        "procReady": 0,
+        "dead": false,
+        "bought": [],
+        "lastAbility": "slash",
+        "goldLost": 0
+      },
+      "stats": {
+        "damage": 19.2,
+        "health": 690,
+        "speed": 1.4,
+        "haste": 1.05,
+        "crit": 0.05,
+        "critPower": 1.6,
+        "armor": 7,
+        "regen": 0.4,
+        "leech": 0,
+        "reach": 46,
+        "cooldown": 1,
+        "gold": 1,
+        "xp": 1,
+        "luck": 0,
+        "burn": 0,
+        "chain": 0,
+        "execute": 0,
+        "spirit": 0,
+        "lance": false,
+        "nova": false,
+        "powers": []
+      },
+      "events": [
+        {
+          "id": 71,
+          "tick": 296,
+          "type": "hit",
+          "x": 579.3682874013301,
+          "y": -161.83630297701785,
+          "owner": "local",
+          "text": "",
+          "amount": 58,
+          "angle": 0,
+          "color": "#e9ebd6"
+        },
+        {
+          "id": 72,
+          "tick": 296,
+          "type": "kill",
+          "x": 579.3682874013301,
+          "y": -146.83630297701785,
+          "owner": "local",
+          "text": "",
+          "amount": 1,
+          "angle": 0,
+          "color": "#d3e7a1"
+        },
+        {
+          "id": 73,
+          "tick": 302,
+          "type": "slash",
+          "x": 588.7150470053837,
+          "y": -204.1655058731892,
+          "owner": "local",
+          "text": "",
+          "amount": 0,
+          "angle": 0.43548384975210125,
+          "color": "#ddebc0"
+        },
+        {
+          "id": 74,
+          "tick": 323,
+          "type": "slash",
+          "x": 685.6835780832678,
+          "y": -158.42524587056738,
+          "owner": "local",
+          "text": "",
+          "amount": 0,
+          "angle": 0.4720673025327276,
+          "color": "#ddebc0"
+        },
+        {
+          "id": 75,
+          "tick": 323,
+          "type": "hit",
+          "x": 708.793994074154,
+          "y": -161.5841858904937,
+          "owner": "local",
+          "text": "",
+          "amount": 17,
+          "angle": 0,
+          "color": "#e9ebd6"
+        },
+        {
+          "id": 76,
+          "tick": 326,
+          "type": "level",
+          "x": 690.9889092441605,
+          "y": -155.80150588003627,
+          "owner": "local",
+          "text": "Level 3 · a new skill point",
+          "amount": 3,
+          "angle": 0,
+          "color": "#d3e7a1"
+        },
+        {
+          "id": 77,
+          "tick": 339,
+          "type": "slash",
+          "x": 697.0150195980322,
+          "y": -152.8213061067677,
+          "owner": "local",
+          "text": "",
+          "amount": 0,
+          "angle": 0.4857470382719735,
+          "color": "#ddebc0"
+        },
+        {
+          "id": 78,
+          "tick": 339,
+          "type": "hit",
+          "x": 716.2080918876094,
+          "y": -157.6807970731812,
+          "owner": "local",
+          "text": "",
+          "amount": 22,
+          "angle": 0,
+          "color": "#e9ebd6"
+        },
+        {
+          "id": 79,
+          "tick": 339,
+          "type": "hit",
+          "x": 744.702513248609,
+          "y": -155.38947187758876,
+          "owner": "local",
+          "text": "",
+          "amount": 22,
+          "angle": 0,
+          "color": "#e9ebd6"
+        },
+        {
+          "id": 80,
+          "tick": 339,
+          "type": "kill",
+          "x": 744.702513248609,
+          "y": -140.38947187758876,
+          "owner": "local",
+          "text": "",
+          "amount": 1,
+          "angle": 0,
+          "color": "#d3e7a1"
+        },
+        {
+          "id": 81,
+          "tick": 354,
+          "type": "slash",
+          "x": 699.268184680891,
+          "y": -151.64743389735366,
+          "owner": "local",
+          "text": "",
+          "amount": 0,
+          "angle": 0.4864903553297312,
+          "color": "#ddebc0"
+        },
+        {
+          "id": 82,
+          "tick": 354,
+          "type": "hit",
+          "x": 724.393026980746,
+          "y": -153.35884190331217,
+          "owner": "local",
+          "text": "",
+          "amount": 35,
+          "angle": 0,
+          "color": "#e9ebd6"
+        }
+      ]
+    },
+    "render": {
+      "drawn": 131,
+      "candidates": 345,
+      "limited": 0,
+      "renderMs": 0.7609008117314302,
+      "terrainCanvases": 25,
+      "lod": "detail",
+      "fps": 59.98992849471237,
+      "frameMs": 16.669464776710676,
+      "zoom": 1.8,
+      "drawDistance": 4096,
+      "entityLimit": 8192,
+      "width": 1440,
+      "height": 1000,
+      "simulationHz": 59.95316159250586,
+      "cameraX": 702.3328183799448,
+      "cameraY": -149.98172335505632
+    },
+    "settings": {
+      "version": 1,
+      "drawDistance": 4096,
+      "entityLimit": 8192,
+      "population": 2400,
+      "showPerformance": true
+    },
+    "display": {
+      "gameMode": true,
+      "fullscreen": false
+    },
+    "network": {
+      "role": "solo",
+      "state": "offline",
+      "room": "",
+      "message": "A little solitude",
+      "peers": 0,
+      "received": 0,
+      "sent": 0,
+      "population": 0
+    },
+    "paused": false,
+    "view": "world"
+  }
+}

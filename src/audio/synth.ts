@@ -1,6 +1,16 @@
 import { random } from "../engine/math.ts";
 
-export type SoundName = "pulse" | "shard" | "beacon" | "dash" | "step" | "ambient";
+export type SoundName =
+  | "pulse"
+  | "shard"
+  | "beacon"
+  | "dash"
+  | "step"
+  | "ambient"
+  | "slash"
+  | "hit"
+  | "hurt"
+  | "level";
 export const SAMPLE_RATE = 22050;
 export function synthesize(name: SoundName, seed = 142): Float32Array {
   const duration =
@@ -45,6 +55,18 @@ export function synthesize(name: SoundName, seed = 142): Float32Array {
           envelope *
           Math.min(1, Math.max(0, t - v * 0.15) * 8);
     } else if (name === "dash") sample = (random(i, 3, seed) - 0.5) * 0.28 * envelope;
+    else if (name === "slash")
+      sample =
+        ((random(i, 8, seed) - 0.5) * 0.32 + Math.sin(t * 2 * Math.PI * (450 - t * 900)) * 0.06) *
+        envelope;
+    else if (name === "hit")
+      sample =
+        (Math.sin(t * 2 * Math.PI * (115 - t * 220)) * 0.22 + (random(i, 17, seed) - 0.5) * 0.19) *
+        envelope;
+    else if (name === "hurt") sample = Math.sin(t * 2 * Math.PI * 85) * 0.27 * envelope;
+    else if (name === "level")
+      sample =
+        (Math.sin(t * 2 * Math.PI * 659.25) + Math.sin(t * 2 * Math.PI * 987.77)) * 0.13 * envelope;
     else sample = (random(i, 8, seed) - 0.5) * 0.08 * envelope;
     data[i] = sample;
   }

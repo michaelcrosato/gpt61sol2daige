@@ -1,3 +1,6 @@
+import { Adventure } from "../game/adventure.ts";
+import type { AdventureState } from "../game/types.ts";
+import { validateAdventure } from "../game/validation.ts";
 import { MAX_NPCS } from "./limits.ts";
 import { checksum, clamp, distance, hash, random } from "./math.ts";
 import { type Body, collideCircles, moveBody, SpatialHash } from "./physics.ts";
@@ -12,11 +15,23 @@ import {
   World,
 } from "./world.ts";
 
-export const ENGINE_VERSION = "1.1.0";
+export const ENGINE_VERSION = "2.0.0";
 export const STEP = 1 / 60;
 export { MAX_NPCS } from "./limits.ts";
 export const MAX_PLAYERS = 8;
-export type Input = { x: number; y: number; dash: boolean; pulse: boolean; interact: boolean };
+export type Input = {
+  x: number;
+  y: number;
+  dash: boolean;
+  pulse: boolean;
+  interact: boolean;
+  attack?: boolean;
+  lance?: boolean;
+  nova?: boolean;
+  potion?: boolean;
+  aimX?: number;
+  aimY?: number;
+};
 export const idleInput = (): Input => ({ x: 0, y: 0, dash: false, pulse: false, interact: false });
 export interface Player extends Body {
   id: string;
@@ -50,6 +65,7 @@ export interface SaveState {
   collected: string[];
   patches: TerrainPatch[];
   players: Player[];
+  adventure?: AdventureState;
   npcs: {
     x: number[];
     y: number[];
@@ -62,6 +78,7 @@ export interface SaveState {
 }
 export class Simulation {
   world: World;
+  adventure: Adventure;
   tick = 0;
   count = 0;
   shards = 0;
@@ -86,6 +103,8 @@ export class Simulation {
 
   constructor(seed = 142, population = 2400) {
     this.world = new World(seed);
+    this.adventure = new Adventure(seed);
+    this.adventure.configureWorld(this);
     this.setPopulation(population);
   }
   addPlayer(id: string, name = "Wayfarer"): Player {
@@ -118,10 +137,12 @@ export class Simulation {
       steps: 0,
     };
     this.players.set(id, p);
+    this.adventure.onJoin(this, p);
     return p;
   }
   removePlayer(id: string): void {
     this.players.delete(id);
+    this.adventure.removePlayer(id);
   }
   setInput(id: string, input: Partial<Input>): void {
     const p = this.players.get(id);
@@ -132,6 +153,18 @@ export class Simulation {
       dash: input.dash === true,
       pulse: input.pulse === true,
       interact: input.interact === true,
+      attack: input.attack === true,
+      lance: input.lance === true,
+      nova: input.nova === true,
+      potion: input.potion === true,
+      aimX:
+        typeof input.aimX === "number" && Number.isFinite(input.aimX)
+          ? clamp(input.aimX, -1, 1)
+          : 0,
+      aimY:
+        typeof input.aimY === "number" && Number.isFinite(input.aimY)
+          ? clamp(input.aimY, -1, 1)
+          : 0,
     };
   }
   setPopulation(count: number): void {
@@ -263,13 +296,15 @@ export class Simulation {
     this.metrics.far = 0;
     const players = [...this.players.values()];
     for (const p of players) {
+      const hero = this.adventure.hero(p.id),
+        heroStats = this.adventure.stats(p.id, this.tick);
       p.px = p.x;
       p.py = p.y;
       p.pulseCooldown = Math.max(0, p.pulseCooldown - STEP);
       p.dashCooldown = Math.max(0, p.dashCooldown - STEP);
       p.energy = Math.min(100, p.energy + STEP * 17);
-      let ix = p.input.x,
-        iy = p.input.y;
+      let ix = hero.dead ? 0 : p.input.x,
+        iy = hero.dead ? 0 : p.input.y;
       const length = Math.hypot(ix, iy);
       if (length > 1) {
         ix /= length;
@@ -277,18 +312,24 @@ export class Simulation {
       }
       if (length > 0) p.facing = Math.atan2(iy, ix);
       const wading = this.world.at(p.x, p.y).terrain === Terrain.Water;
-      const speed = wading ? 58 : 115;
+      const speed = (wading ? 58 : 115) * heroStats.speed;
       p.vx += (ix * speed - p.vx) * 0.18;
       p.vy += (iy * speed - p.vy) * 0.18;
-      if (p.input.dash && p.dashCooldown === 0 && p.energy >= 28) {
+      if (!hero.dead && p.input.dash && p.dashCooldown === 0 && p.energy >= 28) {
         p.vx = Math.cos(p.facing) * 520;
         p.vy = Math.sin(p.facing) * 520;
         p.energy -= 28;
         p.dashCooldown = 0.55;
         this.emit("dash", p, "");
+        this.adventure.dash(this, p);
       }
-      if (p.input.pulse) this.pulse(p);
-      if (p.input.interact && !p.lastInteract) this.interact(p);
+      if (hero.dashUntil > this.tick && !hero.dead) {
+        p.vx = Math.cos(hero.dashAngle) * 490 * Math.max(1, heroStats.speed / 1.4);
+        p.vy = Math.sin(hero.dashAngle) * 490 * Math.max(1, heroStats.speed / 1.4);
+      }
+      if (p.input.pulse && !hero.dead) this.pulse(p);
+      if (p.input.interact && !p.lastInteract && !hero.dead && !this.adventure.interact(this, p))
+        this.interact(p);
       p.lastInteract = p.input.interact;
       this.metrics.contacts += moveBody(this.world, p, STEP);
       p.steps += distance(p.px, p.py, p.x, p.y);
@@ -399,6 +440,7 @@ export class Simulation {
       for (let b = a + 1; b < players.length; b++)
         if (collideCircles(players[a], players[b], 3, 3)) this.metrics.contacts++;
     }
+    this.adventure.step(this);
   }
   stateHash(): string {
     let h = checksum([this.world.seed, this.tick, this.count, this.shards]);
@@ -429,6 +471,12 @@ export class Simulation {
           +p.input.dash,
           +p.input.pulse,
           +p.input.interact,
+          +(p.input.attack ?? false),
+          +(p.input.lance ?? false),
+          +(p.input.nova ?? false),
+          +(p.input.potion ?? false),
+          p.input.aimX ?? 0,
+          p.input.aimY ?? 0,
           p.steps,
           p.color,
         ],
@@ -447,6 +495,9 @@ export class Simulation {
     );
     for (const patch of [...this.world.patches.values()].sort((a, b) => a[0] - b[0] || a[1] - b[1]))
       h = checksum(patch, h);
+    const adventure = JSON.stringify(this.adventure.state);
+    for (let i = 0; i < adventure.length; i++)
+      h = Math.imul(h ^ adventure.charCodeAt(i), 16777619) >>> 0;
     return h.toString(16).padStart(8, "0");
   }
   observe() {
@@ -481,6 +532,7 @@ export class Simulation {
       },
       physics: { ...this.metrics },
       events: this.events.slice(-8),
+      adventure: this.adventure.observe(this.players.keys().next().value, this.tick),
     };
   }
   save(): SaveState {
@@ -494,6 +546,7 @@ export class Simulation {
       collected: [...this.collected],
       patches: [...this.world.patches.values()].map((p) => [...p]),
       players: structuredClone([...this.players.values()]),
+      adventure: this.adventure.save(),
       npcs: {
         x: Array.from(this.x.subarray(0, this.count)),
         y: Array.from(this.y.subarray(0, this.count)),
@@ -515,6 +568,9 @@ export class Simulation {
     for (const id of state.beacons) sim.beacons.add(id);
     for (const key of state.collected) sim.collected.add(key);
     for (const p of state.players) sim.players.set(p.id, structuredClone(p));
+    if (state.adventure) sim.adventure.restore(state.adventure);
+    for (const id of sim.players.keys()) sim.adventure.hero(id);
+    sim.adventure.configureWorld(sim);
     for (const key of ["x", "y", "vx", "vy", "kind", "attuned", "generation"] as const)
       sim[key].set(state.npcs[key]);
     sim.px.set(sim.x);
@@ -548,6 +604,7 @@ export function validateSave(state: SaveState): void {
   )
     throw new Error("Invalid save header");
   validatePatches(state.patches ?? []);
+  if (state.adventure) validateAdventure(state.adventure);
   const ids = new Set<string>();
   for (const p of state.players) {
     if (
@@ -585,6 +642,12 @@ export function validateSave(state: SaveState): void {
       [p.input.x, p.input.y].some((n) => !Number.isFinite(n) || Math.abs(n) > 1) ||
       [p.input.dash, p.input.pulse, p.input.interact, p.lastInteract].some(
         (b) => typeof b !== "boolean",
+      ) ||
+      [p.input.attack, p.input.lance, p.input.nova, p.input.potion].some(
+        (v) => v !== undefined && typeof v !== "boolean",
+      ) ||
+      [p.input.aimX, p.input.aimY].some(
+        (v) => v !== undefined && (!Number.isFinite(v) || Math.abs(v) > 1),
       )
     )
       throw new Error("Invalid saved player");

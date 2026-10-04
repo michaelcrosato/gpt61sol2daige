@@ -121,6 +121,10 @@
     "beacon.wav",
     "dash.wav",
     "step.wav",
-    "ambient.wav"
+    "ambient.wav",
+    "slash.wav",
+    "hit.wav",
+    "hurt.wav",
+    "level.wav"
   ]
 }

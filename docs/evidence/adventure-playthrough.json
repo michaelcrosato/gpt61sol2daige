@@ -1,0 +1,1286 @@
+{
+  "version": 1,
+  "seed": 142,
+  "tuning": {
+    "difficulty": 1,
+    "playerDamage": 2,
+    "playerHealth": 2,
+    "playerSpeed": 1,
+    "enemyDamage": 1,
+    "enemyHealth": 1,
+    "enemySpeed": 1
+  },
+  "results": [
+    {
+      "area": 1,
+      "name": "Brambleburst",
+      "land": 0,
+      "cleared": true,
+      "ticks": 548,
+      "dead": false,
+      "level": 4,
+      "gold": 208,
+      "items": 7,
+      "mechanicUses": 4
+    },
+    {
+      "area": 2,
+      "name": "Slipstream",
+      "land": 0,
+      "cleared": true,
+      "ticks": 495,
+      "dead": false,
+      "level": 6,
+      "gold": 331,
+      "items": 10,
+      "mechanicUses": 11
+    },
+    {
+      "area": 3,
+      "name": "Stormglass",
+      "land": 0,
+      "cleared": true,
+      "ticks": 401,
+      "dead": false,
+      "level": 8,
+      "gold": 485,
+      "items": 14,
+      "mechanicUses": 15
+    },
+    {
+      "area": 4,
+      "name": "Echo Wells",
+      "land": 0,
+      "cleared": true,
+      "ticks": 585,
+      "dead": false,
+      "level": 9,
+      "gold": 716,
+      "items": 17,
+      "mechanicUses": 23
+    },
+    {
+      "area": 5,
+      "name": "Cinderwake",
+      "land": 1,
+      "cleared": true,
+      "ticks": 595,
+      "dead": false,
+      "level": 11,
+      "gold": 988,
+      "items": 22,
+      "mechanicUses": 29
+    },
+    {
+      "area": 6,
+      "name": "Bloodbloom",
+      "land": 1,
+      "cleared": true,
+      "ticks": 541,
+      "dead": false,
+      "level": 13,
+      "gold": 1258,
+      "items": 27,
+      "mechanicUses": 31
+    },
+    {
+      "area": 7,
+      "name": "Gravity Knots",
+      "land": 1,
+      "cleared": true,
+      "ticks": 748,
+      "dead": false,
+      "level": 15,
+      "gold": 1657,
+      "items": 34,
+      "mechanicUses": 39
+    },
+    {
+      "area": 8,
+      "name": "Riftstep",
+      "land": 1,
+      "cleared": true,
+      "ticks": 797,
+      "dead": false,
+      "level": 17,
+      "gold": 2057,
+      "items": 40,
+      "mechanicUses": 50
+    },
+    {
+      "area": 9,
+      "name": "Ravenous Echo Wells",
+      "land": 2,
+      "cleared": true,
+      "ticks": 856,
+      "dead": false,
+      "level": 19,
+      "gold": 2505,
+      "items": 40,
+      "mechanicUses": 66
+    }
+  ],
+  "final": {
+    "mode": "area",
+    "area": 10,
+    "land": 2,
+    "town": "Tideglass Haven",
+    "name": "Resonant Stormglass",
+    "recipe": {
+      "version": 1,
+      "index": 10,
+      "land": 2,
+      "seed": 3402502698,
+      "landSeed": 3298013210,
+      "name": "Resonant Stormglass",
+      "theme": "glass",
+      "layout": "terraces",
+      "x": 1450,
+      "y": -260,
+      "radius": 350,
+      "signature": "glass",
+      "mechanics": ["glass", "blood", "rift"],
+      "combination": {
+        "from": "glass",
+        "into": "blood"
+      },
+      "behaviors": ["hunter", "sentinel", "charger"],
+      "rigs": ["crawler", "wraith", "warden"],
+      "killGoal": 42,
+      "boss": "Glasswater Harbinger",
+      "bossBehavior": "spitter",
+      "power": 2.5300000000000002,
+      "procedural": true
+    },
+    "kills": 0,
+    "goal": 42,
+    "cleared": false,
+    "highest": 9,
+    "mechanicUses": 66,
+    "tuning": {
+      "difficulty": 1,
+      "playerDamage": 2,
+      "playerHealth": 2,
+      "playerSpeed": 1,
+      "enemyDamage": 1,
+      "enemyHealth": 1,
+      "enemySpeed": 1
+    },
+    "enemies": [
+      {
+        "id": 1204,
+        "name": "Briarling",
+        "x": 1268.922105777916,
+        "y": -180.21219635998278,
+        "hp": 80.96000000000001,
+        "maxHp": 80.96000000000001,
+        "phase": "walk",
+        "boss": false,
+        "behavior": "hunter"
+      },
+      {
+        "id": 1205,
+        "name": "Thorn Guard",
+        "x": 1532.4937363370923,
+        "y": -1.1840527211275003,
+        "hp": 202.40000000000003,
+        "maxHp": 202.40000000000003,
+        "phase": "walk",
+        "boss": false,
+        "behavior": "sentinel"
+      },
+      {
+        "id": 1206,
+        "name": "Barkmaw",
+        "x": 1352.2699040607959,
+        "y": -517.4101439965619,
+        "hp": 136.62,
+        "maxHp": 136.62,
+        "phase": "walk",
+        "boss": false,
+        "behavior": "charger"
+      },
+      {
+        "id": 1207,
+        "name": "Briarling",
+        "x": 1182.9309673076546,
+        "y": -130.33905291885617,
+        "hp": 80.96000000000001,
+        "maxHp": 80.96000000000001,
+        "phase": "walk",
+        "boss": false,
+        "behavior": "hunter"
+      },
+      {
+        "id": 1208,
+        "name": "Thorn Guard",
+        "x": 1305.1451029596328,
+        "y": -458.1599878166949,
+        "hp": 202.40000000000003,
+        "maxHp": 202.40000000000003,
+        "phase": "walk",
+        "boss": false,
+        "behavior": "sentinel"
+      },
+      {
+        "id": 1209,
+        "name": "Barkmaw",
+        "x": 1238.9079022072847,
+        "y": -113.62605896739058,
+        "hp": 136.62,
+        "maxHp": 136.62,
+        "phase": "walk",
+        "boss": false,
+        "behavior": "charger"
+      },
+      {
+        "id": 1210,
+        "name": "Briarling",
+        "x": 1606.1240427413377,
+        "y": -284.95975264710336,
+        "hp": 80.96000000000001,
+        "maxHp": 80.96000000000001,
+        "phase": "walk",
+        "boss": false,
+        "behavior": "hunter"
+      },
+      {
+        "id": 1211,
+        "name": "Thorn Guard",
+        "x": 1403.5797752324297,
+        "y": -533.287608514376,
+        "hp": 202.40000000000003,
+        "maxHp": 202.40000000000003,
+        "phase": "walk",
+        "boss": false,
+        "behavior": "sentinel"
+      },
+      {
+        "id": 1212,
+        "name": "Elder Barkmaw",
+        "x": 1437.670944864106,
+        "y": -564.5290264378666,
+        "hp": 273.24,
+        "maxHp": 273.24,
+        "phase": "walk",
+        "boss": false,
+        "behavior": "charger"
+      },
+      {
+        "id": 1213,
+        "name": "Briarling",
+        "x": 1729.8617292646968,
+        "y": -287.3508081672966,
+        "hp": 80.96000000000001,
+        "maxHp": 80.96000000000001,
+        "phase": "walk",
+        "boss": false,
+        "behavior": "hunter"
+      },
+      {
+        "id": 1214,
+        "name": "Thorn Guard",
+        "x": 1422.659950355747,
+        "y": -399.1413242973914,
+        "hp": 202.40000000000003,
+        "maxHp": 202.40000000000003,
+        "phase": "walk",
+        "boss": false,
+        "behavior": "sentinel"
+      }
+    ],
+    "drops": [],
+    "hero": {
+      "level": 19,
+      "xp": 186,
+      "gold": 2505,
+      "points": 17,
+      "skills": {
+        "gale-0": 3,
+        "gale-3": 1
+      },
+      "inventory": [
+        {
+          "id": "starter-blade",
+          "name": "Wayfarer's Edge",
+          "slot": "weapon",
+          "rarity": "common",
+          "level": 1,
+          "power": 15,
+          "affixes": [
+            {
+              "stat": "haste",
+              "value": 0.05
+            }
+          ],
+          "special": "none",
+          "value": 0
+        },
+        {
+          "id": "starter-coat",
+          "name": "The Familiar Cloak",
+          "slot": "armor",
+          "rarity": "common",
+          "level": 1,
+          "power": 7,
+          "affixes": [
+            {
+              "stat": "life",
+              "value": 12
+            }
+          ],
+          "special": "none",
+          "value": 0
+        },
+        {
+          "id": "item-vq0ndk-z",
+          "name": "Rootbound Treads",
+          "slot": "boots",
+          "rarity": "common",
+          "level": 1,
+          "power": 3,
+          "affixes": [
+            {
+              "stat": "xp",
+              "value": 0.06
+            }
+          ],
+          "special": "none",
+          "value": 17
+        },
+        {
+          "id": "item-vq0ndk-1h",
+          "name": "Hollow Lanternseed",
+          "slot": "charm",
+          "rarity": "magic",
+          "level": 2,
+          "power": 4,
+          "affixes": [
+            {
+              "stat": "haste",
+              "value": 0.04
+            },
+            {
+              "stat": "crit",
+              "value": 0.022
+            }
+          ],
+          "special": "none",
+          "value": 24
+        },
+        {
+          "id": "item-vq0ndk-1p",
+          "name": "Keen Thorn Mantle",
+          "slot": "armor",
+          "rarity": "magic",
+          "level": 2,
+          "power": 11,
+          "affixes": [
+            {
+              "stat": "burn",
+              "value": 0.077
+            },
+            {
+              "stat": "critPower",
+              "value": 0.112
+            }
+          ],
+          "special": "none",
+          "value": 38
+        },
+        {
+          "id": "item-vq0ndk-1v",
+          "name": "Verdant Rootbound Treads",
+          "slot": "boots",
+          "rarity": "rare",
+          "level": 2,
+          "power": 5,
+          "affixes": [
+            {
+              "stat": "xp",
+              "value": 0.067
+            },
+            {
+              "stat": "gold",
+              "value": 0.066
+            },
+            {
+              "stat": "life",
+              "value": 14.301
+            }
+          ],
+          "special": "none",
+          "value": 31
+        },
+        {
+          "id": "item-vq0ndk-29",
+          "name": "Keen Thorn Mantle",
+          "slot": "armor",
+          "rarity": "magic",
+          "level": 3,
+          "power": 12,
+          "affixes": [
+            {
+              "stat": "leech",
+              "value": 0.782
+            },
+            {
+              "stat": "crit",
+              "value": 0.023
+            }
+          ],
+          "special": "none",
+          "value": 42
+        },
+        {
+          "id": "item-1ik667d-42",
+          "name": "Bloom Sigil",
+          "slot": "charm",
+          "rarity": "common",
+          "level": 5,
+          "power": 4,
+          "affixes": [
+            {
+              "stat": "leech",
+              "value": 0.63
+            }
+          ],
+          "special": "none",
+          "value": 26
+        },
+        {
+          "id": "item-1ik667d-4l",
+          "name": "Bloom Sigil",
+          "slot": "charm",
+          "rarity": "common",
+          "level": 5,
+          "power": 4,
+          "affixes": [
+            {
+              "stat": "luck",
+              "value": 0.032
+            }
+          ],
+          "special": "none",
+          "value": 26
+        },
+        {
+          "id": "item-1ik667d-4t",
+          "name": "Quick Warden's Coat",
+          "slot": "armor",
+          "rarity": "magic",
+          "level": 5,
+          "power": 13,
+          "affixes": [
+            {
+              "stat": "armor",
+              "value": 11.425
+            },
+            {
+              "stat": "luck",
+              "value": 0.034
+            }
+          ],
+          "special": "none",
+          "value": 48
+        },
+        {
+          "id": "item-11ipx6l-6u",
+          "name": "Ancient Rootbound Treads",
+          "slot": "boots",
+          "rarity": "rare",
+          "level": 6,
+          "power": 6,
+          "affixes": [
+            {
+              "stat": "xp",
+              "value": 0.067
+            },
+            {
+              "stat": "critPower",
+              "value": 0.116
+            },
+            {
+              "stat": "speed",
+              "value": 0.035
+            }
+          ],
+          "special": "none",
+          "value": 42
+        },
+        {
+          "id": "item-11ipx6l-71",
+          "name": "Quick Barkplate",
+          "slot": "armor",
+          "rarity": "magic",
+          "level": 7,
+          "power": 15,
+          "affixes": [
+            {
+              "stat": "armor",
+              "value": 13.038
+            },
+            {
+              "stat": "damage",
+              "value": 0.078
+            }
+          ],
+          "special": "none",
+          "value": 56
+        },
+        {
+          "id": "item-11ipx6l-7c",
+          "name": "Gilded Rootcutter",
+          "slot": "weapon",
+          "rarity": "magic",
+          "level": 7,
+          "power": 22,
+          "affixes": [
+            {
+              "stat": "xp",
+              "value": 0.088
+            },
+            {
+              "stat": "damage",
+              "value": 0.076
+            }
+          ],
+          "special": "none",
+          "value": 70
+        },
+        {
+          "id": "item-11ipx6l-7h",
+          "name": "Gilded Rootcutter",
+          "slot": "weapon",
+          "rarity": "magic",
+          "level": 7,
+          "power": 22,
+          "affixes": [
+            {
+              "stat": "crit",
+              "value": 0.035
+            },
+            {
+              "stat": "burn",
+              "value": 0.1
+            }
+          ],
+          "special": "none",
+          "value": 70
+        },
+        {
+          "id": "item-t7bhqe-9k",
+          "name": "Quick Storm Acorn",
+          "slot": "charm",
+          "rarity": "rare",
+          "level": 8,
+          "power": 7,
+          "affixes": [
+            {
+              "stat": "cooldown",
+              "value": 0.054
+            },
+            {
+              "stat": "crit",
+              "value": 0.027
+            },
+            {
+              "stat": "gold",
+              "value": 0.117
+            }
+          ],
+          "special": "none",
+          "value": 49
+        },
+        {
+          "id": "item-t7bhqe-ab",
+          "name": "Keen Briar Sabre",
+          "slot": "weapon",
+          "rarity": "magic",
+          "level": 8,
+          "power": 23,
+          "affixes": [
+            {
+              "stat": "critPower",
+              "value": 0.137
+            },
+            {
+              "stat": "burn",
+              "value": 0.104
+            }
+          ],
+          "special": "none",
+          "value": 74
+        },
+        {
+          "id": "item-t7bhqe-ah",
+          "name": "Ancient Thorn Mantle",
+          "slot": "armor",
+          "rarity": "rare",
+          "level": 9,
+          "power": 18,
+          "affixes": [
+            {
+              "stat": "haste",
+              "value": 0.065
+            },
+            {
+              "stat": "burn",
+              "value": 0.118
+            },
+            {
+              "stat": "regen",
+              "value": 0.441
+            }
+          ],
+          "special": "none",
+          "value": 84
+        },
+        {
+          "id": "item-5op6ud-bs",
+          "name": "Ember Tear",
+          "slot": "charm",
+          "rarity": "common",
+          "level": 9,
+          "power": 5,
+          "affixes": [
+            {
+              "stat": "cooldown",
+              "value": 0.044
+            }
+          ],
+          "special": "none",
+          "value": 35
+        },
+        {
+          "id": "item-5op6ud-co",
+          "name": "Ancient Mossweave",
+          "slot": "armor",
+          "rarity": "magic",
+          "level": 10,
+          "power": 17,
+          "affixes": [
+            {
+              "stat": "critPower",
+              "value": 0.165
+            },
+            {
+              "stat": "damage",
+              "value": 0.123
+            }
+          ],
+          "special": "none",
+          "value": 66
+        },
+        {
+          "id": "item-5op6ud-d7",
+          "name": "Keen Lanternseed",
+          "slot": "charm",
+          "rarity": "magic",
+          "level": 10,
+          "power": 6,
+          "affixes": [
+            {
+              "stat": "burn",
+              "value": 0.133
+            },
+            {
+              "stat": "leech",
+              "value": 1.171
+            }
+          ],
+          "special": "none",
+          "value": 44
+        },
+        {
+          "id": "item-5op6ud-do",
+          "name": "Gilded Wayblade",
+          "slot": "weapon",
+          "rarity": "magic",
+          "level": 10,
+          "power": 25,
+          "affixes": [
+            {
+              "stat": "burn",
+              "value": 0.099
+            },
+            {
+              "stat": "critPower",
+              "value": 0.153
+            }
+          ],
+          "special": "none",
+          "value": 82
+        },
+        {
+          "id": "item-5op6ud-e2",
+          "name": "Resonant Briar Sabre",
+          "slot": "weapon",
+          "rarity": "magic",
+          "level": 10,
+          "power": 25,
+          "affixes": [
+            {
+              "stat": "luck",
+              "value": 0.051
+            },
+            {
+              "stat": "xp",
+              "value": 0.113
+            }
+          ],
+          "special": "none",
+          "value": 82
+        },
+        {
+          "id": "item-1f7ooiw-g3",
+          "name": "Glassfang",
+          "slot": "weapon",
+          "rarity": "common",
+          "level": 11,
+          "power": 23,
+          "affixes": [
+            {
+              "stat": "gold",
+              "value": 0.147
+            }
+          ],
+          "special": "none",
+          "value": 57
+        },
+        {
+          "id": "item-1f7ooiw-gl",
+          "name": "Ancient Mossweave",
+          "slot": "armor",
+          "rarity": "magic",
+          "level": 12,
+          "power": 18,
+          "affixes": [
+            {
+              "stat": "xp",
+              "value": 0.117
+            },
+            {
+              "stat": "luck",
+              "value": 0.061
+            }
+          ],
+          "special": "none",
+          "value": 72
+        },
+        {
+          "id": "item-1f7ooiw-h4",
+          "name": "Hollow Miststeps",
+          "slot": "boots",
+          "rarity": "rare",
+          "level": 12,
+          "power": 8,
+          "affixes": [
+            {
+              "stat": "damage",
+              "value": 0.095
+            },
+            {
+              "stat": "life",
+              "value": 23.141
+            },
+            {
+              "stat": "leech",
+              "value": 1.239
+            }
+          ],
+          "special": "none",
+          "value": 60
+        },
+        {
+          "id": "item-1f7ooiw-hg",
+          "name": "Ember Tear",
+          "slot": "charm",
+          "rarity": "common",
+          "level": 12,
+          "power": 6,
+          "affixes": [
+            {
+              "stat": "gold",
+              "value": 0.129
+            }
+          ],
+          "special": "none",
+          "value": 42
+        },
+        {
+          "id": "item-1f7ooiw-gq",
+          "name": "Vigorous Thorn Mantle",
+          "slot": "armor",
+          "rarity": "magic",
+          "level": 12,
+          "power": 18,
+          "affixes": [
+            {
+              "stat": "regen",
+              "value": 0.566
+            },
+            {
+              "stat": "leech",
+              "value": 1.241
+            }
+          ],
+          "special": "none",
+          "value": 72
+        },
+        {
+          "id": "item-x98b5w-j3",
+          "name": "Lanternseed",
+          "slot": "charm",
+          "rarity": "common",
+          "level": 13,
+          "power": 6,
+          "affixes": [
+            {
+              "stat": "damage",
+              "value": 0.121
+            }
+          ],
+          "special": "none",
+          "value": 44
+        },
+        {
+          "id": "item-x98b5w-kg",
+          "name": "Bloom Sigil",
+          "slot": "charm",
+          "rarity": "common",
+          "level": 13,
+          "power": 6,
+          "affixes": [
+            {
+              "stat": "regen",
+              "value": 0.44
+            }
+          ],
+          "special": "none",
+          "value": 44
+        },
+        {
+          "id": "item-x98b5w-kl",
+          "name": "Vigorous Warden's Coat",
+          "slot": "armor",
+          "rarity": "rare",
+          "level": 13,
+          "power": 22,
+          "affixes": [
+            {
+              "stat": "cooldown",
+              "value": 0.051
+            },
+            {
+              "stat": "xp",
+              "value": 0.092
+            },
+            {
+              "stat": "speed",
+              "value": 0.065
+            }
+          ],
+          "special": "none",
+          "value": 104
+        },
+        {
+          "id": "item-x98b5w-l5",
+          "name": "Hollow Warden's Coat",
+          "slot": "armor",
+          "rarity": "magic",
+          "level": 14,
+          "power": 20,
+          "affixes": [
+            {
+              "stat": "crit",
+              "value": 0.046
+            },
+            {
+              "stat": "gold",
+              "value": 0.156
+            }
+          ],
+          "special": "none",
+          "value": 80
+        },
+        {
+          "id": "item-x98b5w-lt",
+          "name": "Quick Miststeps",
+          "slot": "boots",
+          "rarity": "magic",
+          "level": 14,
+          "power": 7,
+          "affixes": [
+            {
+              "stat": "leech",
+              "value": 0.952
+            },
+            {
+              "stat": "crit",
+              "value": 0.035
+            }
+          ],
+          "special": "none",
+          "value": 54
+        },
+        {
+          "id": "item-x98b5w-l0",
+          "name": "Gilded Mossweave",
+          "slot": "armor",
+          "rarity": "magic",
+          "level": 14,
+          "power": 20,
+          "affixes": [
+            {
+              "stat": "luck",
+              "value": 0.064
+            },
+            {
+              "stat": "burn",
+              "value": 0.158
+            }
+          ],
+          "special": "none",
+          "value": 80
+        },
+        {
+          "id": "item-x98b5w-l9",
+          "name": "Verdant Windwalkers",
+          "slot": "boots",
+          "rarity": "rare",
+          "level": 14,
+          "power": 9,
+          "affixes": [
+            {
+              "stat": "cooldown",
+              "value": 0.061
+            },
+            {
+              "stat": "xp",
+              "value": 0.112
+            },
+            {
+              "stat": "burn",
+              "value": 0.149
+            }
+          ],
+          "special": "none",
+          "value": 67
+        },
+        {
+          "id": "item-yku6qo-nh",
+          "name": "Quick Warden's Coat",
+          "slot": "armor",
+          "rarity": "rare",
+          "level": 15,
+          "power": 24,
+          "affixes": [
+            {
+              "stat": "regen",
+              "value": 0.487
+            },
+            {
+              "stat": "armor",
+              "value": 15.23
+            },
+            {
+              "stat": "haste",
+              "value": 0.073
+            }
+          ],
+          "special": "none",
+          "value": 114
+        },
+        {
+          "id": "item-yku6qo-pg",
+          "name": "Barkplate",
+          "slot": "armor",
+          "rarity": "common",
+          "level": 16,
+          "power": 18,
+          "affixes": [
+            {
+              "stat": "leech",
+              "value": 1.351
+            }
+          ],
+          "special": "none",
+          "value": 62
+        },
+        {
+          "id": "item-yku6qo-pm",
+          "name": "Ember Tear",
+          "slot": "charm",
+          "rarity": "common",
+          "level": 16,
+          "power": 7,
+          "affixes": [
+            {
+              "stat": "armor",
+              "value": 15.001
+            }
+          ],
+          "special": "none",
+          "value": 51
+        },
+        {
+          "id": "item-yku6qo-px",
+          "name": "Briar Sabre",
+          "slot": "weapon",
+          "rarity": "common",
+          "level": 16,
+          "power": 27,
+          "affixes": [
+            {
+              "stat": "gold",
+              "value": 0.136
+            }
+          ],
+          "special": "none",
+          "value": 71
+        },
+        {
+          "id": "item-yku6qo-q7",
+          "name": "Warden's Coat",
+          "slot": "armor",
+          "rarity": "common",
+          "level": 16,
+          "power": 18,
+          "affixes": [
+            {
+              "stat": "burn",
+              "value": 0.144
+            }
+          ],
+          "special": "none",
+          "value": 62
+        },
+        {
+          "id": "item-yku6qo-qm",
+          "name": "Quick Rootcutter",
+          "slot": "weapon",
+          "rarity": "magic",
+          "level": 16,
+          "power": 32,
+          "affixes": [
+            {
+              "stat": "haste",
+              "value": 0.074
+            },
+            {
+              "stat": "crit",
+              "value": 0.053
+            }
+          ],
+          "special": "none",
+          "value": 108
+        }
+      ],
+      "equipment": {
+        "weapon": "item-yku6qo-qm",
+        "armor": "item-yku6qo-nh",
+        "boots": "item-x98b5w-l9",
+        "charm": "item-t7bhqe-9k"
+      },
+      "hp": 668,
+      "potions": 3,
+      "kills": 266,
+      "deaths": 0,
+      "combo": 1,
+      "comboUntil": 5615,
+      "attackAt": 5560,
+      "attackUntil": 5576,
+      "attackAngle": 0.05265791565253591,
+      "slashReady": 5574,
+      "whorlReady": 5622,
+      "lanceReady": 5501,
+      "novaReady": 0,
+      "potionReady": 0,
+      "invulnerableUntil": 5686,
+      "hurtUntil": 4945,
+      "dashUntil": 4775,
+      "dashAngle": 1.2621731236282128,
+      "lastDash": 4766,
+      "burnUntil": 3284,
+      "hasteUntil": 1234,
+      "bloodUntil": 5198,
+      "recallUntil": 0,
+      "lastHit": 4933,
+      "procReady": 0,
+      "dead": false,
+      "bought": [],
+      "lastAbility": "slash",
+      "goldLost": 0
+    },
+    "stats": {
+      "damage": 205.21200000000005,
+      "health": 668,
+      "speed": 2.2539999999999996,
+      "haste": 1.147,
+      "crit": 0.13,
+      "critPower": 1.6,
+      "armor": 39.230000000000004,
+      "regen": 0.887,
+      "leech": 0,
+      "reach": 46,
+      "cooldown": 0.885,
+      "gold": 1.117,
+      "xp": 1.6680000000000001,
+      "luck": 0,
+      "burn": 0.849,
+      "chain": 0,
+      "execute": 0,
+      "spirit": 0,
+      "lance": true,
+      "nova": false,
+      "powers": []
+    },
+    "events": [
+      {
+        "id": 1254,
+        "tick": 5538,
+        "type": "hit",
+        "x": 846.8865675957089,
+        "y": -15.430343068493379,
+        "owner": "local",
+        "text": "",
+        "amount": 293,
+        "angle": 0,
+        "color": "#e9ebd6"
+      },
+      {
+        "id": 1255,
+        "tick": 5545,
+        "type": "slash",
+        "x": 818.8296738012917,
+        "y": -2.237758902377787,
+        "owner": "local",
+        "text": "",
+        "amount": 0,
+        "angle": 0.06176525141929403,
+        "color": "#ddebc0"
+      },
+      {
+        "id": 1256,
+        "tick": 5545,
+        "type": "hit",
+        "x": 846.8498929332417,
+        "y": -15.504878847445932,
+        "owner": "local",
+        "text": "",
+        "amount": 147,
+        "angle": 0,
+        "color": "#e9ebd6"
+      },
+      {
+        "id": 1257,
+        "tick": 5550,
+        "type": "hit",
+        "x": 846.7670376326921,
+        "y": -15.535187751842834,
+        "owner": "local",
+        "text": "",
+        "amount": 4,
+        "angle": 0,
+        "color": "#e9ebd6"
+      },
+      {
+        "id": 1258,
+        "tick": 5560,
+        "type": "slash",
+        "x": 816.0827827806979,
+        "y": -2.182626667012527,
+        "owner": "local",
+        "text": "",
+        "amount": 0,
+        "angle": 0.05265791565253591,
+        "color": "#ddebc0"
+      },
+      {
+        "id": 1259,
+        "tick": 5560,
+        "type": "hit",
+        "x": 844.3147123912445,
+        "y": -15.694616498547765,
+        "owner": "local",
+        "text": "crit",
+        "amount": 270,
+        "angle": 0,
+        "color": "#f4d98d"
+      },
+      {
+        "id": 1260,
+        "tick": 5562,
+        "type": "mechanic",
+        "x": 845,
+        "y": 0,
+        "owner": "local",
+        "text": "Gravity Knots",
+        "amount": 155,
+        "angle": 0,
+        "color": "#ba9fe3"
+      },
+      {
+        "id": 1261,
+        "tick": 5566,
+        "type": "hit",
+        "x": 843.1523736749814,
+        "y": -15.763906791403002,
+        "owner": "local",
+        "text": "",
+        "amount": 293,
+        "angle": 0,
+        "color": "#e9ebd6"
+      },
+      {
+        "id": 1262,
+        "tick": 5566,
+        "type": "kill",
+        "x": 843.1523736749814,
+        "y": -0.763906791403002,
+        "owner": "local",
+        "text": "Glasswater Usurper defeated",
+        "amount": 3,
+        "angle": 0,
+        "color": "#d3e7a1"
+      },
+      {
+        "id": 1263,
+        "tick": 5566,
+        "type": "portal",
+        "x": 995,
+        "y": 0,
+        "owner": "",
+        "text": "The outward gate is open. Another area awaits.",
+        "amount": 0,
+        "angle": 0,
+        "color": "#d3e7a1"
+      },
+      {
+        "id": 1264,
+        "tick": 5566,
+        "type": "whorl",
+        "x": 845,
+        "y": 0,
+        "owner": "local",
+        "text": "echo",
+        "amount": 0,
+        "angle": 0,
+        "color": "#c1b9ec"
+      },
+      {
+        "id": 1265,
+        "tick": 5566,
+        "type": "portal",
+        "x": 1220,
+        "y": -260,
+        "owner": "",
+        "text": "Resonant Stormglass · Strike a glass pylon to arc lightning between nearby enemies.",
+        "amount": 0,
+        "angle": 0,
+        "color": "#d3e7a1"
+      }
+    ]
+  }
+}

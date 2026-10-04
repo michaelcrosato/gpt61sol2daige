@@ -1,7 +1,20 @@
+import { ARCHETYPES, type AreaRecipe, areaRecipe, MECHANICS, THEMES } from "../game/content.ts";
+import { SKILLS } from "../game/skills.ts";
+import type { AdventureAction } from "../game/types.ts";
 import { ENGINE_VERSION, idleInput, MAX_NPCS, type SaveState, Simulation } from "./simulation.ts";
 import { LANDMARKS, WORLD_LIMIT } from "./world.ts";
 
 export const COMMANDS = {
+  adventure: {
+    action:
+      "A game action: depart, advance, return, rest, respawn, skill, equip, buy, sell, sell-spares, respec, tuning or new-run",
+    description: "Omit action to observe the run and local build",
+  },
+  encounter: {
+    index: "positive area index; agent/debug preview",
+    recipe: "optional validated modular AreaRecipe",
+  },
+  catalog: { description: "Inspect mechanics, themes, archetypes and all 48 skill nodes" },
   observe: { description: "Compact world state, quest, performance, hash and recent events" },
   step: { ticks: "integer 0..36000; advances the exact fixed simulation" },
   input: {
@@ -11,6 +24,12 @@ export const COMMANDS = {
     dash: "boolean",
     pulse: "boolean",
     interact: "boolean",
+    attack: "boolean; primary melee combo",
+    lance: "boolean; unlocked Thornlance",
+    nova: "boolean; unlocked Bloom Nova",
+    potion: "boolean; healing flask",
+    aimX: "aim direction -1..1; (0,0) selects auto-aim",
+    aimY: "aim direction -1..1; pair with aimX",
   },
   teleport: { x: "world coordinate", y: "world coordinate", player: "optional player id" },
   population: { count: `integer 0..${MAX_NPCS}` },
@@ -104,11 +123,36 @@ export class AgentRuntime {
           dash: command.dash === true,
           pulse: command.pulse === true,
           interact: command.interact === true,
+          attack: command.attack === true,
+          lance: command.lance === true,
+          nova: command.nova === true,
+          potion: command.potion === true,
+          aimX: num("aimX", 0),
+          aimY: num("aimY", 0),
         });
         break;
       case "population":
         this.sim.setPopulation(num("count"));
         break;
+      case "adventure":
+        if (!command.action) return this.sim.adventure.observe(player, this.sim.tick);
+        this.sim.adventure.action(this.sim, player, command.action as AdventureAction);
+        break;
+      case "encounter":
+        this.sim.adventure.startArea(
+          this.sim,
+          num("index", 1),
+          command.recipe as AreaRecipe | undefined,
+        );
+        break;
+      case "catalog":
+        return {
+          mechanics: MECHANICS,
+          themes: THEMES,
+          archetypes: ARCHETYPES,
+          skills: SKILLS,
+          exampleArea: areaRecipe(this.sim.adventure.state.seed, num("index", 1)),
+        };
       case "paint":
         this.sim.world.paint(
           num("tx"),

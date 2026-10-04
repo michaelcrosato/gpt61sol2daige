@@ -8,9 +8,12 @@ import {
 } from "../engine/simulation.ts";
 import { EntityVisibility, type ViewRegion } from "../engine/visibility.ts";
 import { type TerrainPatch, validatePatches, WORLD_LIMIT } from "../engine/world.ts";
+import type { AdventureState } from "../game/types.ts";
+import { validateAdventure } from "../game/validation.ts";
 
-export const PROTOCOL_VERSION = 2;
-export const MAX_PACKET = MAX_NPCS * 16 + 100_008;
+export const PROTOCOL_VERSION = 3;
+export const MAX_HEADER = 512_000;
+export const MAX_PACKET = MAX_NPCS * 16 + MAX_HEADER + 8;
 export interface SnapshotView extends ViewRegion {
   entityLimit: number;
 }
@@ -25,7 +28,7 @@ export function snapshotBuffer(value: ArrayBuffer | ArrayBufferView): ArrayBuffe
   return new Uint8Array(value.buffer, value.byteOffset, value.byteLength).slice().buffer;
 }
 interface Header {
-  version: 2;
+  version: 3;
   seed: number;
   tick: number;
   population: number;
@@ -34,6 +37,7 @@ interface Header {
   collected: string[];
   patches: TerrainPatch[];
   players: Player[];
+  adventure: AdventureState;
   events: GameEvent[];
   originX: number;
   originY: number;
@@ -69,6 +73,7 @@ export function encodeSnapshot(
       })
       .slice(-1024),
     players: [...sim.players.values()],
+    adventure: sim.adventure.networkState(playerId),
     events: sim.events.slice(-12),
     originX,
     originY,
@@ -76,6 +81,7 @@ export function encodeSnapshot(
   const json = encoder.encode(JSON.stringify(header)),
     packet = new ArrayBuffer(8 + json.length + visible.count * 16),
     view = new DataView(packet);
+  if (json.length > MAX_HEADER) throw new Error("World metadata exceeds snapshot budget");
   view.setUint32(0, json.length, true);
   view.setUint32(4, visible.count, true);
   new Uint8Array(packet, 8, json.length).set(json);
@@ -102,7 +108,7 @@ export function decodeSnapshot(
   const view = new DataView(packet),
     length = view.getUint32(0, true),
     count = view.getUint32(4, true);
-  if (length > 100000 || count > MAX_NPCS || 8 + length + count * 16 !== packet.byteLength)
+  if (length > MAX_HEADER || count > MAX_NPCS || 8 + length + count * 16 !== packet.byteLength)
     throw new Error("Invalid snapshot framing");
   const h = JSON.parse(decoder.decode(new Uint8Array(packet, 8, length))) as Header;
   if (
@@ -131,6 +137,7 @@ export function decodeSnapshot(
   )
     throw new Error("Invalid snapshot header");
   validatePatches(h.patches ?? []);
+  validateAdventure(h.adventure);
   // Validate completely before mutating the current simulation.
   const ids = new Set<string>();
   for (const p of h.players) {
@@ -172,7 +179,29 @@ export function decodeSnapshot(
       view.getUint8(offset + 3) > 1
     )
       throw new Error("Invalid snapshot entity");
+  const continuous =
+    previous?.adventure.state.seed === h.adventure.seed &&
+    previous.adventure.state.run === h.adventure.run &&
+    previous.adventure.state.transition === h.adventure.transition;
+  const oldEnemies = new Map(
+    continuous ? previous.adventure.state.enemies.map((enemy) => [enemy.id, enemy]) : [],
+  );
+  const oldProjectiles = new Map(
+    continuous ? previous.adventure.state.projectiles.map((p) => [p.id, p]) : [],
+  );
   const sim = previous?.world.seed === h.seed ? previous : new Simulation(h.seed, 0);
+  sim.adventure.restore(h.adventure);
+  sim.adventure.configureWorld(sim);
+  for (const enemy of sim.adventure.state.enemies) {
+    const old = oldEnemies.get(enemy.id);
+    enemy.px = old?.x ?? enemy.x;
+    enemy.py = old?.y ?? enemy.y;
+  }
+  for (const projectile of sim.adventure.state.projectiles) {
+    const old = oldProjectiles.get(projectile.id);
+    projectile.px = old?.x ?? projectile.x;
+    projectile.py = old?.y ?? projectile.y;
+  }
   if (JSON.stringify([...sim.world.patches.values()]) !== JSON.stringify(h.patches ?? []))
     sim.world.setPatches(h.patches ?? []);
   sim.tick = h.tick;
@@ -187,8 +216,8 @@ export function decodeSnapshot(
     sim.players.set(p.id, {
       ...p,
       radius: 6,
-      px: oldPlayers.get(p.id)?.x ?? p.x,
-      py: oldPlayers.get(p.id)?.y ?? p.y,
+      px: continuous ? (oldPlayers.get(p.id)?.x ?? p.x) : p.x,
+      py: continuous ? (oldPlayers.get(p.id)?.y ?? p.y) : p.y,
       input: idleInput(),
     });
   sim.events.length = 0;

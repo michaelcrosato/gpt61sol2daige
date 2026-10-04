@@ -12,6 +12,8 @@ import {
   TILE,
   type World,
 } from "../engine/world.ts";
+import { THEMES, themeOf } from "../game/content.ts";
+import { type AdventureActor, CombatRenderer } from "./combat.ts";
 import { PALETTE, type SpriteRecipe, spritePixels } from "./sprites.ts";
 
 const GROUND = ["#304f39", "#486747", "#818164", "#34666a", "#294f59", "#8a8766", "#6a7662"];
@@ -28,12 +30,13 @@ const PLAYER_COLORS = [
 ];
 type DrawItem = {
   y: number;
-  kind: "decor" | "npc" | "player" | "landmark";
+  kind: "decor" | "npc" | "player" | "landmark" | "adventure";
   x: number;
   type: number;
   variant: number;
   player?: Player;
   id?: string;
+  adventure?: AdventureActor;
 };
 export class Renderer {
   readonly canvas: HTMLCanvasElement;
@@ -56,6 +59,11 @@ export class Renderer {
   private readonly visible = new EntityVisibility(MAX_NPCS);
   private readonly terrainCache = new Map<string, HTMLCanvasElement>();
   private readonly spriteCache = new Map<string, HTMLCanvasElement>();
+  private readonly combat = new CombatRenderer();
+  private ground: readonly string[] = GROUND;
+  private shades: readonly string[] = SHADES;
+  private theme = "";
+  private transition = -1;
   private readonly overview = document.createElement("canvas");
   private overviewKey = "";
   private readonly dots = document.createElement("canvas");
@@ -105,6 +113,13 @@ export class Renderer {
     pixels.fill(0);
     for (let n = 0; n < this.visible.count; n++) {
       const i = this.visible.ids[n];
+      if (
+        sim.adventure.state.mode === "area" &&
+        (sim.x[i] - sim.adventure.state.recipe.x) ** 2 +
+          (sim.y[i] - sim.adventure.state.recipe.y) ** 2 <
+          (sim.adventure.state.recipe.radius + 35) ** 2
+      )
+        continue;
       const x = Math.round(
         (lerp(sim.px[i], sim.x[i], alpha) - this.x) * this.zoom + this.width / 2,
       );
@@ -174,9 +189,9 @@ export class Renderer {
           v = chunk.variants[i],
           px = x * TILE,
           py = y * TILE;
-        ctx.fillStyle = GROUND[type];
+        ctx.fillStyle = this.ground[type];
         ctx.fillRect(px, py, TILE, TILE);
-        ctx.fillStyle = SHADES[type];
+        ctx.fillStyle = this.shades[type];
         for (let j = 0; j < 7; j++) {
           const h = hash(v, j, 731),
             ox = h % 15,
@@ -212,9 +227,40 @@ export class Renderer {
       this.terrainCache.delete(this.terrainCache.keys().next().value!);
     return canvas;
   }
-  draw(sim: Simulation, localId: string, alpha: number, time: number, delta: number): void {
+  draw(
+    sim: Simulation,
+    localId: string,
+    alpha: number,
+    time: number,
+    delta: number,
+    renderTick = sim.tick,
+  ): void {
+    this.combat.tick = renderTick;
+    this.combat.interpolation = alpha;
     const start = performance.now(),
       ctx = this.ctx;
+    const adventure = sim.adventure.state;
+    const theme = themeOf(
+      adventure.mode === "area"
+        ? adventure.recipe.theme
+        : THEMES[adventure.townLand % THEMES.length].id,
+    );
+    if (theme.id !== this.theme) {
+      this.theme = theme.id;
+      this.ground = theme.ground;
+      this.shades = this.ground.map((color) => {
+        const n = Number.parseInt(color.slice(1), 16);
+        return `#${[n >> 16, (n >> 8) & 255, n & 255]
+          .map((c) =>
+            Math.min(255, c + 7)
+              .toString(16)
+              .padStart(2, "0"),
+          )
+          .join("")}`;
+      });
+      this.terrainCache.clear();
+      this.overviewKey = "";
+    }
     if (
       this.cachedWorld !== sim.world ||
       this.seed !== sim.world.seed ||
@@ -227,6 +273,14 @@ export class Renderer {
       this.cachedWorld = sim.world;
     }
     const player = sim.players.get(localId);
+    if (this.transition !== adventure.transition) {
+      if (this.transition >= 0 && player) {
+        this.x = player.x;
+        this.y = player.y;
+        this.follow = true;
+      }
+      this.transition = adventure.transition;
+    }
     if (player && this.follow) {
       const smoothing = 1 - Math.exp(-delta * 6);
       this.x = lerp(this.x, lerp(player.px, player.x, alpha), smoothing);
@@ -270,7 +324,7 @@ export class Renderer {
         for (let y = 0; y < rows; y++)
           for (let x = 0; x < columns; x++) {
             overview.fillStyle =
-              GROUND[
+              this.ground[
                 sim.world.sample(
                   ((startX + x) * stride) / TILE,
                   ((startY + y) * stride) / TILE,
@@ -319,6 +373,7 @@ export class Renderer {
           }
         }
     }
+    this.combat.ground(ctx, sim, time, this.zoom);
     this.visible.select(
       sim.x,
       sim.y,
@@ -335,11 +390,34 @@ export class Renderer {
         const i = this.visible.ids[n],
           x = lerp(sim.px[i], sim.x[i], alpha),
           y = lerp(sim.py[i], sim.y[i], alpha);
+        if (
+          adventure.mode === "area" &&
+          (x - adventure.recipe.x) ** 2 + (y - adventure.recipe.y) ** 2 <
+            (adventure.recipe.radius + 35) ** 2
+        )
+          continue;
         if (x < left || x > right || y < top || y > bottom) continue;
         this.metrics.drawn++;
         items.push({ kind: "npc", x, y, type: sim.kind[i], variant: i, id: String(i) });
       }
-    for (const l of LANDMARKS)
+    for (const actor of this.combat.actors(sim, alpha))
+      if (
+        actor.x >= left - 90 &&
+        actor.x <= right + 90 &&
+        actor.y >= top - 130 &&
+        actor.y <= bottom + 90
+      )
+        items.push({
+          kind: "adventure",
+          x: actor.x,
+          y: actor.y,
+          type: 0,
+          variant: 0,
+          adventure: actor,
+        });
+    for (const l of LANDMARKS.filter(
+      (landmark) => adventure.mode === "town" && landmark.kind === "camp",
+    ))
       if (l.x >= left && l.x <= right && l.y >= top && l.y <= bottom)
         items.push({
           kind: "landmark",
@@ -362,6 +440,8 @@ export class Renderer {
     const frame = Math.floor(time * 9);
     for (const item of items) {
       if (item.kind === "decor") this.drawDecor(item, player, time);
+      else if (item.kind === "adventure")
+        this.combat.actor(ctx, item.adventure!, sim, alpha, time, this.zoom);
       else if (item.kind === "landmark") this.drawLandmark(item, sim, time);
       else if (item.kind === "npc") {
         ctx.fillStyle = "#162f2c55";
@@ -398,9 +478,15 @@ export class Renderer {
         const walk = Math.hypot(p.vx, p.vy) > 5 ? Math.floor(p.steps / 3.5) : 0;
         ctx.save();
         ctx.translate(Math.round(item.x), Math.round(item.y));
+        if (sim.adventure.hero(p.id).dead) {
+          ctx.rotate(-Math.PI / 2);
+          ctx.scale(1, 0.55);
+          ctx.globalAlpha = 0.7;
+        }
         if (Math.cos(p.facing) < -0.3) ctx.scale(-1, 1);
         ctx.drawImage(this.sprite("player", 0, walk, p.color), -32, -56);
         ctx.restore();
+        this.combat.player(ctx, sim, p, item.x, item.y);
         ctx.fillStyle = PLAYER_COLORS[p.color];
         ctx.beginPath();
         ctx.moveTo(item.x, item.y - 30);
@@ -415,6 +501,7 @@ export class Renderer {
         }
       }
     }
+    this.combat.effects(ctx, sim, localId, this.zoom);
     for (const event of sim.events) {
       const age = (sim.tick - event.tick) / 60;
       if (event.type === "pulse" && age < 0.65) {
@@ -669,15 +756,30 @@ export class Renderer {
         const wx = p.x + (x - size / 2) * scale,
           wy = p.y + (y - size / 2) * scale;
         ctx.fillStyle =
-          GROUND[sim.world.sample(Math.floor(wx / TILE), Math.floor(wy / TILE)).terrain];
+          this.ground[sim.world.sample(Math.floor(wx / TILE), Math.floor(wy / TILE)).terrain];
         ctx.fillRect(x, y, 4, 4);
       }
     ctx.strokeStyle = "#d5dfa154";
     ctx.strokeRect(size / 2 - 18, size / 2 - 12, 36, 24);
-    for (const l of LANDMARKS) {
-      ctx.fillStyle = sim.beacons.has(l.id) ? "#d5ed9f" : "#d7b88b";
-      ctx.fillRect(size / 2 + (l.x - p.x) / scale - 2, size / 2 + (l.y - p.y) / scale - 2, 4, 4);
-    }
+    for (const enemy of sim.adventure.state.enemies)
+      if (enemy.hp > 0) {
+        ctx.fillStyle = enemy.boss ? "#f3d292" : "#e89783";
+        ctx.fillRect(
+          size / 2 + (enemy.x - p.x) / scale - 1,
+          size / 2 + (enemy.y - p.y) / scale - 1,
+          enemy.boss ? 4 : 2,
+          enemy.boss ? 4 : 2,
+        );
+      }
+    const s = sim.adventure.state,
+      gate = s.mode === "town" ? { x: 218, y: 36 } : { x: s.recipe.x + 275, y: s.recipe.y };
+    ctx.fillStyle = "#d9eaa8";
+    ctx.fillRect(
+      size / 2 + (gate.x - p.x) / scale - 2,
+      size / 2 + (gate.y - p.y) / scale - 2,
+      4,
+      4,
+    );
     ctx.fillStyle = "#eef3cf";
     ctx.beginPath();
     ctx.moveTo(size / 2, size / 2 - 4);
@@ -696,7 +798,7 @@ export class Renderer {
           Math.floor((centerX + (x - width / 2) * scale) / TILE),
           Math.floor((centerY + (y - height / 2) * scale) / TILE),
         );
-        ctx.fillStyle = GROUND[t.terrain];
+        ctx.fillStyle = this.ground[t.terrain];
         ctx.fillRect(x, y, 3, 3);
       }
     ctx.strokeStyle = "#d5dfa126";
@@ -713,18 +815,7 @@ export class Renderer {
       ctx.lineTo(width, y);
       ctx.stroke();
     }
-    for (const l of LANDMARKS) {
-      const x = width / 2 + (l.x - centerX) / scale,
-        y = height / 2 + (l.y - centerY) / scale;
-      ctx.fillStyle = "#172d25";
-      ctx.fillRect(x - 7, y - 7, 14, 14);
-      ctx.strokeStyle = sim.beacons.has(l.id) ? "#e4eda5" : "#d6b88a";
-      ctx.strokeRect(x - 5, y - 5, 10, 10);
-      ctx.font = "12px monospace";
-      ctx.textAlign = "center";
-      ctx.fillStyle = "#e7e4c9";
-      ctx.fillText(l.name, x, y - 15);
-    }
+    this.combat.atlas(ctx, sim, width, height, centerX, centerY);
     for (const p of sim.players.values()) {
       const x = width / 2 + (p.x - centerX) / scale,
         y = height / 2 + (p.y - centerY) / scale;

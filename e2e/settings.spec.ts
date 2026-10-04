@@ -72,7 +72,7 @@ test("native fullscreen fills the screen, retains controls and dialogs, and rest
       }),
     )
     .toEqual([0, 0, true, true]);
-  await page.getByRole("button", { name: "Light pulse", exact: true }).click();
+  await page.getByRole("button", { name: "Whorl", exact: true }).click();
   await expect
     .poll(async () =>
       (await page.evaluate(() => window.fern.observe())).events.some((e) => e.type === "pulse"),

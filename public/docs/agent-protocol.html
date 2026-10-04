@@ -54,15 +54,35 @@ unsolicited diagnostic prose to stdout. CLI banners from
 <tr>
 <td><code>observe</code></td>
 <td>none</td>
-<td>Compact state, checksum, players, quest, streaming/physics counters,
-last eight events</td>
+<td>Compact state, checksum, players, adventure, quest and
+streaming/physics counters</td>
 </tr>
 <tr>
 <td><code>input</code></td>
 <td><code>player?</code>, <code>x?</code>, <code>y?</code>,
-<code>dash?</code>, <code>pulse?</code>, <code>interact?</code></td>
+<code>dash?</code>, <code>pulse?</code>, <code>interact?</code>,
+<code>attack?</code>, <code>lance?</code>, <code>nova?</code>,
+<code>potion?</code>, <code>aimX?</code>, <code>aimY?</code></td>
 <td>Replaces input; missing axes/buttons become idle; axes clamp to
-−1…1</td>
+−1…1; aim is a direction vector clamped to −1…1 per axis</td>
+</tr>
+<tr>
+<td><code>catalog</code></td>
+<td>none</td>
+<td>Mechanics, themes, archetypes, 48 skill nodes and a sample
+recipe</td>
+</tr>
+<tr>
+<td><code>adventure</code></td>
+<td><code>player?</code>, <code>action?</code></td>
+<td>Inspect the selected build/run, or execute a validated game
+action</td>
+</tr>
+<tr>
+<td><code>encounter</code></td>
+<td><code>index</code>, <code>recipe?</code></td>
+<td>Debug-preview a positive safe-integer area or a validated custom
+<code>AreaRecipe</code>; changes the party encounter</td>
 </tr>
 <tr>
 <td><code>step</code></td>
@@ -197,6 +217,103 @@ saved toast or restored state in browser automation. Legacy
 <code>fern:save:v1</code> localStorage checkpoints remain readable.
 Game-mode settings provide Save game and Load game controls, while the
 lab retains its original controls.</p>
+<h2 id="adventure-actions-2.0">Adventure actions (2.0)</h2>
+<pre class="js"><code>window.fern.game.observe(); // Run, live enemies/drops, local hero, derived stats, recent combat events.
+await window.fern.game.action({type: &quot;skill&quot;, id: &quot;blade-0&quot;});
+await window.fern.game.action({type: &quot;buy&quot;, index: 2});
+await window.fern.game.action({type: &quot;depart&quot;});
+window.fern.game.panel(&quot;skills&quot;); // Also inventory, town, pause, mechanics.</code></pre>
+<p>The browser adapter executes locally as solo/host and sends
+acknowledged RPCs as a guest. The same headless call is
+<code>{"op":"adventure","action":{"type":"skill","id":"blade-0"}}</code>.
+Never call a guest’s <code>command</code> to simulate authority; use
+<code>game.action</code> and <code>network.input</code>.</p>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr>
+<th>Action <code>type</code></th>
+<th>Fields and effect</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>depart</code>, <code>advance</code></td>
+<td>Leader leaves town for the next uncleared area, or advances after
+defeating the warden</td>
+</tr>
+<tr>
+<td><code>return</code></td>
+<td>Leader channels recall for 150 ticks; movement/damage
+interrupts</td>
+</tr>
+<tr>
+<td><code>respawn</code></td>
+<td>Revives a dead hero; preserves a live party encounter or returns a
+defeated party to town</td>
+</tr>
+<tr>
+<td><code>rest</code></td>
+<td>Town-only free life/spirit/flask refill</td>
+</tr>
+<tr>
+<td><code>skill</code></td>
+<td><code>id</code>: catalog node; checks level, prerequisite, path
+investment, rank and unspent points</td>
+</tr>
+<tr>
+<td><code>respec</code></td>
+<td>Town-only refund; costs 10 gold per allocated point</td>
+</tr>
+<tr>
+<td><code>equip</code>, <code>sell</code></td>
+<td><code>id</code>: owned item; selling requires town and an unequipped
+item</td>
+</tr>
+<tr>
+<td><code>sell-spares</code></td>
+<td>Town-only sale of unequipped common/magic gear; preserves
+rare/legendary finds</td>
+</tr>
+<tr>
+<td><code>buy</code></td>
+<td><code>index</code>: 0–5; validates stock, funds and 40-slot bag
+capacity</td>
+</tr>
+<tr>
+<td><code>tuning</code></td>
+<td>Leader-only <code>values</code> partial object:
+<code>difficulty</code>, <code>playerDamage</code>,
+<code>playerHealth</code>, <code>enemyDamage</code>,
+<code>enemyHealth</code> (0.1–10), <code>playerSpeed</code>,
+<code>enemySpeed</code> (0.1–3); UI sliders use narrower maxima of 3 for
+difficulty and 5 for damage/health</td>
+</tr>
+<tr>
+<td><code>new-run</code></td>
+<td>Leader starts a newly seeded run, clearing builds/progression while
+retaining tuning</td>
+</tr>
+</tbody>
+</table>
+<p><code>pulse</code> now casts Whorl as well as the existing wildlife
+impulse. <code>attack</code> repeats the melee combo; lance/nova require
+their unlocks. Held flags respect authoritative cooldowns.
+<code>(aimX, aimY) = (0, 0)</code> selects keyboard auto-aim toward a
+nearby enemy, falling back to movement direction. For explicit aim,
+normalize <code>(target.x − player.x, target.y − player.y)</code> to a
+unit direction vector. Every combat command, delayed echo, item roll and
+transition participates in deterministic replay.</p>
+<p>Solo dialogs and the atlas pause the live clock; explicit
+<code>step</code> still advances it for QA. Closing a dialog preserves
+an explicit <code>pause(true)</code>. Online menus never pause the
+party. Combat observations are bounded; <code>save</code> is the full
+inspectable state. The live-enemy limit is 100, distinct from the 65,536
+ambient-creature pool. Other players’ unequipped inventory items are
+omitted from guest snapshots.</p>
 <h2 id="actual-online-sessions">Actual online sessions</h2>
 <pre class="js"><code>const room = await window.fern.network.host();
 // In another independently loaded browser/context:
@@ -217,7 +334,7 @@ synchronize.</p>
 npm run assets -- sprite examples/autumn-traveler.sprite.json --out artifacts/autumn
 npm run assets -- level examples/moss-courtyard.level.json --out artifacts/courtyard
 npm run assets -- chunk -1 2 142 --out artifacts/chunks</code></pre>
-<p>The default creates 64 SVG frames, six WAV files and a manifest in
+<p>The default creates 64 SVG frames, ten WAV files and a manifest in
 <code>public/generated</code>. The runtime generates its own matching
 sprites/audio in memory, so it does not need to fetch the exported
 examples. A sprite recipe supplies version, kind, seed, and optional
@@ -235,6 +352,21 @@ row-major order. Coordinate hashing lets agents search seeds or generate
 distant chunks without first visiting intervening terrain. Do not edit
 generated PNG/SVG/WAV outputs and expect the runtime to change: recipes
 and source are authoritative.</p>
+<pre class="bash"><code>node tools/adventure.ts                         # Catalog: mechanics, themes, rigs, layouts, skills
+node tools/adventure.ts area 25 142             # Seeded AreaRecipe JSON
+node tools/adventure.ts validate artifacts/adventure/area-25.json
+node tools/adventure.ts rig examples/glass-warden.rig.json  # 80 SVG frames
+node tools/adventure.ts playthrough 9           # Actual input-driven run; JSON evidence</code></pre>
+<p><code>--out</code> selects an export directory. Rig recipes supply
+<code>version:1</code>, <code>rig</code>, <code>theme</code> and integer
+<code>seed</code>; runtime and SVG share <code>monsterPixels</code>.
+Area recipes select a theme, layout, signature/secondary mechanics,
+links, archetypes, power and kill goal. Read <code>catalog</code> for an
+example, validate edits, then preview with <code>encounter</code>. The
+playthrough accepts 1–64 areas and uses 2× player damage/health
+explicitly; its controller buys skills, equips upgrades, dodges and
+fights using ordinary inputs. It is a progression smoke test, not proof
+of balance at every generated depth.</p>
 <h2 id="a-useful-change-loop">A useful change loop</h2>
 <ol type="1">
 <li>Capture a seed, checkpoint and input/command sequence that

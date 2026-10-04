@@ -1,6 +1,6 @@
 {
   "name": "fern-agent-engine",
-  "version": "1.1.0",
+  "version": "2.0.0",
   "private": true,
   "type": "module",
   "engines": {
@@ -19,9 +19,12 @@
     "bench": "node tools/bench.ts",
     "bench:browser": "node tools/browser-bench.ts",
     "bench:quality": "node tools/quality-bench.ts",
+    "bench:combat": "node tools/combat-bench.ts",
     "assets": "node tools/assets.ts",
     "docs": "node tools/docs.ts",
-    "signal": "node tools/signal.ts"
+    "signal": "node tools/signal.ts",
+    "adventure": "node tools/adventure.ts",
+    "verify:run": "node tools/adventure.ts playthrough 9"
   },
   "dependencies": {
     "peerjs": "1.5.5"

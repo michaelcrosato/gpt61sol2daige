@@ -1,4 +1,6 @@
 import "./style.css";
+import "./adventure.css";
+import { AdventureUI } from "./app/adventure-ui.ts";
 import { GameDisplay } from "./app/display.ts";
 import {
   DEFAULT_SETTINGS,
@@ -16,6 +18,7 @@ import { AgentRuntime, type Command } from "./engine/agent.ts";
 import { clamp } from "./engine/math.ts";
 import { type Input, idleInput, type SaveState, Simulation, STEP } from "./engine/simulation.ts";
 import { LANDMARKS } from "./engine/world.ts";
+import type { AdventureAction } from "./game/types.ts";
 import { Coop } from "./net/coop.ts";
 import { Renderer } from "./render/renderer.ts";
 
@@ -41,6 +44,7 @@ renderer.entityLimit = preferences.entityLimit;
 const audio = new AudioEngine();
 let started = false,
   paused = false,
+  manuallyPaused = false,
   view = "world",
   lastInput = "",
   latestEvent = -1,
@@ -53,6 +57,16 @@ let touchInput = { x: 0, y: 0 },
   pulseUntil = 0,
   dashUntil = 0,
   interactUntil = 0;
+let attackUntil = 0,
+  lanceUntil = 0,
+  novaUntil = 0,
+  potionUntil = 0,
+  attacking = false,
+  pointerAim = false;
+let pointerWorld = { x: 0, y: 0 },
+  latestCombatEvent = 0;
+let pointerScreen = { x: 0, y: 0 },
+  combatSession = "";
 let fps = 60,
   frameMs = 16.67,
   accumulator = 0,
@@ -83,6 +97,32 @@ const display = new GameDisplay(
   },
   toast,
 );
+const adventureUI = new AdventureUI({
+  sim: () => runtime.sim,
+  player: () => net.localId,
+  role: () => net.status.role,
+  action: gameAction,
+  showDialog: openDialog,
+  closeDialog: closeDialog,
+  notify: toast,
+  clearInput: () => {
+    keys.clear();
+    touchInput = { x: 0, y: 0 };
+    inputOverride = null;
+    attacking = false;
+  },
+  preview: (index) => {
+    execute({ op: "encounter", index });
+    renderer.follow = true;
+    latestCombatEvent = 0;
+  },
+});
+async function gameAction(action: AdventureAction): Promise<unknown> {
+  if (net.status.role === "guest") return net.action(action);
+  const result = execute({ op: "adventure", action });
+  if (action.type === "new-run") latestCombatEvent = 0;
+  return result;
+}
 
 function quality(): Settings {
   return {
@@ -145,7 +185,7 @@ function showSettings(): void {
   inputOverride = null;
   fillSettings(quality());
   updateNetwork();
-  el<HTMLDialogElement>("settings-dialog").showModal();
+  openDialog(el<HTMLDialogElement>("settings-dialog"));
 }
 for (const id of ["settings-open", "game-settings"]) el(id).addEventListener("click", showSettings);
 for (const [field] of settingFields) {
@@ -257,7 +297,11 @@ function ensureAuthority(): void {
 function execute(command: Command): unknown {
   if (!command || typeof command !== "object" || typeof command.op !== "string")
     throw new Error("Expected a command object");
-  if (!["observe", "describe", "inspect", "save"].includes(command.op)) ensureAuthority();
+  if (
+    !["observe", "describe", "inspect", "save", "catalog"].includes(command.op) &&
+    !(command.op === "adventure" && !command.action)
+  )
+    ensureAuthority();
   if (
     net.status.role !== "solo" &&
     ["reset", "restore", "join", "leave", "step", "teleport"].includes(command.op)
@@ -266,6 +310,7 @@ function execute(command: Command): unknown {
   if (command.op === "restore") {
     const restored = Simulation.restore(command.state as SaveState);
     const me = restored.players.get("local") ?? restored.players.values().next().value;
+    restored.adventure.retainPlayer(me?.id ?? "local", "local");
     restored.players.clear();
     if (me) {
       me.id = "local";
@@ -277,6 +322,7 @@ function execute(command: Command): unknown {
   if (["reset", "restore"].includes(command.op)) {
     runtime.localId = net.localId;
     latestEvent = -1;
+    latestCombatEvent = 0;
     lastInput = "";
     accumulator = 0;
     updateUI();
@@ -299,7 +345,10 @@ function safe(action: () => unknown) {
   };
 }
 function changeView(next: string): void {
+  el("sidebar").classList.remove("open");
+  el("game-journal").setAttribute("aria-expanded", "false");
   view = next;
+  refreshPause();
   keys.clear();
   touchInput = { x: 0, y: 0 };
   inputOverride = null;
@@ -315,8 +364,7 @@ function changeView(next: string): void {
   updateUI();
 }
 function drawAtlas(): void {
-  const p = runtime.sim.players.get(net.localId);
-  atlasCenter = { x: p?.x ?? 0, y: p?.y ?? 0 };
+  atlasCenter = { x: 1400, y: 0 };
   renderer.atlas(
     el<HTMLCanvasElement>("atlas-canvas"),
     runtime.sim.world,
@@ -364,21 +412,41 @@ function updateNetwork(): void {
   for (const id of ["setting-population", "setting-population-value"])
     el<HTMLInputElement>(id).disabled = guest;
   el("population-help").textContent = guest
-    ? "The host sets the shared population. You can still change your own draw distance and visible-creature limit."
-    : "How many creatures are simulated. In co-op, the host sets this for everyone.";
+    ? "The host sets ambient wildlife. Your view limit is independent; encounter enemies always stay visible."
+    : "Ambient wildlife around the combat areas. Encounters generate their own enemies; the host controls population in co-op.";
   for (const id of ["pause", "step", "load", "game-load", "replay"])
     el<HTMLButtonElement>(id).disabled = online;
   el<HTMLButtonElement>("game-save").disabled = guest;
   runtime.localId = net.localId;
   if (online && paused) setPaused(false);
+  refreshPause();
 }
 function setPaused(value: boolean): void {
   if (net.status.role !== "solo" && value)
     throw new Error("Leave the expedition to pause the simulation.");
-  paused = value;
-  accumulator = 0;
+  manuallyPaused = value;
+  refreshPause();
+}
+function refreshPause(): void {
+  const next =
+    manuallyPaused ||
+    (net.status.role === "solo" && (view === "atlas" || !!document.querySelector("dialog[open]")));
+  if (next !== paused) accumulator = 0;
+  paused = next;
   el("pause-label").hidden = !paused;
   el("pause").innerHTML = `${icon(paused ? "play" : "pause", 15)}${paused ? "Resume" : "Pause"}`;
+}
+function openDialog(dialog: HTMLDialogElement): void {
+  keys.clear();
+  touchInput = { x: 0, y: 0 };
+  inputOverride = null;
+  attacking = false;
+  if (!dialog.open) dialog.showModal();
+  refreshPause();
+}
+function closeDialog(dialog: HTMLDialogElement): void {
+  dialog.close();
+  refreshPause();
 }
 async function saveTrail(): Promise<void> {
   ensureAuthority();
@@ -395,7 +463,13 @@ async function loadTrail(): Promise<void> {
   toast("Welcome back to your trail.");
   begin();
 }
-el("begin").addEventListener("click", begin);
+el("begin").addEventListener(
+  "click",
+  safe(async () => {
+    begin();
+    if (runtime.sim.adventure.state.mode === "town") await gameAction({ type: "depart" });
+  }),
+);
 el("continue").addEventListener("click", safe(loadTrail));
 void hasCheckpoint().then((saved) => {
   el("continue").hidden = !saved;
@@ -434,6 +508,41 @@ el("pulse").addEventListener("click", () => {
   if (!started) begin();
   pulseUntil = performance.now() + 180;
 });
+el("attack-button").addEventListener("pointerdown", (event) => {
+  event.preventDefault();
+  if (!started) begin();
+  inputOverride = null;
+  pointerAim = false;
+  attacking = true;
+  el("attack-button").setPointerCapture(event.pointerId);
+});
+for (const name of ["pointerup", "pointercancel", "lostpointercapture"])
+  el("attack-button").addEventListener(name, () => {
+    attacking = false;
+  });
+el("attack-button").addEventListener("click", () => {
+  attackUntil = performance.now() + 200;
+});
+el("lance-button").addEventListener("click", () => {
+  if (!started) begin();
+  if (!runtime.sim.adventure.stats(net.localId).lance) {
+    toast("Unlock Thornlance in the Stormstep skill path (K).");
+    return;
+  }
+  lanceUntil = performance.now() + 180;
+});
+el("nova-button").addEventListener("click", () => {
+  if (!started) begin();
+  if (!runtime.sim.adventure.stats(net.localId).nova) {
+    toast("Unlock Bloom Nova in the Emberwake skill path (K).");
+    return;
+  }
+  novaUntil = performance.now() + 180;
+});
+el("potion-button").addEventListener("click", () => {
+  if (!started) begin();
+  potionUntil = performance.now() + 180;
+});
 el("dash").addEventListener("click", () => {
   if (!started) begin();
   dashUntil = performance.now() + 180;
@@ -452,9 +561,10 @@ el("sound").addEventListener(
     el("sound").setAttribute("aria-label", enabled ? "Disable sound" : "Enable sound");
   }),
 );
-el("help").addEventListener("click", () => el<HTMLDialogElement>("help-dialog").showModal());
+el("help").addEventListener("click", () => openDialog(el<HTMLDialogElement>("help-dialog")));
 el("help-done").addEventListener("click", () => el<HTMLDialogElement>("help-dialog").close());
 for (const dialog of document.querySelectorAll<HTMLDialogElement>("dialog")) {
+  dialog.addEventListener("close", refreshPause);
   dialog.addEventListener("click", (event) => {
     if (event.target === dialog) {
       const r = dialog.getBoundingClientRect();
@@ -470,7 +580,7 @@ for (const dialog of document.querySelectorAll<HTMLDialogElement>("dialog")) {
 }
 function showSession(): void {
   keys.clear();
-  el<HTMLDialogElement>("session-dialog").showModal();
+  openDialog(el<HTMLDialogElement>("session-dialog"));
   updateNetwork();
 }
 el("invite").addEventListener("click", showSession);
@@ -610,7 +720,22 @@ let dragging = false,
 canvas.addEventListener("contextmenu", (e) => e.preventDefault());
 canvas.addEventListener("pointerdown", (event) => {
   canvas.focus({ preventScroll: true });
+  const rect = canvas.getBoundingClientRect();
+  pointerScreen = { x: event.clientX - rect.left, y: event.clientY - rect.top };
+  pointerWorld = renderer.screenToWorld(event.clientX - rect.left, event.clientY - rect.top);
+  if (event.button === 0) {
+    if (!started) begin();
+    inputOverride = null;
+    attacking = true;
+    pointerAim = true;
+    canvas.setPointerCapture(event.pointerId);
+  }
   if (event.button === 2) {
+    if (!started) begin();
+    pointerAim = true;
+    lanceUntil = performance.now() + 180;
+  }
+  if (event.button === 1) {
     dragging = true;
     renderer.follow = false;
     dragX = event.clientX;
@@ -619,17 +744,22 @@ canvas.addEventListener("pointerdown", (event) => {
   }
 });
 canvas.addEventListener("pointermove", (event) => {
+  const rect = canvas.getBoundingClientRect();
+  pointerScreen = { x: event.clientX - rect.left, y: event.clientY - rect.top };
+  pointerWorld = renderer.screenToWorld(event.clientX - rect.left, event.clientY - rect.top);
   if (!dragging) return;
   renderer.x -= (event.clientX - dragX) / renderer.zoom;
   renderer.y -= (event.clientY - dragY) / renderer.zoom;
   dragX = event.clientX;
   dragY = event.clientY;
 });
-canvas.addEventListener("pointerup", () => {
-  dragging = false;
+canvas.addEventListener("pointerup", (event) => {
+  if (!(event.buttons & 4)) dragging = false;
+  if (!(event.buttons & 1)) attacking = false;
 });
 canvas.addEventListener("pointercancel", () => {
   dragging = false;
+  attacking = false;
 });
 canvas.addEventListener(
   "wheel",
@@ -667,6 +797,12 @@ const movementKeys = [
   "e",
   "2",
   "3",
+  "4",
+  "1",
+  "q",
+  "r",
+  "f",
+  "j",
 ];
 document.addEventListener("keydown", (event) => {
   if (
@@ -678,6 +814,19 @@ document.addEventListener("keydown", (event) => {
   )
     return;
   const key = event.key.toLowerCase();
+  if (!event.repeat && ["i", "k", "p", "t"].includes(key)) {
+    event.preventDefault();
+    if (key === "i") adventureUI.open("inventory");
+    if (key === "k") adventureUI.open("skills");
+    if (key === "p") adventureUI.open("pause");
+    if (key === "t") void adventureUI.act({ type: "return" });
+    return;
+  }
+  if (key === "escape" && !display.gameMode && !event.repeat) {
+    event.preventDefault();
+    adventureUI.open("pause");
+    return;
+  }
   if ((key === "g" || (key === "escape" && display.gameMode)) && !event.repeat) {
     event.preventDefault();
     keys.clear();
@@ -699,8 +848,9 @@ document.addEventListener("keydown", (event) => {
     inputOverride = null;
     keys.add(key);
   }
-  if (key === "1" && !event.repeat) el("lantern").click();
-  if (key === "f") renderer.follow = true;
+  if (key === "l" && !event.repeat) el("lantern").click();
+  if (key === "c") renderer.follow = true;
+  if (key === "j") pointerAim = false;
   if (key === "+" || key === "=") renderer.setZoom(renderer.targetZoom * 1.2);
   if (key === "-") renderer.setZoom(renderer.targetZoom / 1.2);
 });
@@ -709,6 +859,7 @@ window.addEventListener("blur", () => {
   keys.clear();
   inputOverride = null;
   touchInput = { x: 0, y: 0 };
+  attacking = false;
 });
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) {
@@ -721,6 +872,9 @@ document.addEventListener("visibilitychange", () => {
 function getInput(now: number): Input {
   if (inputOverride) return inputOverride;
   if (!started || view !== "world" || document.querySelector("dialog[open]")) return idleInput();
+  const player = runtime.sim.players.get(net.localId);
+  pointerWorld = renderer.screenToWorld(pointerScreen.x, pointerScreen.y);
+  const aimDistance = player ? Math.hypot(pointerWorld.x - player.x, pointerWorld.y - player.y) : 1;
   return {
     x: clamp(
       (keys.has("d") || keys.has("arrowright") ? 1 : 0) -
@@ -736,9 +890,15 @@ function getInput(now: number): Input {
       -1,
       1,
     ),
-    dash: keys.has("shift") || keys.has("3") || now < dashUntil,
-    pulse: keys.has(" ") || keys.has("2") || now < pulseUntil,
+    dash: keys.has("shift") || keys.has(" ") || now < dashUntil,
+    pulse: keys.has("q") || keys.has("2") || now < pulseUntil,
     interact: keys.has("e") || now < interactUntil,
+    attack: attacking || keys.has("j") || now < attackUntil,
+    lance: keys.has("r") || keys.has("3") || now < lanceUntil,
+    nova: keys.has("f") || keys.has("4") || now < novaUntil,
+    potion: keys.has("1") || now < potionUntil,
+    aimX: pointerAim && player ? (pointerWorld.x - player.x) / Math.max(1, aimDistance) : 0,
+    aimY: pointerAim && player ? (pointerWorld.y - player.y) / Math.max(1, aimDistance) : 0,
   };
 }
 function updateUI(): void {
@@ -756,7 +916,11 @@ function updateUI(): void {
   el("game-fps").textContent = `${Math.round(fps)} FPS`;
   el("game-entities").textContent =
     `${renderer.metrics.drawn.toLocaleString()} visible · ${total.toLocaleString()} active`;
-  el("game-quest").textContent = `${sim.beacons.size} / 3 beacons · ${sim.shards} light shards`;
+  const run = sim.adventure.state;
+  el("game-quest").textContent =
+    run.mode === "town"
+      ? `Land ${run.townLand + 1} · town sanctuary`
+      : `Area ${run.area} · ${run.cleared ? "outward gate open" : `${run.kills} / ${run.recipe.killGoal} defeated`}`;
   const rateTime = performance.now();
   if (rateTime - lastRateTime >= 1000 || sim.tick < lastRateTick) {
     tickRate = Math.max(
@@ -778,8 +942,9 @@ function updateUI(): void {
     el("game-sound").dataset.enabled = String(audio.enabled);
   }
   if (player) {
-    el("location").textContent = sim.world.biome(player.x, player.y);
-    el("game-location").textContent = sim.world.biome(player.x, player.y);
+    const location = run.mode === "area" ? run.recipe.name : sim.world.biome(player.x, player.y);
+    el("location").textContent = location;
+    el("game-location").textContent = location;
     el("coordinates").textContent = `${Math.round(player.x)}, ${Math.round(player.y)}`;
     el("energy-fill").style.width = `${clamp(player.energy, 0, 100)}%`;
     for (const landmark of LANDMARKS.slice(1)) {
@@ -804,15 +969,39 @@ function updateUI(): void {
       el("population-label").textContent = total.toLocaleString();
     }
   }
+  adventureUI.update();
 }
 function processEvents(): void {
+  const session = `${runtime.sim.adventure.state.seed}:${runtime.sim.adventure.state.run}:${net.localId}`;
+  if (session !== combatSession) {
+    combatSession = session;
+    latestCombatEvent = 0;
+  }
   for (let i = 0; i < runtime.sim.events.length; i++) {
     const event = runtime.sim.events[i];
     if (event.tick <= latestEvent) continue;
     if (event.type !== "rest") audio.play(event.type);
-    if (event.player === net.localId && event.message) toast(event.message);
+    if (event.player === net.localId && event.message && event.type !== "pulse")
+      toast(event.message);
   }
   if (runtime.sim.events.length) latestEvent = runtime.sim.events.at(-1)!.tick;
+  for (const event of runtime.sim.adventure.state.events) {
+    if (event.id <= latestCombatEvent) continue;
+    adventureUI.event(event);
+    if (
+      event.type === "slash" ||
+      event.type === "hit" ||
+      event.type === "hurt" ||
+      event.type === "level"
+    )
+      audio.play(event.type);
+    else if (event.type === "kill") audio.play("hit");
+    else if (event.type === "whorl" || event.type === "nova") audio.play("pulse");
+    else if (event.type === "loot") audio.play("shard");
+    else if (event.type === "portal" || event.type === "boss") audio.play("beacon");
+  }
+  if (runtime.sim.adventure.state.events.length)
+    latestCombatEvent = runtime.sim.adventure.state.events.at(-1)!.id;
 }
 function loop(now: number): void {
   const elapsed = (now - lastFrame) / 1000;
@@ -863,14 +1052,21 @@ function loop(now: number): void {
         ? 1
         : clamp(accumulator / STEP, 0, 1);
   if (view === "world") {
-    renderer.draw(runtime.sim, net.localId, alpha, now / 1000, delta);
+    renderer.draw(
+      runtime.sim,
+      net.localId,
+      alpha,
+      now / 1000,
+      delta,
+      runtime.sim.tick + (paused ? 0 : alpha * (net.status.role === "guest" ? 6 : 1)),
+    );
     renderMs = renderMs * 0.9 + renderer.metrics.renderMs * 0.1;
   }
   if (now - lastUI > 250) {
     updateUI();
-    processEvents();
     lastUI = now;
   }
+  processEvents();
   requestAnimationFrame(loop);
 }
 
@@ -879,6 +1075,7 @@ const api = {
   describe: () => runtime.execute({ op: "describe" }),
   observe: () => ({
     ...runtime.sim.observe(),
+    adventure: runtime.sim.adventure.observe(net.localId, runtime.sim.tick),
     render: {
       ...renderer.metrics,
       renderMs,
@@ -890,6 +1087,8 @@ const api = {
       width: renderer.width,
       height: renderer.height,
       simulationHz: tickRate,
+      cameraX: renderer.x,
+      cameraY: renderer.y,
     },
     settings: quality(),
     display: display.observe(),
@@ -898,6 +1097,12 @@ const api = {
     view,
   }),
   command: (command: Command) => execute(command),
+  game: {
+    action: gameAction,
+    observe: () => runtime.sim.adventure.observe(net.localId, runtime.sim.tick),
+    panel: (panel: "inventory" | "skills" | "town" | "pause" | "mechanics") =>
+      adventureUI.open(panel),
+  },
   batch: (commands: Command[]) => {
     if (!Array.isArray(commands) || commands.length > 1000)
       throw new Error("Batch must contain at most 1000 commands");
