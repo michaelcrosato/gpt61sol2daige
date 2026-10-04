@@ -1,0 +1,7 @@
+{"op":"physics","action":"reset"}
+{"op":"physics","action":"impulse","id":"wheel","x":240,"y":0,"atX":-140,"atY":54}
+{"op":"physics","action":"impulse","id":"crate-0","x":600,"y":50}
+{"op":"step","ticks":120}
+{"op":"physics","action":"sweep"}
+{"op":"step","ticks":30}
+{"op":"physics","action":"inspect"}

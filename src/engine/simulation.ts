@@ -1,6 +1,9 @@
 import { Adventure } from "../game/adventure.ts";
 import type { AdventureState } from "../game/types.ts";
 import { validateAdventure } from "../game/validation.ts";
+import { rapier } from "../physics/bootstrap.ts";
+import { PhysicsWorld, validatePhysicsSnapshot } from "../physics/runtime.ts";
+import type { PhysicsSnapshot } from "../physics/types.ts";
 import { MAX_NPCS } from "./limits.ts";
 import { checksum, clamp, distance, hash, random } from "./math.ts";
 import { type Body, collideCircles, moveBody, SpatialHash } from "./physics.ts";
@@ -66,6 +69,7 @@ export interface SaveState {
   patches: TerrainPatch[];
   players: Player[];
   adventure?: AdventureState;
+  playground?: PhysicsSnapshot;
   npcs: {
     x: number[];
     y: number[];
@@ -77,6 +81,8 @@ export interface SaveState {
   };
 }
 export class Simulation {
+  playground: PhysicsWorld | null = null;
+  private disposed = false;
   world: World;
   adventure: Adventure;
   tick = 0;
@@ -102,6 +108,7 @@ export class Simulation {
   private readonly b: Body = { x: 0, y: 0, vx: 0, vy: 0, radius: 3 };
 
   constructor(seed = 142, population = 2400) {
+    rapier();
     this.world = new World(seed);
     this.adventure = new Adventure(seed);
     this.adventure.configureWorld(this);
@@ -110,6 +117,8 @@ export class Simulation {
   addPlayer(id: string, name = "Wayfarer"): Player {
     const existing = this.players.get(id);
     if (existing) return existing;
+    if (this.playground && this.players.size)
+      throw new Error("Physics playground is solo-only until M04");
     if (this.players.size >= MAX_PLAYERS) throw new Error("This expedition is full (8 players).");
     if (!/^[\w-]{1,80}$/.test(id)) throw new Error("Invalid player id");
     const color = [...Array(MAX_PLAYERS).keys()].find(
@@ -283,6 +292,7 @@ export class Simulation {
     );
   }
   step(steps = 1): void {
+    if (this.disposed) throw new Error("Simulation is disposed");
     if (!Number.isInteger(steps) || steps < 0 || steps > 36000)
       throw new Error("Step count must be 0–36000");
     const start = performance.now();
@@ -441,6 +451,7 @@ export class Simulation {
         if (collideCircles(players[a], players[b], 3, 3)) this.metrics.contacts++;
     }
     this.adventure.step(this);
+    this.playground?.step();
   }
   stateHash(): string {
     let h = checksum([this.world.seed, this.tick, this.count, this.shards]);
@@ -498,6 +509,11 @@ export class Simulation {
     const adventure = JSON.stringify(this.adventure.state);
     for (let i = 0; i < adventure.length; i++)
       h = Math.imul(h ^ adventure.charCodeAt(i), 16777619) >>> 0;
+    if (this.playground) {
+      const physics = JSON.stringify(this.playground.save());
+      for (let i = 0; i < physics.length; i++)
+        h = Math.imul(h ^ physics.charCodeAt(i), 16777619) >>> 0;
+    }
     return h.toString(16).padStart(8, "0");
   }
   observe() {
@@ -531,6 +547,7 @@ export class Simulation {
         editedTiles: this.world.patches.size,
       },
       physics: { ...this.metrics },
+      playground: this.playground?.inspect() ?? null,
       events: this.events.slice(-8),
       adventure: this.adventure.observe(this.players.keys().next().value, this.tick),
     };
@@ -547,6 +564,7 @@ export class Simulation {
       patches: [...this.world.patches.values()].map((p) => [...p]),
       players: structuredClone([...this.players.values()]),
       adventure: this.adventure.save(),
+      ...(this.playground ? { playground: this.playground.save() } : {}),
       npcs: {
         x: Array.from(this.x.subarray(0, this.count)),
         y: Array.from(this.y.subarray(0, this.count)),
@@ -575,7 +593,21 @@ export class Simulation {
       sim[key].set(state.npcs[key]);
     sim.px.set(sim.x);
     sim.py.set(sim.y);
+    if (state.playground) {
+      try {
+        sim.playground = PhysicsWorld.restore(state.playground);
+      } catch (error) {
+        sim.dispose();
+        throw error;
+      }
+    }
     return sim;
+  }
+  dispose(): void {
+    if (this.disposed) return;
+    this.disposed = true;
+    this.playground?.dispose();
+    this.playground = null;
   }
 }
 
@@ -604,6 +636,10 @@ export function validateSave(state: SaveState): void {
   )
     throw new Error("Invalid save header");
   validatePatches(state.patches ?? []);
+  if (state.playground) {
+    if (state.players.length > 1) throw new Error("Saved physics playground must be solo-only");
+    validatePhysicsSnapshot(state.playground);
+  }
   if (state.adventure) validateAdventure(state.adventure);
   const ids = new Set<string>();
   for (const p of state.players) {

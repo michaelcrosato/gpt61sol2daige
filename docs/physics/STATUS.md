@@ -1,13 +1,13 @@
 # Reactive physics milestone status
 
-Planning baseline: `c47cb119d6f57c70ddf79a4a72db59376d68f1e5` on `main`, Fern 2.0. Planning date: 2026-10-04. The current deliverable adds this plan and execution guidance only.
+Planning baseline: `c47cb119d6f57c70ddf79a4a72db59376d68f1e5` on `main`, Fern 2.0. Planning PR [#2](https://github.com/michaelcrosato/gpt61sol2daige/pull/2) is merged at `00ab840c1f1757d554610570145820269be6b2e8`, verified with Git/GitHub on 2026-10-04.
 
-**Next eligible implementation milestone: M01. No physics implementation milestone has started.** Select the requested implementation model and use a fresh session with [START.md](START.md).
+**M01 is implemented; merge verification is required. M02 is next only after verifying M01's merged PR and ancestry.** Use a fresh GPT-6.1 Sol / xhigh session with [START.md](START.md), then reconcile this pre-commit status from Git/GitHub evidence.
 
 | Milestone | State | Handoff and evidence |
 | --- | --- | --- |
-| Planning | Prepared; verify containing PR merge through GitHub | [Planning handoff](handoffs/M00.md) |
-| M01 | Not started | [Foundation](milestones/M01.md) |
+| Planning | Verified and merged | [Planning handoff](handoffs/M00.md), PR #2 |
+| M01 | Implemented; merge verification required | [Foundation handoff](handoffs/M01.md), [scene evidence](../evidence/physics-m01.json) |
 | M02 | Not started | [Regional controls](milestones/M02.md) |
 | M03 | Not started | [Actors and world](milestones/M03.md) |
 | M04 | Not started | [Saves and co-op](milestones/M04.md) |

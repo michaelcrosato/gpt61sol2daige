@@ -4,8 +4,11 @@ import { Simulation } from "../src/engine/simulation.ts";
 import { areaRecipe, BEHAVIORS, LAYOUTS, MECHANICS, RIGS, THEMES } from "../src/game/content.ts";
 import { SKILLS } from "../src/game/skills.ts";
 import { validateArea } from "../src/game/validation.ts";
+import { initializePhysics } from "../src/physics/bootstrap.ts";
 import { type RigRecipe, rigSvg } from "../src/render/rigs.ts";
 import { fightArea } from "./lib/expedition-bot.ts";
+
+await initializePhysics();
 
 const args = process.argv.slice(2);
 const outIndex = args.indexOf("--out"),

@@ -1,6 +1,6 @@
 # Architecture
 
-Fern is a single TypeScript repository with a browser-independent simulation. There is no imported game engine, scene editor, rendering framework, physics library, artwork pack or audio pack.
+Fern is a single TypeScript repository with a browser-independent simulation. Its solo physics playground uses the official Rapier2D JavaScript/WASM package behind a local adapter. There is no imported game engine, scene editor, rendering framework, artwork pack or audio pack. Adventure actors and ambient wildlife retain the existing solver until their physics milestones.
 
 ```text
 JSONL / browser commands ─── AgentRuntime ─── Simulation (60 Hz)
@@ -22,6 +22,9 @@ JSONL / browser commands ─── AgentRuntime ─── Simulation (60 Hz)
 | `src/engine/math.ts` | Integer coordinate hashes, smooth noise, checksums | DOM, network, wall-clock randomness |
 | `src/engine/world.ts` | Seeded terrain, tile patches, bounded chunk cache | Camera, renderer, mutable RNG |
 | `src/engine/physics.ts` | Spatial buckets, circle impulses, static contacts, swept substeps | Game UI or audio |
+| `src/physics/bootstrap.ts` | Shared async Rapier initialization, readiness and caller cancellation | DOM, network |
+| `src/physics/runtime.ts` | Rapier world/queue, stable body IDs, solved transforms, contacts and validated playground snapshots | DOM, renderer, transport |
+| `src/app/physics-ui.ts` | Solo lab controls and real body/collider drawing | Ownership of Rapier handles |
 | `src/engine/simulation.ts` | Fixed-step state, NPC arrays, players, shared quest, checkpoints | Browser or transport |
 | `src/engine/agent.ts` | Validated commands, observation and replay | Browser or filesystem |
 | `src/game/content.ts`, `skills.ts`, `loot.ts` | Area recipes, modular registries, skill gates and item rolls | DOM, transport, mutable RNG |
@@ -104,3 +107,13 @@ Solo browser recording covers gameplay inputs and simulation advancement. Online
 ### Join lifecycle
 
 A guest requests a welcome until the first valid world snapshot is received. The host admits an already-open native channel idempotently and rate-limits repeated welcome responses. A transient failure during admission recreates the connection, with handshake timeouts of 6, 10 and 22 seconds across at most three attempts. Explicit full-room/version rejection and invalid snapshots are not retried. Generation and request identifiers prevent callbacks from canceled attempts from mutating a new session. The native connection still carries every byte; no test substitutes a fake transport.
+
+## M01 physics foundation
+
+Await `initializePhysics()` from `src/physics/bootstrap.ts` before constructing, restoring or replaying a `Simulation`. Browser boot, all direct Node tool entry points, headless tests and browser replay tests use this explicit barrier. Importing engine modules still requires no DOM, GPU or network. The compatibility package embeds WASM; initialization does not fetch a separate WASM URL. Failed browser boot displays an error with reload guidance. Canceling one initialization waiter does not cancel another; no world exists until a ready caller explicitly opens a scene.
+
+`Simulation.playground` is null by default. `physics/reset` is the temporary development selector that opens its ten-body recipe. Rapier exclusively owns those poses, with zero global gravity, 16 Fern units per physics unit and one synchronous 1/60-second step per simulation tick. Commands apply between ticks; impulses take effect on the next solve. No legacy integration writes playground bodies. `physics/close`, reset, restore, failed replay and browser replacement dispose the superseded world and event queue. `Simulation.dispose()` is idempotent. Caller-owned simulations returned by `replay()` must be disposed by the caller.
+
+Version-1 game checkpoints optionally contain a version-1 `playground` member. It preserves pinned backend version, unit scale, tick, stable body IDs with body/collider handles, recipes, snapshot bytes/checksum and bounded contact history. Restore validates lengths, byte values, identity uniqueness, registry/world correspondence, shapes, body properties and finite solved state; rejected restores preserve the current simulation. Same-build tests compare full solved continuation and replay hashes. Raw backend snapshots are version-specific and are not a cross-version migration format. The development lab explicitly limits command/checkpoint bodies to 4,096 and binary snapshots to 4 MB; this is neither an ambient physics budget nor an adaptive cutoff.
+
+The Canvas playground draws solved positions/angles and Rapier's collider lines, with contact impact audio through the existing synth. It is solo-only until M04. Opening a room while a scene exists is rejected before altering the scene; opening a scene during an online or connecting room is also rejected. Protocol 3 rejects playground encoding instead of silently sending incomplete physical state. Eight actual browser clients continue to exercise the ordinary adventure protocol.

@@ -3,7 +3,10 @@ import test from "node:test";
 import { type SoundName, synthesize, wav } from "../src/audio/synth.ts";
 import { Simulation } from "../src/engine/simulation.ts";
 import { decodeSnapshot, encodeSnapshot, snapshotBuffer } from "../src/net/protocol.ts";
+import { initializePhysics } from "../src/physics/bootstrap.ts";
 import { spritePixels, spriteSvg, validateRecipe } from "../src/render/sprites.ts";
+
+await initializePhysics();
 
 test("binary snapshots synchronize players, shared quest, and thousands of creatures", () => {
   const sim = new Simulation(142, 6000);

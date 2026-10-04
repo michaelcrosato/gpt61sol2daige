@@ -12,8 +12,11 @@
 <nav aria-label="Documentation"><a href="/">fern. <span>Back to the world</span></a><a href="/docs/report.html">Design report</a><a href="/docs/agent-protocol.html">Agent protocol</a><a href="/docs/verification.html">Verification</a></nav>
 <main><h1 id="architecture">Architecture</h1>
 <p>Fern is a single TypeScript repository with a browser-independent
-simulation. There is no imported game engine, scene editor, rendering
-framework, physics library, artwork pack or audio pack.</p>
+simulation. Its solo physics playground uses the official Rapier2D
+JavaScript/WASM package behind a local adapter. There is no imported
+game engine, scene editor, rendering framework, artwork pack or audio
+pack. Adventure actors and ambient wildlife retain the existing solver
+until their physics milestones.</p>
 <pre class="text"><code>JSONL / browser commands ─── AgentRuntime ─── Simulation (60 Hz)
                                                 │
                            World generation ────┤
@@ -54,6 +57,23 @@ framework, physics library, artwork pack or audio pack.</p>
 <td>Spatial buckets, circle impulses, static contacts, swept
 substeps</td>
 <td>Game UI or audio</td>
+</tr>
+<tr>
+<td><code>src/physics/bootstrap.ts</code></td>
+<td>Shared async Rapier initialization, readiness and caller
+cancellation</td>
+<td>DOM, network</td>
+</tr>
+<tr>
+<td><code>src/physics/runtime.ts</code></td>
+<td>Rapier world/queue, stable body IDs, solved transforms, contacts and
+validated playground snapshots</td>
+<td>DOM, renderer, transport</td>
+</tr>
+<tr>
+<td><code>src/app/physics-ui.ts</code></td>
+<td>Solo lab controls and real body/collider drawing</td>
+<td>Ownership of Rapier handles</td>
 </tr>
 <tr>
 <td><code>src/engine/simulation.ts</code></td>
@@ -364,7 +384,48 @@ admission recreates the connection, with handshake timeouts of 6, 10 and
 rejection and invalid snapshots are not retried. Generation and request
 identifiers prevent callbacks from canceled attempts from mutating a new
 session. The native connection still carries every byte; no test
-substitutes a fake transport.</p></main>
+substitutes a fake transport.</p>
+<h2 id="m01-physics-foundation">M01 physics foundation</h2>
+<p>Await <code>initializePhysics()</code> from
+<code>src/physics/bootstrap.ts</code> before constructing, restoring or
+replaying a <code>Simulation</code>. Browser boot, all direct Node tool
+entry points, headless tests and browser replay tests use this explicit
+barrier. Importing engine modules still requires no DOM, GPU or network.
+The compatibility package embeds WASM; initialization does not fetch a
+separate WASM URL. Failed browser boot displays an error with reload
+guidance. Canceling one initialization waiter does not cancel another;
+no world exists until a ready caller explicitly opens a scene.</p>
+<p><code>Simulation.playground</code> is null by default.
+<code>physics/reset</code> is the temporary development selector that
+opens its ten-body recipe. Rapier exclusively owns those poses, with
+zero global gravity, 16 Fern units per physics unit and one synchronous
+1/60-second step per simulation tick. Commands apply between ticks;
+impulses take effect on the next solve. No legacy integration writes
+playground bodies. <code>physics/close</code>, reset, restore, failed
+replay and browser replacement dispose the superseded world and event
+queue. <code>Simulation.dispose()</code> is idempotent. Caller-owned
+simulations returned by <code>replay()</code> must be disposed by the
+caller.</p>
+<p>Version-1 game checkpoints optionally contain a version-1
+<code>playground</code> member. It preserves pinned backend version,
+unit scale, tick, stable body IDs with body/collider handles, recipes,
+snapshot bytes/checksum and bounded contact history. Restore validates
+lengths, byte values, identity uniqueness, registry/world
+correspondence, shapes, body properties and finite solved state;
+rejected restores preserve the current simulation. Same-build tests
+compare full solved continuation and replay hashes. Raw backend
+snapshots are version-specific and are not a cross-version migration
+format. The development lab explicitly limits command/checkpoint bodies
+to 4,096 and binary snapshots to 4 MB; this is neither an ambient
+physics budget nor an adaptive cutoff.</p>
+<p>The Canvas playground draws solved positions/angles and Rapier’s
+collider lines, with contact impact audio through the existing synth. It
+is solo-only until M04. Opening a room while a scene exists is rejected
+before altering the scene; opening a scene during an online or
+connecting room is also rejected. Protocol 3 rejects playground encoding
+instead of silently sending incomplete physical state. Eight actual
+browser clients continue to exercise the ordinary adventure
+protocol.</p></main>
 <footer>Fern · A world engine built for agents · <a href="https://github.com/michaelcrosato/gpt61sol2daige">Source on GitHub</a></footer>
 </body>
 </html>

@@ -5,6 +5,9 @@ import { MAX_NPCS } from "../src/engine/limits.ts";
 import { Simulation } from "../src/engine/simulation.ts";
 import { EntityVisibility } from "../src/engine/visibility.ts";
 import { decodeSnapshot, encodeSnapshot, MAX_PACKET } from "../src/net/protocol.ts";
+import { initializePhysics } from "../src/physics/bootstrap.ts";
+
+await initializePhysics();
 
 test("settings persist exact values and reject malformed or excessive work budgets", () => {
   const next = updateSettings(

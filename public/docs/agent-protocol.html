@@ -384,7 +384,90 @@ rendering detail.</li>
 <p><code>npm run check</code>, <code>npm run build</code>, and
 <code>npm run test:e2e</code> define the repository’s verification
 gates. Tests use local signaling by default; production tests must
-explicitly target the deployed URL.</p></main>
+explicitly target the deployed URL.</p>
+<h2 id="physics-playground-m01">Physics playground (M01)</h2>
+<p>In solo <strong>Agent lab</strong>, choose <strong>Open / reset
+playground</strong>, select a body and use <strong>Push right</strong>,
+<strong>Push off center</strong> or <strong>Launch swept body</strong>.
+The collider checkbox is presentation-only. Pause/run and explicit tick
+controls use the same simulation clock. Save trail, Snapshot JSON and
+replay include the physical scene. Close the playground before
+hosting/joining; online and connecting rooms reject playground commands
+until M04.</p>
+<p>The discoverable <code>physics</code> operation supplies these
+actions:</p>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr>
+<th><code>action</code></th>
+<th>Fields / result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>inspect</code> (default)</td>
+<td>Backend, unit scale, tick, bodies with solved poses/velocities and
+sleeping state, total contact starts and the last 64 contact
+transitions; <code>{active:false}</code> when closed</td>
+</tr>
+<tr>
+<td><code>reset</code></td>
+<td>Open/recreate the ten-body crate/wheel/wall recipe, disposing the
+previous world and queue</td>
+</tr>
+<tr>
+<td><code>close</code></td>
+<td>Dispose the scene without changing adventure progress</td>
+</tr>
+<tr>
+<td><code>spawn</code></td>
+<td><code>body</code>:
+<code>{id,motion:"dynamic"|"fixed",shape:{kind:"circle",radius}|{kind:"box",width,height},x,y,angle?,mass?,friction?,restitution?,damping?,ccd?}</code></td>
+</tr>
+<tr>
+<td><code>impulse</code></td>
+<td><code>id</code>, <code>x?</code>, <code>y?</code> (default 0);
+optional <code>atX</code> and <code>atY</code> world-space application
+point together; linear impulse units are kg·Fern units/s</td>
+</tr>
+<tr>
+<td><code>sweep</code></td>
+<td>Predict the nearest collider on the authored lane and launch the
+real CCD body; returns its ID, path and hit fraction; use
+<code>step</code> to observe contact</td>
+</tr>
+</tbody>
+</table>
+<pre class="json"><code>{&quot;op&quot;:&quot;physics&quot;,&quot;action&quot;:&quot;reset&quot;}
+{&quot;op&quot;:&quot;physics&quot;,&quot;action&quot;:&quot;impulse&quot;,&quot;id&quot;:&quot;wheel&quot;,&quot;x&quot;:240,&quot;y&quot;:0,&quot;atX&quot;:-140,&quot;atY&quot;:54}
+{&quot;op&quot;:&quot;step&quot;,&quot;ticks&quot;:60}
+{&quot;op&quot;:&quot;physics&quot;,&quot;action&quot;:&quot;inspect&quot;}
+{&quot;op&quot;:&quot;physics&quot;,&quot;action&quot;:&quot;spawn&quot;,&quot;body&quot;:{&quot;id&quot;:&quot;my-crate&quot;,&quot;motion&quot;:&quot;dynamic&quot;,&quot;shape&quot;:{&quot;kind&quot;:&quot;box&quot;,&quot;width&quot;:24,&quot;height&quot;:24},&quot;x&quot;:-100,&quot;y&quot;:-90,&quot;mass&quot;:2}}</code></pre>
+<p>Body IDs use 1–80 letters/digits/underscores/hyphens and must be
+unique. Spawn coordinates lie within ±10,000; circle radii are 1–256 and
+box dimensions 1–512. Mass is 0.01–10,000 (default 1), friction 0–10
+(default 0.6), restitution 0–1 (default 0.3), damping 0–100 (default
+0.35), and CCD defaults on. Angles and impulse components/application
+coordinates are finite and bounded by ±100,000. Fixed bodies reject
+impulses. The lab has explicit 4,096-body and 4 MB binary-checkpoint
+limits; these do not alter ambient population. These props remain an
+experimental scene and do not collide with adventure actors yet.</p>
+<pre class="bash"><code>npm run physics                          # asserts the default scene&#39;s movement, spin, contacts, CCD and snapshot/replay
+node tools/physics.ts my-scene.jsonl      # runs an authored command sequence and checks its snapshot/replay continuation
+node tools/agent.ts --count 0 &lt; examples/physics-playground.jsonl</code></pre>
+<p>When importing the engine directly, await
+<code>initializePhysics()</code> from
+<code>src/physics/bootstrap.ts</code> first; synchronous construction,
+restore, commands and replay follow that barrier. Dispose caller-owned
+<code>Simulation</code> instances when finished. Raw playground
+snapshots identify Rapier 0.21.0 and reject incompatible versions; old
+version-1 saves without this member retain the ordinary adventure path.
+FPS/throughput telemetry is informational, with no FPS acceptance
+threshold.</p></main>
 <footer>Fern · A world engine built for agents · <a href="https://github.com/michaelcrosato/gpt61sol2daige">Source on GitHub</a></footer>
 </body>
 </html>

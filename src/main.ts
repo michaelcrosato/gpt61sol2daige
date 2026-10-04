@@ -2,6 +2,7 @@ import "./style.css";
 import "./adventure.css";
 import { AdventureUI } from "./app/adventure-ui.ts";
 import { GameDisplay } from "./app/display.ts";
+import { mountPhysicsUI } from "./app/physics-ui.ts";
 import {
   DEFAULT_SETTINGS,
   PRESETS,
@@ -20,10 +21,27 @@ import { type Input, idleInput, type SaveState, Simulation, STEP } from "./engin
 import { LANDMARKS } from "./engine/world.ts";
 import type { AdventureAction } from "./game/types.ts";
 import { Coop } from "./net/coop.ts";
+import { initializePhysics } from "./physics/bootstrap.ts";
 import { Renderer } from "./render/renderer.ts";
 
 mountUI();
 mountSettingsUI();
+const bootMessage = document.createElement("p");
+bootMessage.id = "physics-boot";
+bootMessage.setAttribute("role", "status");
+bootMessage.textContent = "Preparing the world…";
+document.getElementById("viewport")!.append(bootMessage);
+const bootController = new AbortController();
+window.addEventListener("pagehide", () => bootController.abort(), { once: true });
+try {
+  await initializePhysics(bootController.signal);
+  bootController.signal.throwIfAborted();
+  bootMessage.remove();
+} catch (error) {
+  bootMessage.setAttribute("role", "alert");
+  bootMessage.textContent = `${error instanceof Error ? error.message : String(error)}. Reload to retry.`;
+  throw error;
+}
 let preferences: Settings;
 try {
   preferences = parseSettings(localStorage.getItem(SETTINGS_KEY));
@@ -38,6 +56,10 @@ const seed =
     ? Number(params.get("seed")) >>> 0
     : 142;
 const runtime = new AgentRuntime(new Simulation(seed, preferences.population));
+let physicsEventSource = runtime.sim.playground;
+let latestPhysicsTick = 0;
+let frameHandle = 0;
+let activePage = true;
 const renderer = new Renderer(canvas, el<HTMLCanvasElement>("minimap"));
 renderer.drawDistance = preferences.drawDistance;
 renderer.entityLimit = preferences.entityLimit;
@@ -80,11 +102,18 @@ let tickRate = 60,
 const net = new Coop(
   () => runtime.sim,
   (sim) => {
+    if (runtime.sim !== sim) runtime.sim.dispose();
     runtime.sim = sim;
     runtime.localId = net.localId;
   },
   updateNetwork,
 );
+const physicsUI = mountPhysicsUI({
+  world: () => runtime.sim.playground,
+  solo: () => net.status.role === "solo" && net.status.state !== "connecting",
+  execute,
+  pause: setPaused,
+});
 const display = new GameDisplay(
   updateDisplay,
   () => {
@@ -297,6 +326,10 @@ function ensureAuthority(): void {
 function execute(command: Command): unknown {
   if (!command || typeof command !== "object" || typeof command.op !== "string")
     throw new Error("Expected a command object");
+  if (command.op === "physics" && net.status.state === "connecting")
+    throw new Error(
+      "Wait for the expedition connection to finish before using the solo playground",
+    );
   if (
     !["observe", "describe", "inspect", "save", "catalog"].includes(command.op) &&
     !(command.op === "adventure" && !command.action)
@@ -304,7 +337,7 @@ function execute(command: Command): unknown {
     ensureAuthority();
   if (
     net.status.role !== "solo" &&
-    ["reset", "restore", "join", "leave", "step", "teleport"].includes(command.op)
+    ["reset", "restore", "join", "leave", "step", "teleport", "physics"].includes(command.op)
   )
     throw new Error("Leave the expedition before using this lab command.");
   if (command.op === "restore") {
@@ -317,8 +350,16 @@ function execute(command: Command): unknown {
       restored.players.set("local", me);
     } else restored.addPlayer("local");
     command = { ...command, state: restored.save() };
+    restored.dispose();
   }
   const result = runtime.execute(command);
+  if (
+    ["restore", "reset"].includes(command.op) ||
+    (command.op === "physics" && ["reset", "close"].includes(String(command.action)))
+  ) {
+    physicsEventSource = runtime.sim.playground;
+    latestPhysicsTick = physicsEventSource?.tick ?? 0;
+  }
   if (["reset", "restore"].includes(command.op)) {
     runtime.localId = net.localId;
     latestEvent = -1;
@@ -972,6 +1013,14 @@ function updateUI(): void {
   adventureUI.update();
 }
 function processEvents(): void {
+  const physics = runtime.sim.playground;
+  if (physics !== physicsEventSource) {
+    physicsEventSource = physics;
+    latestPhysicsTick = 0;
+  }
+  for (const event of physics?.events ?? [])
+    if (event.tick > latestPhysicsTick && event.started) audio.play("hit");
+  latestPhysicsTick = physics?.tick ?? 0;
   const session = `${runtime.sim.adventure.state.seed}:${runtime.sim.adventure.state.run}:${net.localId}`;
   if (session !== combatSession) {
     combatSession = session;
@@ -1004,6 +1053,7 @@ function processEvents(): void {
     latestCombatEvent = runtime.sim.adventure.state.events.at(-1)!.id;
 }
 function loop(now: number): void {
+  if (!activePage) return;
   const elapsed = (now - lastFrame) / 1000;
   const delta = Math.min(elapsed, 0.1);
   lastFrame = now;
@@ -1062,12 +1112,13 @@ function loop(now: number): void {
     );
     renderMs = renderMs * 0.9 + renderer.metrics.renderMs * 0.1;
   }
+  if (view === "lab") physicsUI.draw();
   if (now - lastUI > 250) {
     updateUI();
     lastUI = now;
   }
   processEvents();
-  requestAnimationFrame(loop);
+  frameHandle = requestAnimationFrame(loop);
 }
 
 /** Deliberate public automation API. All state-changing commands pass through the same engine protocol. */
@@ -1159,5 +1210,13 @@ declare global {
   }
 }
 window.fern = api;
+window.addEventListener("pagehide", (event) => {
+  if (!event.persisted) {
+    activePage = false;
+    cancelAnimationFrame(frameHandle);
+    net.disconnect();
+    runtime.sim.dispose();
+  }
+});
 updateUI();
-requestAnimationFrame(loop);
+frameHandle = requestAnimationFrame(loop);

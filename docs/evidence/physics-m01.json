@@ -1,0 +1,356 @@
+{
+  "scene": "examples/physics-playground.jsonl",
+  "before": {
+    "backend": "Rapier2D 0.21.0",
+    "units": 16,
+    "tick": 150,
+    "contacts": 13,
+    "bodies": [
+      {
+        "id": "backstop",
+        "motion": "fixed",
+        "shape": {
+          "kind": "box",
+          "width": 440,
+          "height": 12
+        },
+        "x": 0,
+        "y": -158,
+        "angle": 0,
+        "vx": 0,
+        "vy": 0,
+        "angularVelocity": 0,
+        "sleeping": false
+      },
+      {
+        "id": "crate-0",
+        "motion": "dynamic",
+        "shape": {
+          "kind": "box",
+          "width": 26,
+          "height": 26
+        },
+        "x": 50.105873107910156,
+        "y": -54.4470329284668,
+        "mass": 2,
+        "restitution": 0.25,
+        "angle": 2.8211493492126465,
+        "vx": 21.30994987487793,
+        "vy": -5.607559680938721,
+        "angularVelocity": 0.8746199011802673,
+        "sleeping": false
+      },
+      {
+        "id": "crate-1",
+        "motion": "dynamic",
+        "shape": {
+          "kind": "box",
+          "width": 26,
+          "height": 26
+        },
+        "x": 82.20646667480469,
+        "y": -22.59310531616211,
+        "mass": 2,
+        "restitution": 0.25,
+        "angle": -0.37941259145736694,
+        "vx": 8.833747863769531,
+        "vy": 6.837996482849121,
+        "angularVelocity": -0.5239479541778564,
+        "sleeping": false
+      },
+      {
+        "id": "crate-2",
+        "motion": "dynamic",
+        "shape": {
+          "kind": "box",
+          "width": 26,
+          "height": 26
+        },
+        "x": 102.49823760986328,
+        "y": -58.68600082397461,
+        "mass": 2,
+        "restitution": 0.25,
+        "angle": 0.08512131869792938,
+        "vx": -1.6428173780441284,
+        "vy": -8.110512733459473,
+        "angularVelocity": 0.5703550577163696,
+        "sleeping": false
+      },
+      {
+        "id": "crate-3",
+        "motion": "dynamic",
+        "shape": {
+          "kind": "box",
+          "width": 26,
+          "height": 26
+        },
+        "x": -44.95354080200195,
+        "y": 0.3709784746170044,
+        "mass": 2,
+        "restitution": 0.25,
+        "angle": 0.745765745639801,
+        "vx": 1.146262764930725,
+        "vy": 2.9116668701171875,
+        "angularVelocity": 0.1668180376291275,
+        "sleeping": false
+      },
+      {
+        "id": "crate-4",
+        "motion": "dynamic",
+        "shape": {
+          "kind": "box",
+          "width": 26,
+          "height": 26
+        },
+        "x": -13.425118446350098,
+        "y": 2.1466987133026123,
+        "mass": 2,
+        "restitution": 0.25,
+        "angle": 0.3132629096508026,
+        "vx": 2.34041690826416,
+        "vy": 3.869357109069824,
+        "angularVelocity": 0.08471465855836868,
+        "sleeping": false
+      },
+      {
+        "id": "crate-5",
+        "motion": "dynamic",
+        "shape": {
+          "kind": "box",
+          "width": 26,
+          "height": 26
+        },
+        "x": 45.703216552734375,
+        "y": 15.811457633972168,
+        "mass": 2,
+        "restitution": 0.25,
+        "angle": 1.0973429679870605,
+        "vx": 11.896275520324707,
+        "vy": 8.343461990356445,
+        "angularVelocity": 0.3590811789035797,
+        "sleeping": false
+      },
+      {
+        "id": "sweep",
+        "motion": "dynamic",
+        "shape": {
+          "kind": "circle",
+          "radius": 4
+        },
+        "x": -297.3269348144531,
+        "y": 110,
+        "mass": 0.5,
+        "restitution": 0,
+        "damping": 0,
+        "ccd": true,
+        "angle": 0,
+        "vx": -960.0000610351562,
+        "vy": 0,
+        "angularVelocity": 0,
+        "sleeping": false
+      },
+      {
+        "id": "wall",
+        "motion": "fixed",
+        "shape": {
+          "kind": "box",
+          "width": 12,
+          "height": 300
+        },
+        "x": 128,
+        "y": 0,
+        "angle": 0,
+        "vx": 0,
+        "vy": 0,
+        "angularVelocity": 0,
+        "sleeping": false
+      },
+      {
+        "id": "wheel",
+        "motion": "dynamic",
+        "shape": {
+          "kind": "circle",
+          "radius": 16
+        },
+        "x": 60.58867645263672,
+        "y": 103.39439392089844,
+        "mass": 1,
+        "angle": -2.155275583267212,
+        "vx": -30.09033203125,
+        "vy": 37.77620315551758,
+        "angularVelocity": -2.392453670501709,
+        "sleeping": false
+      }
+    ],
+    "events": [
+      {
+        "tick": 2,
+        "a": "crate-0",
+        "b": "crate-1",
+        "started": true
+      },
+      {
+        "tick": 3,
+        "a": "crate-1",
+        "b": "crate-2",
+        "started": true
+      },
+      {
+        "tick": 6,
+        "a": "crate-1",
+        "b": "crate-2",
+        "started": false
+      },
+      {
+        "tick": 8,
+        "a": "crate-0",
+        "b": "crate-3",
+        "started": true
+      },
+      {
+        "tick": 10,
+        "a": "crate-0",
+        "b": "crate-4",
+        "started": true
+      },
+      {
+        "tick": 12,
+        "a": "crate-0",
+        "b": "crate-3",
+        "started": false
+      },
+      {
+        "tick": 17,
+        "a": "crate-1",
+        "b": "crate-5",
+        "started": true
+      },
+      {
+        "tick": 20,
+        "a": "crate-0",
+        "b": "crate-1",
+        "started": false
+      },
+      {
+        "tick": 20,
+        "a": "crate-0",
+        "b": "crate-4",
+        "started": false
+      },
+      {
+        "tick": 21,
+        "a": "crate-1",
+        "b": "crate-5",
+        "started": false
+      },
+      {
+        "tick": 23,
+        "a": "crate-1",
+        "b": "crate-5",
+        "started": true
+      },
+      {
+        "tick": 24,
+        "a": "crate-0",
+        "b": "crate-5",
+        "started": true
+      },
+      {
+        "tick": 26,
+        "a": "crate-1",
+        "b": "crate-5",
+        "started": false
+      },
+      {
+        "tick": 27,
+        "a": "crate-0",
+        "b": "crate-5",
+        "started": false
+      },
+      {
+        "tick": 57,
+        "a": "crate-2",
+        "b": "wall",
+        "started": true
+      },
+      {
+        "tick": 59,
+        "a": "crate-2",
+        "b": "wall",
+        "started": false
+      },
+      {
+        "tick": 75,
+        "a": "crate-3",
+        "b": "crate-4",
+        "started": true
+      },
+      {
+        "tick": 76,
+        "a": "crate-1",
+        "b": "crate-2",
+        "started": true
+      },
+      {
+        "tick": 77,
+        "a": "wall",
+        "b": "wheel",
+        "started": true
+      },
+      {
+        "tick": 79,
+        "a": "crate-1",
+        "b": "crate-2",
+        "started": false
+      },
+      {
+        "tick": 79,
+        "a": "wall",
+        "b": "wheel",
+        "started": false
+      },
+      {
+        "tick": 96,
+        "a": "crate-2",
+        "b": "wall",
+        "started": true
+      },
+      {
+        "tick": 100,
+        "a": "crate-2",
+        "b": "wall",
+        "started": false
+      },
+      {
+        "tick": 124,
+        "a": "sweep",
+        "b": "wall",
+        "started": true
+      },
+      {
+        "tick": 126,
+        "a": "sweep",
+        "b": "wall",
+        "started": false
+      }
+    ]
+  },
+  "sweep": {
+    "body": "sweep",
+    "from": {
+      "x": -180,
+      "y": 110
+    },
+    "to": {
+      "x": 220,
+      "y": 110
+    },
+    "hit": {
+      "id": "wall",
+      "fraction": 0.7450000643730164
+    }
+  },
+  "replayHash": "d2a8c0ca",
+  "continuationHash": "b2d631fb",
+  "snapshotContinuation": "passed"
+}

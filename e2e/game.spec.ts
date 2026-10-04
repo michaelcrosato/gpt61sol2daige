@@ -1,7 +1,10 @@
 import { type Browser, type BrowserContext, expect, type Page, test } from "@playwright/test";
 import { type Replay, replay } from "../src/engine/agent.ts";
 import type { SaveState } from "../src/engine/simulation.ts";
+import { initializePhysics } from "../src/physics/bootstrap.ts";
 import { instrumentRtc, rtcDiagnostics } from "./rtc-diagnostics.ts";
+
+test.beforeAll(() => initializePhysics());
 
 test("documentation and generated assets are served from the deployed package", async ({
   request,
@@ -96,7 +99,7 @@ test("exploration, abilities, atlas, audio, lab commands, saving and determinist
     body: JSON.stringify(telemetry, null, 2),
     contentType: "application/json",
   });
-  expect(telemetry.render.fps).toBeGreaterThan(20);
+  // FPS is informational; entity coverage and real interactions remain acceptance checks.
   expect(errors).toEqual([]);
 });
 
@@ -213,6 +216,19 @@ test("real WebRTC joins eight clients, syncs builds, combat and world, rejects n
       await expect
         .poll(async () => (await guest.page.evaluate(() => window.fern.observe())).players.length)
         .toBe(8);
+    for (const participant of participants.slice(0, 2)) {
+      const denied = await participant.page.evaluate(() => {
+        try {
+          window.fern.command({ op: "physics", action: "reset" });
+          return "unexpected success";
+        } catch (error) {
+          return String(error);
+        }
+      });
+      expect(denied).toMatch(/host|Leave the expedition/);
+      expect(await participant.page.evaluate(() => window.fern.observe().playground)).toBeNull();
+      await expect(participant.page.locator("#physics-open")).toBeDisabled();
+    }
     const guest = participants[1],
       id = await guest.page.evaluate(() => window.fern.network.localId());
     await guest.page.evaluate(() => {

@@ -1,10 +1,23 @@
 import { ARCHETYPES, type AreaRecipe, areaRecipe, MECHANICS, THEMES } from "../game/content.ts";
 import { SKILLS } from "../game/skills.ts";
 import type { AdventureAction } from "../game/types.ts";
+import { createPlayground } from "../physics/runtime.ts";
+import type { BodyRecipe } from "../physics/types.ts";
 import { ENGINE_VERSION, idleInput, MAX_NPCS, type SaveState, Simulation } from "./simulation.ts";
 import { LANDMARKS, WORLD_LIMIT } from "./world.ts";
 
 export const COMMANDS = {
+  physics: {
+    action: "inspect (default), reset (open/reset solo playground), close, spawn, impulse, sweep",
+    body: "spawn: BodyRecipe {id,motion:dynamic|fixed,shape:{kind:circle,radius}|{kind:box,width,height},x,y,angle?,mass?,friction?,restitution?,damping?,ccd?}",
+    id: "impulse: stable body ID",
+    x: "impulse x in kg·Fern units/s; finite ±100000",
+    y: "impulse y in kg·Fern units/s; finite ±100000",
+    atX: "optional world-space application point; provide both atX and atY to spin",
+    atY: "optional world-space application point",
+    description:
+      "Solo Rapier development selector; step/save/restore/replay include this scene. No adventure actors use it yet.",
+  },
   adventure: {
     action:
       "A game action: depart, advance, return, rest, respawn, skill, equip, buy, sell, sell-spares, respec, tuning or new-run",
@@ -92,7 +105,35 @@ export class AgentRuntime {
       return v;
     };
     const player = typeof command.player === "string" ? command.player : this.localId;
+    let result: unknown;
     switch (command.op) {
+      case "physics": {
+        const action = command.action ?? "inspect";
+        if (action === "inspect") return this.sim.playground?.inspect() ?? { active: false };
+        if (this.sim.players.size > 1) throw new Error("Physics playground is solo-only until M04");
+        if (action === "reset" || action === "close") {
+          const next = action === "reset" ? createPlayground() : null;
+          this.sim.playground?.dispose();
+          this.sim.playground = next;
+        } else {
+          const world = this.sim.playground;
+          if (!world) throw new Error("Open the physics playground with physics/reset first");
+          if (action === "spawn") world.spawn(command.body as BodyRecipe);
+          else if (action === "impulse") {
+            if (typeof command.id !== "string") throw new Error("Physics body id is required");
+            world.impulse(
+              command.id,
+              num("x", 0),
+              num("y", 0),
+              command.atX === undefined ? undefined : num("atX"),
+              command.atY === undefined ? undefined : num("atY"),
+            );
+          } else if (action === "sweep") result = world.sweep();
+          else throw new Error(`Unknown physics action: ${String(action)}`);
+        }
+        result ??= this.sim.playground?.inspect() ?? { active: false };
+        break;
+      }
       case "describe":
         return {
           engine: "Fern",
@@ -172,6 +213,7 @@ export class AgentRuntime {
           throw new Error("seed must be an unsigned 32-bit integer");
         const next = new Simulation(seed, num("count", this.sim.count));
         next.addPlayer(this.localId);
+        this.sim.dispose();
         this.sim = next;
         break;
       }
@@ -186,11 +228,14 @@ export class AgentRuntime {
         if (typeof command.id !== "string") throw new Error("id is required");
         this.sim.removePlayer(command.id);
         break;
-      case "restore":
-        this.sim = Simulation.restore(command.state as SaveState);
+      case "restore": {
+        const next = Simulation.restore(command.state as SaveState);
+        this.sim.dispose();
+        this.sim = next;
         this.localId = this.sim.players.keys().next().value ?? "local";
         if (!this.sim.players.size) this.sim.addPlayer(this.localId);
         break;
+      }
       case "inspect": {
         const x = num("x"),
           y = num("y"),
@@ -222,7 +267,7 @@ export class AgentRuntime {
         throw new Error(`Unknown command: ${command.op}`);
     }
     if (record) this.log.push(structuredClone(command));
-    return this.sim.observe();
+    return result ?? this.sim.observe();
   }
 }
 export function replay(recording: Replay): Simulation {
@@ -234,8 +279,14 @@ export function replay(recording: Replay): Simulation {
   )
     throw new Error("Invalid replay");
   const agent = new AgentRuntime(Simulation.restore(recording.initial));
-  for (const command of recording.commands) agent.execute(command, false);
-  if (agent.sim.stateHash() !== recording.hash)
-    throw new Error(`Replay diverged: expected ${recording.hash}, got ${agent.sim.stateHash()}`);
-  return agent.sim;
+  try {
+    for (const command of recording.commands) agent.execute(command, false);
+    const hash = agent.sim.stateHash();
+    if (hash !== recording.hash)
+      throw new Error(`Replay diverged: expected ${recording.hash}, got ${hash}`);
+    return agent.sim;
+  } catch (error) {
+    agent.sim.dispose();
+    throw error;
+  }
 }
