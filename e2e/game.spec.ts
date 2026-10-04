@@ -1,6 +1,7 @@
 import { type Browser, type BrowserContext, expect, type Page, test } from "@playwright/test";
 import { type Replay, replay } from "../src/engine/agent.ts";
 import type { SaveState } from "../src/engine/simulation.ts";
+import { instrumentRtc, rtcDiagnostics } from "./rtc-diagnostics.ts";
 
 test("documentation and generated assets are served from the deployed package", async ({
   request,
@@ -133,6 +134,7 @@ async function traveler(
 ): Promise<{ context: BrowserContext; page: Page }> {
   const context = await browser.newContext({ viewport: { width: 800, height: 640 } });
   const page = await context.newPage();
+  await instrumentRtc(page);
   await page.goto(baseURL);
   await page.waitForFunction(() => !!window.fern);
   // Hidden lab avoids eight renderers competing with the network test; simulations still run.
@@ -281,6 +283,19 @@ test("real WebRTC joins eight isolated clients, syncs movement and quest, reject
     await expect
       .poll(async () => (await ninth.page.evaluate(() => window.fern.network.status())).role)
       .toBe("solo");
+  } catch (error) {
+    const diagnostics = await Promise.all(
+      participants.map(async (p, index) => ({
+        index,
+        state: await rtcDiagnostics(p.page).catch(() => "page unavailable"),
+      })),
+    );
+    console.error("WebRTC diagnostics", JSON.stringify(diagnostics));
+    await test.info().attach("WebRTC diagnostics", {
+      body: JSON.stringify(diagnostics, null, 2),
+      contentType: "application/json",
+    });
+    throw error;
   } finally {
     await Promise.all(participants.map((p) => p.context.close()));
   }
