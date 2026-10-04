@@ -1,5 +1,7 @@
+import { MAX_NPCS } from "../engine/limits.ts";
 import { clamp, hash, lerp } from "../engine/math.ts";
 import type { Player, Simulation } from "../engine/simulation.ts";
+import { EntityVisibility } from "../engine/visibility.ts";
 import {
   CHUNK_SIZE,
   CHUNK_TILES,
@@ -47,10 +49,21 @@ export class Renderer {
   debug = false;
   lantern = true;
   daytime = 0.38;
+  drawDistance = 4096;
+  entityLimit = 8192;
   waypoint: { x: number; y: number } | null = null;
-  metrics = { drawn: 0, renderMs: 0, terrainCanvases: 0, lod: "detail" };
+  metrics = { drawn: 0, candidates: 0, limited: 0, renderMs: 0, terrainCanvases: 0, lod: "detail" };
+  private readonly visible = new EntityVisibility(MAX_NPCS);
   private readonly terrainCache = new Map<string, HTMLCanvasElement>();
   private readonly spriteCache = new Map<string, HTMLCanvasElement>();
+  private readonly overview = document.createElement("canvas");
+  private overviewKey = "";
+  private readonly dots = document.createElement("canvas");
+  private dotImage?: ImageData;
+  private dotPixels?: Uint32Array;
+  private readonly dotColors = new Uint32Array(
+    new Uint8Array([173, 217, 178, 255, 196, 173, 121, 255, 124, 172, 155, 255]).buffer,
+  );
   private seed = -1;
   private revision = -1;
   private cachedWorld?: World;
@@ -72,11 +85,48 @@ export class Renderer {
   resize(): void {
     const rect = this.canvas.getBoundingClientRect(),
       ratio = Math.min(devicePixelRatio || 1, 2);
-    this.width = rect.width;
-    this.height = rect.height;
+    this.width = Math.max(1, rect.width);
+    this.height = Math.max(1, rect.height);
     this.canvas.width = Math.max(1, Math.round(rect.width * ratio));
     this.canvas.height = Math.max(1, Math.round(rect.height * ratio));
     this.ctx.imageSmoothingEnabled = false;
+  }
+  private drawDistantCreatures(sim: Simulation, alpha: number, ratio: number): void {
+    const width = Math.ceil(this.width),
+      height = Math.ceil(this.height);
+    const context = this.dots.getContext("2d")!;
+    if (!this.dotImage || this.dots.width !== width || this.dots.height !== height) {
+      this.dots.width = width;
+      this.dots.height = height;
+      this.dotImage = context.createImageData(width, height);
+      this.dotPixels = new Uint32Array(this.dotImage.data.buffer);
+    }
+    const pixels = this.dotPixels!;
+    pixels.fill(0);
+    for (let n = 0; n < this.visible.count; n++) {
+      const i = this.visible.ids[n];
+      const x = Math.round(
+        (lerp(sim.px[i], sim.x[i], alpha) - this.x) * this.zoom + this.width / 2,
+      );
+      const y = Math.round(
+        (lerp(sim.py[i], sim.y[i], alpha) - this.y) * this.zoom + this.height / 2,
+      );
+      if (x < 0 || x >= width - 1 || y < 0 || y >= height - 1) continue;
+      const offset = y * width + x,
+        color = this.dotColors[sim.kind[i]];
+      pixels[offset] =
+        pixels[offset + 1] =
+        pixels[offset + width] =
+        pixels[offset + width + 1] =
+          color;
+      this.metrics.drawn++;
+    }
+    // One upload and one composite replace tens of thousands of Canvas draw calls.
+    context.putImageData(this.dotImage, 0, 0);
+    this.ctx.save();
+    this.ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+    this.ctx.drawImage(this.dots, 0, 0, this.width, this.height);
+    this.ctx.restore();
   }
   setZoom(zoom: number): void {
     this.targetZoom = clamp(zoom, 0.08, 5);
@@ -171,6 +221,7 @@ export class Renderer {
       this.revision !== sim.world.revision
     ) {
       this.terrainCache.clear();
+      this.overviewKey = "";
       this.seed = sim.world.seed;
       this.revision = sim.world.revision;
       this.cachedWorld = sim.world;
@@ -189,10 +240,17 @@ export class Renderer {
     ctx.translate(this.width / 2, this.height / 2);
     ctx.scale(this.zoom, this.zoom);
     ctx.translate(-this.x, -this.y);
-    const left = this.x - this.width / (2 * this.zoom) - 60,
-      right = this.x + this.width / (2 * this.zoom) + 60;
-    const top = this.y - this.height / (2 * this.zoom) - 60,
-      bottom = this.y + this.height / (2 * this.zoom) + 80;
+    const left = this.x - Math.min(this.drawDistance, this.width / (2 * this.zoom) + 60),
+      right = this.x + Math.min(this.drawDistance, this.width / (2 * this.zoom) + 60);
+    const top = this.y - Math.min(this.drawDistance, this.height / (2 * this.zoom) + 60),
+      bottom = this.y + Math.min(this.drawDistance, this.height / (2 * this.zoom) + 80);
+    const fog = Math.hypot(this.width, this.height) / (2 * this.zoom) > this.drawDistance * 0.92;
+    ctx.save();
+    if (fog) {
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, this.drawDistance, 0, Math.PI * 2);
+      ctx.clip();
+    }
     const items: DrawItem[] = [];
     this.metrics.drawn = 0;
     const visibleChunks =
@@ -200,12 +258,35 @@ export class Renderer {
     if (this.zoom < 0.4 || visibleChunks > 88) {
       this.metrics.lod = "overview";
       const stride = this.zoom < 0.17 ? 128 : 64;
-      for (let y = Math.floor(top / stride) * stride; y < bottom; y += stride)
-        for (let x = Math.floor(left / stride) * stride; x < right; x += stride) {
-          ctx.fillStyle =
-            GROUND[sim.world.sample(Math.floor(x / TILE), Math.floor(y / TILE)).terrain];
-          ctx.fillRect(x, y, stride, stride);
-        }
+      const startX = Math.floor(left / stride),
+        startY = Math.floor(top / stride);
+      const columns = Math.ceil(right / stride) - startX,
+        rows = Math.ceil(bottom / stride) - startY;
+      const key = `${stride}:${startX}:${startY}:${columns}:${rows}`;
+      if (this.overviewKey !== key) {
+        this.overview.width = columns;
+        this.overview.height = rows;
+        const overview = this.overview.getContext("2d")!;
+        for (let y = 0; y < rows; y++)
+          for (let x = 0; x < columns; x++) {
+            overview.fillStyle =
+              GROUND[
+                sim.world.sample(
+                  ((startX + x) * stride) / TILE,
+                  ((startY + y) * stride) / TILE,
+                ).terrain
+              ];
+            overview.fillRect(x, y, 1, 1);
+          }
+        this.overviewKey = key;
+      }
+      ctx.drawImage(
+        this.overview,
+        startX * stride,
+        startY * stride,
+        columns * stride,
+        rows * stride,
+      );
     } else {
       this.metrics.lod = this.zoom < 0.8 ? "canopy" : "detail";
       const minCX = Math.floor(left / CHUNK_SIZE),
@@ -238,16 +319,26 @@ export class Renderer {
           }
         }
     }
-    for (let i = 0; i < sim.count; i++) {
-      const x = lerp(sim.px[i], sim.x[i], alpha),
-        y = lerp(sim.py[i], sim.y[i], alpha);
-      if (x < left || x > right || y < top || y > bottom) continue;
-      this.metrics.drawn++;
-      if (this.zoom < 0.65) {
-        ctx.fillStyle = sim.kind[i] === 0 ? "#add9b2" : sim.kind[i] === 1 ? "#c4ad79" : "#7cac9b";
-        ctx.fillRect(x, y, 2.2 / this.zoom, 2.2 / this.zoom);
-      } else items.push({ kind: "npc", x, y, type: sim.kind[i], variant: i, id: String(i) });
-    }
+    this.visible.select(
+      sim.x,
+      sim.y,
+      sim.count,
+      { x: this.x, y: this.y, radius: this.drawDistance, left, right, top, bottom },
+      this.entityLimit,
+    );
+    this.metrics.candidates = this.visible.candidates;
+    this.metrics.limited = this.visible.candidates - this.visible.count;
+    if (this.zoom < 0.65) {
+      this.drawDistantCreatures(sim, alpha, ratio);
+    } else
+      for (let n = 0; n < this.visible.count; n++) {
+        const i = this.visible.ids[n],
+          x = lerp(sim.px[i], sim.x[i], alpha),
+          y = lerp(sim.py[i], sim.y[i], alpha);
+        if (x < left || x > right || y < top || y > bottom) continue;
+        this.metrics.drawn++;
+        items.push({ kind: "npc", x, y, type: sim.kind[i], variant: i, id: String(i) });
+      }
     for (const l of LANDMARKS)
       if (l.x >= left && l.x <= right && l.y >= top && l.y <= bottom)
         items.push({
@@ -362,6 +453,26 @@ export class Renderer {
         ctx.fillStyle = `rgba(228,222,160,${0.12 + (1 + Math.sin(time * 0.6 + i)) * 0.16})`;
         ctx.fillRect(x, y, 1, 1);
       }
+    ctx.restore();
+    if (fog) {
+      const haze = ctx.createRadialGradient(
+        this.x,
+        this.y,
+        this.drawDistance * 0.82,
+        this.x,
+        this.y,
+        this.drawDistance,
+      );
+      haze.addColorStop(0, "#233b3000");
+      haze.addColorStop(1, "#233b30");
+      ctx.fillStyle = haze;
+      ctx.fillRect(
+        this.x - this.drawDistance,
+        this.y - this.drawDistance,
+        this.drawDistance * 2,
+        this.drawDistance * 2,
+      );
+    }
     ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
     const vignette = ctx.createRadialGradient(
       this.width / 2,

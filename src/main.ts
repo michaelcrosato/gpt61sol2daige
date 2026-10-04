@@ -1,4 +1,15 @@
 import "./style.css";
+import { GameDisplay } from "./app/display.ts";
+import {
+  DEFAULT_SETTINGS,
+  PRESETS,
+  parseSettings,
+  SETTINGS_KEY,
+  type Settings,
+  updateSettings,
+} from "./app/preferences.ts";
+import { hasCheckpoint, loadCheckpoint, saveCheckpoint } from "./app/save-store.ts";
+import { mountSettingsUI } from "./app/settings-ui.ts";
 import { icon, mountUI } from "./app/ui.ts";
 import { AudioEngine } from "./audio/audio.ts";
 import { AgentRuntime, type Command } from "./engine/agent.ts";
@@ -9,6 +20,13 @@ import { Coop } from "./net/coop.ts";
 import { Renderer } from "./render/renderer.ts";
 
 mountUI();
+mountSettingsUI();
+let preferences: Settings;
+try {
+  preferences = parseSettings(localStorage.getItem(SETTINGS_KEY));
+} catch {
+  preferences = { ...DEFAULT_SETTINGS };
+}
 const el = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const canvas = el<HTMLCanvasElement>("world-canvas");
 const params = new URLSearchParams(location.search);
@@ -16,8 +34,10 @@ const seed =
   params.has("seed") && /^\d{1,10}$/.test(params.get("seed")!)
     ? Number(params.get("seed")) >>> 0
     : 142;
-const runtime = new AgentRuntime(new Simulation(seed, 2400));
+const runtime = new AgentRuntime(new Simulation(seed, preferences.population));
 const renderer = new Renderer(canvas, el<HTMLCanvasElement>("minimap"));
+renderer.drawDistance = preferences.drawDistance;
+renderer.entityLimit = preferences.entityLimit;
 const audio = new AudioEngine();
 let started = false,
   paused = false,
@@ -40,6 +60,9 @@ let fps = 60,
   lastUI = 0,
   stepMs = 0,
   renderMs = 0;
+let tickRate = 60,
+  lastRateTime = performance.now(),
+  lastRateTick = runtime.sim.tick;
 const net = new Coop(
   () => runtime.sim,
   (sim) => {
@@ -48,6 +71,152 @@ const net = new Coop(
   },
   updateNetwork,
 );
+const display = new GameDisplay(
+  updateDisplay,
+  () => {
+    for (const dialog of document.querySelectorAll<HTMLDialogElement>("dialog[open]"))
+      dialog.close();
+    el("sidebar").classList.remove("open");
+    changeView("world");
+    if (paused) setPaused(false);
+    begin();
+  },
+  toast,
+);
+
+function quality(): Settings {
+  return {
+    ...preferences,
+    population: net.status.role === "guest" ? net.status.population : runtime.sim.count,
+  };
+}
+function setQuality(patch: Partial<Settings>): Settings {
+  const next = updateSettings(quality(), patch);
+  if (patch.population !== undefined && net.status.role === "guest")
+    throw new Error(
+      "Only the host can change the world population. Your view settings are independent.",
+    );
+  if (net.status.role !== "guest" && next.population !== runtime.sim.count)
+    execute({ op: "population", count: next.population });
+  preferences = {
+    ...next,
+    population: net.status.role === "guest" ? preferences.population : next.population,
+  };
+  renderer.drawDistance = next.drawDistance;
+  renderer.entityLimit = next.entityLimit;
+  try {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(preferences));
+  } catch {
+    toast("Settings applied for this session. Browser storage is unavailable.");
+  }
+  updateDisplay();
+  updateUI();
+  return quality();
+}
+function updateDisplay(): void {
+  el("game-performance").hidden = !preferences.showPerformance;
+  el("settings-game-mode").innerHTML =
+    `${icon(display.gameMode ? "collapse" : "expand", 16)}${display.gameMode ? "Exit game mode" : "Game mode"}`;
+  if (!display.gameMode) el("sidebar").classList.remove("open");
+  el("game-journal").setAttribute(
+    "aria-expanded",
+    String(el("sidebar").classList.contains("open")),
+  );
+  requestAnimationFrame(() => renderer.resize());
+}
+const settingFields = [
+  ["distance", "drawDistance"],
+  ["entities", "entityLimit"],
+  ["population", "population"],
+] as const;
+function fillSettings(values: Settings): void {
+  for (const [field, key] of settingFields) {
+    el<HTMLInputElement>(`setting-${field}`).value = String(values[key]);
+    el<HTMLInputElement>(`setting-${field}-value`).value = String(values[key]);
+  }
+  el<HTMLInputElement>("setting-performance").checked = values.showPerformance;
+  el("settings-error").hidden = true;
+  for (const button of document.querySelectorAll<HTMLButtonElement>("[data-quality]"))
+    button.setAttribute("aria-pressed", "false");
+}
+function showSettings(): void {
+  keys.clear();
+  touchInput = { x: 0, y: 0 };
+  inputOverride = null;
+  fillSettings(quality());
+  updateNetwork();
+  el<HTMLDialogElement>("settings-dialog").showModal();
+}
+for (const id of ["settings-open", "game-settings"]) el(id).addEventListener("click", showSettings);
+for (const [field] of settingFields) {
+  const slider = el<HTMLInputElement>(`setting-${field}`),
+    number = el<HTMLInputElement>(`setting-${field}-value`);
+  slider.addEventListener("input", () => {
+    number.value = slider.value;
+  });
+  number.addEventListener("input", () => {
+    if (number.validity.valid && number.value !== "") slider.value = number.value;
+  });
+}
+for (const button of document.querySelectorAll<HTMLButtonElement>("[data-quality]"))
+  button.addEventListener("click", () => {
+    const preset = PRESETS[button.dataset.quality as keyof typeof PRESETS];
+    fillSettings({
+      ...quality(),
+      ...preset,
+      population: net.status.role === "guest" ? quality().population : preset.population,
+    });
+    button.setAttribute("aria-pressed", "true");
+  });
+el("settings-reset").addEventListener("click", () =>
+  fillSettings({
+    ...DEFAULT_SETTINGS,
+    population: net.status.role === "guest" ? quality().population : DEFAULT_SETTINGS.population,
+  }),
+);
+el("settings-form").addEventListener("submit", (event) => {
+  event.preventDefault();
+  try {
+    const patch: Partial<Settings> = {
+      drawDistance: Number(el<HTMLInputElement>("setting-distance-value").value),
+      entityLimit: Number(el<HTMLInputElement>("setting-entities-value").value),
+      showPerformance: el<HTMLInputElement>("setting-performance").checked,
+    };
+    if (net.status.role !== "guest")
+      patch.population = Number(el<HTMLInputElement>("setting-population-value").value);
+    setQuality(patch);
+    el<HTMLDialogElement>("settings-dialog").close();
+    canvas.focus({ preventScroll: true });
+    toast("Settings applied. Your world has a little more room to grow.");
+  } catch (error) {
+    el("settings-error").hidden = false;
+    el("settings-error").textContent = error instanceof Error ? error.message : String(error);
+  }
+});
+el("fullscreen-open").addEventListener(
+  "click",
+  safe(() => display.enter()),
+);
+el("fullscreen-exit").addEventListener(
+  "click",
+  safe(() => display.exit()),
+);
+el("settings-game-mode").addEventListener(
+  "click",
+  safe(() => {
+    el<HTMLDialogElement>("settings-dialog").close();
+    return display.toggle();
+  }),
+);
+el("game-map").addEventListener("click", () => changeView(view === "atlas" ? "world" : "atlas"));
+el("game-journal").addEventListener("click", () => {
+  el("sidebar").classList.toggle("open");
+  el("game-journal").setAttribute(
+    "aria-expanded",
+    String(el("sidebar").classList.contains("open")),
+  );
+});
+el("game-sound").addEventListener("click", () => el("sound").click());
 
 function toast(message: string, duration = 4200): void {
   if (!message) return;
@@ -192,7 +361,14 @@ function updateNetwork(): void {
     online = net.status.role !== "solo";
   for (const id of ["population", "apply-seed", "world-seed"])
     el<HTMLInputElement>(id).disabled = guest;
-  for (const id of ["pause", "step", "load", "replay"]) el<HTMLButtonElement>(id).disabled = online;
+  for (const id of ["setting-population", "setting-population-value"])
+    el<HTMLInputElement>(id).disabled = guest;
+  el("population-help").textContent = guest
+    ? "The host sets the shared population. You can still change your own draw distance and visible-creature limit."
+    : "How many creatures are simulated. In co-op, the host sets this for everyone.";
+  for (const id of ["pause", "step", "load", "game-load", "replay"])
+    el<HTMLButtonElement>(id).disabled = online;
+  el<HTMLButtonElement>("game-save").disabled = guest;
   runtime.localId = net.localId;
   if (online && paused) setPaused(false);
 }
@@ -204,15 +380,16 @@ function setPaused(value: boolean): void {
   el("pause-label").hidden = !paused;
   el("pause").innerHTML = `${icon(paused ? "play" : "pause", 15)}${paused ? "Resume" : "Pause"}`;
 }
-function saveTrail(): void {
+async function saveTrail(): Promise<void> {
   ensureAuthority();
-  localStorage.setItem("fern:save:v1", JSON.stringify(runtime.sim.save()));
+  await saveCheckpoint(runtime.sim.save());
+  el("continue").hidden = false;
   toast("Trail saved on this device.");
 }
-function loadTrail(): void {
-  const data = localStorage.getItem("fern:save:v1");
+async function loadTrail(): Promise<void> {
+  const data = await loadCheckpoint();
   if (!data) throw new Error("No saved trail yet. Save one in Agent lab.");
-  execute({ op: "restore", state: JSON.parse(data) as SaveState });
+  execute({ op: "restore", state: data });
   runtime.beginRecording();
   renderer.follow = true;
   toast("Welcome back to your trail.");
@@ -220,11 +397,23 @@ function loadTrail(): void {
 }
 el("begin").addEventListener("click", begin);
 el("continue").addEventListener("click", safe(loadTrail));
-try {
-  el("continue").hidden = !localStorage.getItem("fern:save:v1");
-} catch {
-  /* Storage can be unavailable in private contexts. */
-}
+void hasCheckpoint().then((saved) => {
+  el("continue").hidden = !saved;
+});
+el("game-save").addEventListener(
+  "click",
+  safe(async () => {
+    el<HTMLDialogElement>("settings-dialog").close();
+    await saveTrail();
+  }),
+);
+el("game-load").addEventListener(
+  "click",
+  safe(async () => {
+    el<HTMLDialogElement>("settings-dialog").close();
+    await loadTrail();
+  }),
+);
 for (const tab of document.querySelectorAll<HTMLButtonElement>("[data-view]"))
   tab.addEventListener("click", () => changeView(tab.dataset.view!));
 el("open-map").addEventListener("click", () => changeView("atlas"));
@@ -489,6 +678,15 @@ document.addEventListener("keydown", (event) => {
   )
     return;
   const key = event.key.toLowerCase();
+  if ((key === "g" || (key === "escape" && display.gameMode)) && !event.repeat) {
+    event.preventDefault();
+    keys.clear();
+    if (key === "escape" && el("sidebar").classList.contains("open")) {
+      el("sidebar").classList.remove("open");
+      el("game-journal").setAttribute("aria-expanded", "false");
+    } else safe(() => display.toggle())();
+    return;
+  }
   if (key === "m" && !event.repeat) {
     event.preventDefault();
     changeView(view === "atlas" ? "world" : "atlas");
@@ -555,8 +753,33 @@ function updateUI(): void {
   el("beacon-count").textContent = `${sim.beacons.size} / 3`;
   el("shard-count").textContent = String(sim.shards);
   el("party-count").textContent = `${sim.players.size} / 8`;
+  el("game-fps").textContent = `${Math.round(fps)} FPS`;
+  el("game-entities").textContent =
+    `${renderer.metrics.drawn.toLocaleString()} visible · ${total.toLocaleString()} active`;
+  el("game-quest").textContent = `${sim.beacons.size} / 3 beacons · ${sim.shards} light shards`;
+  const rateTime = performance.now();
+  if (rateTime - lastRateTime >= 1000 || sim.tick < lastRateTick) {
+    tickRate = Math.max(
+      0,
+      ((sim.tick - lastRateTick) * 1000) / Math.max(1, rateTime - lastRateTime),
+    );
+    lastRateTime = rateTime;
+    lastRateTick = sim.tick;
+  }
+  el("settings-live").textContent =
+    `${Math.round(fps)} FPS · ${renderer.metrics.drawn.toLocaleString()} drawn · ${Math.round(tickRate)} sim Hz`;
+  el("game-sound").setAttribute("aria-pressed", String(audio.enabled));
+  el("game-sound").setAttribute(
+    "aria-label",
+    audio.enabled ? "Disable game sound" : "Enable game sound",
+  );
+  if (el("game-sound").dataset.enabled !== String(audio.enabled)) {
+    el("game-sound").innerHTML = icon(audio.enabled ? "sound" : "mute", 18);
+    el("game-sound").dataset.enabled = String(audio.enabled);
+  }
   if (player) {
     el("location").textContent = sim.world.biome(player.x, player.y);
+    el("game-location").textContent = sim.world.biome(player.x, player.y);
     el("coordinates").textContent = `${Math.round(player.x)}, ${Math.round(player.y)}`;
     el("energy-fill").style.width = `${clamp(player.energy, 0, 100)}%`;
     for (const landmark of LANDMARKS.slice(1)) {
@@ -592,9 +815,10 @@ function processEvents(): void {
   if (runtime.sim.events.length) latestEvent = runtime.sim.events.at(-1)!.tick;
 }
 function loop(now: number): void {
-  const delta = Math.min((now - lastFrame) / 1000, 0.1);
+  const elapsed = (now - lastFrame) / 1000;
+  const delta = Math.min(elapsed, 0.1);
   lastFrame = now;
-  frameMs = frameMs * 0.94 + delta * 1000 * 0.06;
+  frameMs = frameMs * 0.94 + elapsed * 1000 * 0.06;
   fps = 1000 / Math.max(frameMs, 1);
   const input = getInput(now),
     encoded = JSON.stringify(input);
@@ -606,8 +830,10 @@ function loop(now: number): void {
       lastInput = encoded;
     }
     if (!paused) {
-      accumulator += delta;
-      const ticks = Math.min(Math.floor(accumulator / STEP), 5);
+      accumulator = Math.min(accumulator + delta, STEP * 5);
+      // Preserve fixed ticks without allowing an overloaded population to monopolize the UI.
+      const tickBudget = Math.max(1, Math.min(5, Math.floor(12 / Math.max(stepMs, 0.1))));
+      const ticks = Math.min(Math.floor(accumulator / STEP), tickBudget);
       if (ticks > 0) {
         runtime.sim.step(ticks);
         accumulator = Math.max(0, accumulator - ticks * STEP);
@@ -621,7 +847,15 @@ function loop(now: number): void {
       }
     }
   }
-  net.update(delta, input, Math.hypot(renderer.width, renderer.height) / (2 * renderer.zoom) + 160);
+  net.update(delta, input, {
+    x: renderer.x,
+    y: renderer.y,
+    radius: Math.min(
+      renderer.drawDistance,
+      Math.hypot(renderer.width, renderer.height) / (2 * renderer.zoom) + 160,
+    ),
+    entityLimit: renderer.entityLimit,
+  });
   const alpha =
     net.status.role === "guest"
       ? clamp((now - net.lastSnapshot) / 100, 0, 1)
@@ -645,7 +879,20 @@ const api = {
   describe: () => runtime.execute({ op: "describe" }),
   observe: () => ({
     ...runtime.sim.observe(),
-    render: { ...renderer.metrics, renderMs, fps, frameMs, zoom: renderer.zoom },
+    render: {
+      ...renderer.metrics,
+      renderMs,
+      fps,
+      frameMs,
+      zoom: renderer.zoom,
+      drawDistance: renderer.drawDistance,
+      entityLimit: renderer.entityLimit,
+      width: renderer.width,
+      height: renderer.height,
+      simulationHz: tickRate,
+    },
+    settings: quality(),
+    display: display.observe(),
     network: { ...net.status },
     paused,
     view,
@@ -659,6 +906,25 @@ const api = {
   pause: (value = true) => setPaused(value),
   start: begin,
   view: changeView,
+  settings: {
+    get: quality,
+    set: setQuality,
+    reset: () =>
+      setQuality(
+        net.status.role === "guest"
+          ? {
+              drawDistance: DEFAULT_SETTINGS.drawDistance,
+              entityLimit: DEFAULT_SETTINGS.entityLimit,
+              showPerformance: DEFAULT_SETTINGS.showPerformance,
+            }
+          : { ...DEFAULT_SETTINGS },
+      ),
+  },
+  display: {
+    enterGame: (fullscreen = true) => display.enter(fullscreen),
+    exitGame: () => display.exit(),
+    get: () => display.observe(),
+  },
   zoom: (value: number) => {
     if (!Number.isFinite(value)) throw new Error("Zoom must be finite");
     renderer.setZoom(value);

@@ -1,3 +1,4 @@
+import { MAX_NPCS } from "./limits.ts";
 import { checksum, clamp, distance, hash, random } from "./math.ts";
 import { type Body, collideCircles, moveBody, SpatialHash } from "./physics.ts";
 import {
@@ -11,9 +12,9 @@ import {
   World,
 } from "./world.ts";
 
-export const ENGINE_VERSION = "1.0.0";
+export const ENGINE_VERSION = "1.1.0";
 export const STEP = 1 / 60;
-export const MAX_NPCS = 8192;
+export { MAX_NPCS } from "./limits.ts";
 export const MAX_PLAYERS = 8;
 export type Input = { x: number; y: number; dash: boolean; pulse: boolean; interact: boolean };
 export const idleInput = (): Input => ({ x: 0, y: 0, dash: false, pulse: false, interact: false });
@@ -77,6 +78,7 @@ export class Simulation {
   readonly kind = new Uint8Array(MAX_NPCS);
   readonly attuned = new Uint8Array(MAX_NPCS);
   readonly generation = new Uint32Array(MAX_NPCS);
+  private readonly near = new Uint8Array(MAX_NPCS);
   readonly grid = new SpatialHash(MAX_NPCS);
   metrics = { contacts: 0, near: 0, far: 0, stepMs: 0 };
   private readonly a: Body = { x: 0, y: 0, vx: 0, vy: 0, radius: 3 };
@@ -135,17 +137,30 @@ export class Simulation {
   setPopulation(count: number): void {
     if (!Number.isInteger(count) || count < 0 || count > MAX_NPCS)
       throw new Error(`Population must be an integer from 0 to ${MAX_NPCS}`);
-    const center = this.players.values().next().value;
-    for (let i = this.count; i < count; i++) this.spawn(i, center?.x ?? 0, center?.y ?? 0);
+    const players = [...this.players.values()],
+      radius = this.populationRadius(count);
+    for (let i = this.count; i < count; i++) {
+      const anchor = players[i % Math.max(1, players.length)];
+      this.spawn(i, anchor?.x ?? 0, anchor?.y ?? 0, radius);
+    }
     this.count = count;
   }
-  private spawn(i: number, x: number, y: number): void {
-    const point = this.world.spawnPoint(hash(i, this.generation[i], this.world.seed), x, y);
+  private populationRadius(count = this.count): number {
+    const regions: Player[] = [];
+    for (const player of this.players.values()) {
+      if (!regions.some((p) => (p.x - player.x) ** 2 + (p.y - player.y) ** 2 < 2200 ** 2))
+        regions.push(player);
+    }
+    return 1100 * Math.max(1, Math.sqrt(count / (8192 * Math.max(1, regions.length))));
+  }
+  private spawn(i: number, x: number, y: number, radius = this.populationRadius()): void {
+    const point = this.world.spawnPoint(hash(i, this.generation[i], this.world.seed), x, y, radius);
     this.x[i] = this.px[i] = point.x;
     this.y[i] = this.py[i] = point.y;
     this.vx[i] = this.vy[i] = 0;
     this.kind[i] = hash(i, this.generation[i], 32) % 3;
     this.attuned[i] = 0;
+    this.near[i] = 0;
   }
   teleport(id: string, x: number, y: number): void {
     if (
@@ -278,6 +293,9 @@ export class Simulation {
       this.metrics.contacts += moveBody(this.world, p, STEP);
       p.steps += distance(p.px, p.py, p.x, p.y);
     }
+    const spawnRadius = this.populationRadius();
+    const recycleDistance2 = Math.max(2200, spawnRadius * 1.7) ** 2;
+    const contactStride = this.count > 8192 ? 8 : 4;
     for (let i = 0; i < this.count; i++) {
       this.px[i] = this.x[i];
       this.py[i] = this.y[i];
@@ -294,13 +312,14 @@ export class Simulation {
       // another player stays behind. Rebalancing is staggered over one second.
       if (players.length && this.tick % 60 === i % 60) {
         const anchor = players[i % players.length];
-        if ((anchor.x - this.x[i]) ** 2 + (anchor.y - this.y[i]) ** 2 > 2200 ** 2) {
+        if ((anchor.x - this.x[i]) ** 2 + (anchor.y - this.y[i]) ** 2 > recycleDistance2) {
           this.generation[i]++;
-          this.spawn(i, anchor.x, anchor.y);
+          this.spawn(i, anchor.x, anchor.y, spawnRadius);
           continue;
         }
       }
       const near = nearest < 420 ** 2;
+      this.near[i] = +near;
       if (near) this.metrics.near++;
       else this.metrics.far++;
       // Expensive steering and static contacts use 15 Hz outside player interest. Bodies still integrate at 60 Hz.
@@ -325,7 +344,7 @@ export class Simulation {
       this.a.vx = this.vx[i];
       this.a.vy = this.vy[i];
       this.a.radius = this.kind[i] === 1 ? 4 : 2.5;
-      if (near || (this.tick + i) % 4 === 0)
+      if (near || (this.tick + i) % contactStride === 0)
         this.metrics.contacts += moveBody(this.world, this.a, STEP);
       else {
         this.a.x += this.a.vx * STEP;
@@ -339,8 +358,19 @@ export class Simulation {
     this.grid.build(this.x, this.y, this.count);
     // Impulse collisions are applied in stable id order, preserving deterministic replays.
     for (let i = 0; i < this.count; i++) {
+      if (this.count > 8192 && !this.near[i] && (this.tick + i) % contactStride !== 0) continue;
       this.grid.query(this.x[i], this.y[i], 9, (j) => {
-        if (j <= i) return;
+        if (j === i) return;
+        if (
+          j < i &&
+          !(
+            this.count > 8192 &&
+            this.near[i] &&
+            !this.near[j] &&
+            (this.tick + j) % contactStride !== 0
+          )
+        )
+          return;
         if (Math.abs(this.x[i] - this.x[j]) > 9 || Math.abs(this.y[i] - this.y[j]) > 9) return;
         this.a.x = this.x[i];
         this.a.y = this.y[i];

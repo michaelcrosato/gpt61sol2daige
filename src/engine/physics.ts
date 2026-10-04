@@ -3,12 +3,15 @@ import { Decor, Terrain, TILE, WORLD_LIMIT, type World } from "./world.ts";
 
 /** Reusable broad phase: fixed memory, no object allocation per entity per tick. */
 export class SpatialHash {
-  readonly heads = new Int32Array(16384);
+  readonly heads: Int32Array;
+  private readonly mask: number;
   readonly next: Int32Array;
   readonly cellX: Int32Array;
   readonly cellY: Int32Array;
   readonly size: number;
   constructor(capacity: number, size = 24) {
+    this.heads = new Int32Array(Math.max(16384, 2 ** Math.ceil(Math.log2(capacity * 2))));
+    this.mask = this.heads.length - 1;
     this.next = new Int32Array(capacity);
     this.cellX = new Int32Array(capacity);
     this.cellY = new Int32Array(capacity);
@@ -19,7 +22,7 @@ export class SpatialHash {
     for (let i = 0; i < count; i++) {
       const cx = Math.floor(x[i] / this.size),
         cy = Math.floor(y[i] / this.size),
-        bucket = hash(cx, cy) & 16383;
+        bucket = hash(cx, cy) & this.mask;
       this.cellX[i] = cx;
       this.cellY[i] = cy;
       this.next[i] = this.heads[bucket];
@@ -33,7 +36,7 @@ export class SpatialHash {
       maxY = Math.floor((y + radius) / this.size);
     for (let cy = minY; cy <= maxY; cy++)
       for (let cx = minX; cx <= maxX; cx++) {
-        let i = this.heads[hash(cx, cy) & 16383];
+        let i = this.heads[hash(cx, cy) & this.mask];
         while (i !== -1) {
           if (this.cellX[i] === cx && this.cellY[i] === cy) visitor(i);
           i = this.next[i];

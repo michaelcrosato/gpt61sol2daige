@@ -29,7 +29,7 @@ An accepted call returns `{"ok":true,"result":…}`; failure returns `{"ok":fals
 | `input` | `player?`, `x?`, `y?`, `dash?`, `pulse?`, `interact?` | Replaces input; missing axes/buttons become idle; axes clamp to −1…1 |
 | `step` | `ticks`, 0…36,000 | Advances exactly that many fixed ticks; prefer small batches in the browser |
 | `inspect` | `x`, `y`, `radius?` (0…5,000), `limit?` (0…100) | Tile, biome and a bounded set of nearby entities |
-| `population` | `count`, 0…8,192 | Resizes active NPC pool |
+| `population` | `count`, 0…65,536 | Resizes active NPC pool |
 | `teleport` | `player?`, `x`, `y` | Requires a walkable point within world bounds |
 | `paint` | `tx`, `ty`, `width?`, `height?`, `terrain`, `decor?` | Applies a rectangular tile brush atomically; at most 2,048 edited tiles total |
 | `reset` | `seed` (uint32), `count?` | Starts a new simulation and local player |
@@ -61,7 +61,24 @@ window.fern.pause(false);
 
 Other methods: `describe()`, `start()`, `recording()`, `view("world"|"atlas"|"lab")`. `observe()` adds renderer and network telemetry. `batch` accepts at most 1,000 commands and applies them sequentially; it is not transactional. Pause before deterministic browser experiments so the animation loop does not advance between commands. Browser `input` commands remain active until changed or real movement/view input takes over.
 
+Version 1.1 adds persistent view settings and game mode:
+
+```js
+window.fern.settings.set({drawDistance: 8192, entityLimit: 32768, population: 32768});
+window.fern.settings.get();
+await window.fern.display.enterGame(false); // Fill the window for automation, without a native request.
+window.fern.display.get(); // {gameMode, fullscreen}
+await window.fern.display.exitGame();
+window.fern.settings.reset();
+```
+
+Draw distance is an integer from 256 to 16,384 world units. Visible-creature limit and simulated population are integers from 0 to 65,536; invalid values are rejected before applying any change. `showPerformance` controls the compact game HUD readout. Presentation settings do not change simulation state or replay hashes; a population change goes through the recorded engine command. Settings persist on the current origin/device. Guests may set their draw distance and creature limit, but cannot change population.
+
+`enterGame()` defaults to a native fullscreen request and requires a user activation when the browser demands it; test the real button to verify native fullscreen. `enterGame(false)` uses the same game UI inside the browser window. `observe()` reports display state, viewport dimensions, draw distance, entity limit, eligible/drawn/limited counts, FPS and actual simulation Hz. The view budget affects network snapshots as well as drawing. To benchmark every active creature, make the world population and visible limit equal and zoom out enough to include the active region. `npm run bench:quality` measures four populations with 300 real frames each.
+
 Browser checkpoint loading normalizes the session to one `local` traveler. Engine/CLI checkpoint restoration preserves the original players exactly. Solo replay recording restarts after leaving an online room; online replay is deliberately unavailable. Exported snapshots remain available for online inspection.
+
+Browser save/load is asynchronous and uses IndexedDB; wait for the saved toast or restored state in browser automation. Legacy `fern:save:v1` localStorage checkpoints remain readable. Game-mode settings provide Save game and Load game controls, while the lab retains its original controls.
 
 ## Actual online sessions
 

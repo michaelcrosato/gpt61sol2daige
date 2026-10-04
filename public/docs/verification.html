@@ -16,28 +16,35 @@ limits. Source tests are executable; selected captures and benchmark
 JSON are committed under <code>docs/evidence/</code>. Full test traces
 and generated output stay in ignored local artifact directories.</p>
 <h2 id="reproduction-gates">Reproduction gates</h2>
-<p>The delivered source passes <strong>21 headless tests</strong>,
-TypeScript, lint/format checks, and the production build. The browser
-suite passes desktop gameplay, mobile controls, and actual eight-player
-co-op. GitHub Actions also completed the full local-signaling suite on
-an independent Linux runner. Production gameplay/mobile checks and the
-public-signaling eight-client test passed; an earlier public connection
-attempt timed out before a diagnostic retry and the complete
-eight-client rerun succeeded.</p>
+<p>Version 1.1 passes <strong>26 headless tests</strong>, TypeScript,
+lint/format checks, the production build, and <strong>9 browser
+scenarios</strong>. These cover desktop gameplay, mobile controls,
+actual eight-player co-op, independent guest view budgets, settings
+persistence, native fullscreen, fullscreen denial, browser-initiated
+exits, landscape touch controls, full-size world saves and legacy-save
+compatibility. The original release was also verified on GitHub Actions
+and against production, including public signaling; one earlier public
+connection attempt timed out before the subsequent complete eight-client
+rerun succeeded.</p>
 <pre class="bash"><code>npm ci
 npm run check
 npm run build
 npm run test:e2e
 npm run bench
 # With npm run dev running:
-npm run bench:browser</code></pre>
+npm run bench:browser
+npm run bench:quality</code></pre>
 <p>The browser suite starts isolated app/signaling processes on ports
 5187 and 9018. <code>BASE_URL</code> targets an existing app, including
 production. No simulated WebRTC adapter is used. Chrome runs headlessly
 with background throttling disabled for multiple test tabs. The
 eight-client test places most clients in the lab to avoid conflating
 connection correctness with eight competing renderers on one
-workstation; one guest renders the 6,000-NPC view.</p>
+workstation; one guest renders a 32,768-creature view and also switches
+to a 512-creature budget without changing the host population. Native
+fullscreen tests assert <code>document.fullscreenElement</code> and the
+canvas’s actual viewport bounds. A separate denial test deliberately
+rejects the native API to verify the fallback.</p>
 <h2 id="requirement-to-evidence-map">Requirement-to-evidence map</h2>
 <table>
 <colgroup>
@@ -88,9 +95,32 @@ deterministic simulation tests</td>
 </tr>
 <tr>
 <td>Thousands of on-screen NPCs</td>
-<td>8,192-capacity typed arrays, culling/LOD</td>
-<td>8,192-NPC headless test; 6,000 actually drawn during 300 browser
-frames</td>
+<td>65,536-capacity typed arrays, culling/LOD, batched pixel
+rendering</td>
+<td>Full-capacity checkpoint and packet tests; 65,536 actually drawn
+during 300 browser frames</td>
+</tr>
+<tr>
+<td>Adjustable draw distance and on-screen population</td>
+<td>Independent draw-radius, visible-limit and active-population
+settings</td>
+<td>Browser tests change a real cap to 500, narrow/expand draw distance,
+restore defaults and reload persisted values</td>
+</tr>
+<tr>
+<td>Proper fullscreen game mode</td>
+<td>Native fullscreen plus responsive compact HUD and windowed
+fallback</td>
+<td>Real fullscreen entry/exit, G/Esc, native browser exit, usable
+dialogs, journal/map/abilities, touch and rotation</td>
+</tr>
+<tr>
+<td>Higher-capacity saves and network</td>
+<td>Atomic IndexedDB saves and protocol-2 packets with per-guest
+budgets</td>
+<td>A distant 65,536-creature world with 2,048 painted tiles saves and
+restores exactly; legacy saves still load; real co-op transfers 32,768
+creatures</td>
 </tr>
 <tr>
 <td>Close and far zoom</td>
@@ -151,7 +181,69 @@ behavior</td>
 </tr>
 </tbody>
 </table>
-<h2 id="measurements">Measurements</h2>
+<h2 id="version-1.1-quality-measurements">Version 1.1 quality
+measurements</h2>
+<p>Each case uses a fresh headless Chrome context, 1440×1000 game mode,
+0.12× zoom, 16,384-unit draw distance, and a visible-creature limit
+equal to the simulated population. All the listed creatures were drawn.
+Each measurement covers 300 animation frames after the view settles. The
+same Intel i7-14700F / WSL2 workstation is shared with other work; these
+are observed values, not universal guarantees.</p>
+<table>
+<colgroup>
+<col style="width: 25%" />
+<col style="width: 25%" />
+<col style="width: 25%" />
+<col style="width: 25%" />
+</colgroup>
+<thead>
+<tr>
+<th>Active and visible creatures</th>
+<th>Mean FPS</th>
+<th>p95 frame interval</th>
+<th>Actual simulation ticks/s</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>6,000</td>
+<td>60.22</td>
+<td>16.7 ms</td>
+<td>60.22</td>
+</tr>
+<tr>
+<td>16,384</td>
+<td>60.24</td>
+<td>16.8 ms</td>
+<td>60.24</td>
+</tr>
+<tr>
+<td>32,768</td>
+<td>54.34</td>
+<td>33.3 ms</td>
+<td>54.34</td>
+</tr>
+<tr>
+<td>65,536</td>
+<td>37.20</td>
+<td>33.4 ms</td>
+<td>37.20</td>
+</tr>
+</tbody>
+</table>
+<p>At the largest workloads, rendering and simulation share the main
+thread, so the fixed-step simulation slows too. The UI remains
+responsive and reports actual simulation Hz; the benchmark does not
+disguise a reduced simulation rate as 60 Hz. Headless tests prove
+determinism at the expanded cap, not a guaranteed real-time rate. <a
+href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/evidence/quality-benchmark.json">Raw quality benchmark</a>, <a
+href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/evidence/quality-65536.png">maximum-population capture</a>, <a
+href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/evidence/game-mode.png">fullscreen HUD</a>, <a
+href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/evidence/quality-settings.png">settings</a>, <a
+href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/evidence/game-mode-mobile.png">mobile game mode</a>, <a
+href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/evidence/game-mode-landscape.png">landscape touch
+controls</a>.</p>
+<h2 id="initial-release-measurements">Initial-release measurements</h2>
 <p>CPU workload: seed 142, one moving player, 120 warm-up ticks, 360
 measured ticks per population. Node v24.21.0 on Ubuntu/WSL2, Intel
 i7-14700F, 20 logical cores.</p>
@@ -203,7 +295,7 @@ i7-14700F, 20 logical cores.</p>
 </tr>
 </tbody>
 </table>
-<p>These are measurements of the delivered implementation on a shared
+<p>These are retained measurements of version 1.0 on a shared
 workstation. Full-range snapshots include the metadata for one player
 and no edited tiles; actual packet size varies with players, camera
 interest, events and edits. <a href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/evidence/benchmark.json">Raw CPU
@@ -245,6 +337,16 @@ as well as source documentation. The pattern was removed, and the
 browser suite now requests every documentation page, its stylesheet and
 the generated asset manifest so a successful game build cannot conceal
 missing deliverables.</li>
+<li>Version 1.1’s far-view renderer originally made one Canvas call per
+creature. A reusable RGBA buffer reduced rendering cost substantially at
+32k and 65k populations. Nearby sprites retain their existing
+detail.</li>
+<li>Large checkpoint storage now uses IndexedDB. The test covers a
+65,536-creature world at distant coordinates with the full 2,048-tile
+patch layer, as well as existing localStorage saves.</li>
+<li>High-population region rebalancing now clears derived proximity
+flags when a slot respawns; the checkpoint test checks exact future
+state while travelers separate.</li>
 </ul>
 <h2 id="scope-limits">Scope limits</h2>
 <p>The physics tests cover circles, static terrain and the reference

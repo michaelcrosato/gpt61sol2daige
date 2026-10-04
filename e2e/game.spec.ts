@@ -73,10 +73,11 @@ test("exploration, abilities, atlas, audio, lab commands, saving and determinist
   await page.getByRole("button", { name: "Run command", exact: true }).click();
   expect(await page.evaluate(() => window.fern.observe().population)).toBe(6000);
   await page.getByRole("button", { name: "Save trail", exact: true }).click();
+  await expect(page.getByRole("status")).toHaveText("Trail saved on this device.");
   const saved = await page.evaluate(() => window.fern.observe().hash);
   await page.getByRole("button", { name: "Step 60 ticks", exact: true }).click();
   await page.getByRole("button", { name: "Load trail", exact: true }).click();
-  expect(await page.evaluate(() => window.fern.observe().hash)).toBe(saved);
+  await expect.poll(async () => page.evaluate(() => window.fern.observe().hash)).toBe(saved);
   await page.screenshot({ path: "artifacts/agent-lab.png" });
   const recording = (await page.evaluate(() => window.fern.recording())) as Replay;
   expect(replay(recording).stateHash()).toBe(recording.hash);
@@ -222,6 +223,36 @@ test("real WebRTC joins eight isolated clients, syncs movement and quest, reject
         ),
       )
       .toBe(4);
+    // Each guest chooses its own view budget; population changes remain host-authoritative.
+    await host.page.evaluate(() => window.fern.settings.set({ population: 32768 }));
+    await guest.page.evaluate(() =>
+      window.fern.settings.set({ drawDistance: 256, entityLimit: 512 }),
+    );
+    await expect
+      .poll(async () => (await guest.page.evaluate(() => window.fern.observe())).network.population)
+      .toBe(32768);
+    await expect
+      .poll(async () => (await guest.page.evaluate(() => window.fern.observe())).population)
+      .toBeLessThanOrEqual(512);
+    const denied = await guest.page.evaluate(() => {
+      try {
+        window.fern.settings.set({ population: 0 });
+        return false;
+      } catch {
+        return true;
+      }
+    });
+    expect(denied).toBe(true);
+    expect((await host.page.evaluate(() => window.fern.observe())).population).toBe(32768);
+    await guest.page.evaluate(() =>
+      window.fern.settings.set({ drawDistance: 16384, entityLimit: 32768 }),
+    );
+    await expect
+      .poll(async () => (await guest.page.evaluate(() => window.fern.observe())).population)
+      .toBe(32768);
+    await expect
+      .poll(async () => (await guest.page.evaluate(() => window.fern.observe())).render.drawn)
+      .toBeGreaterThan(25000);
     const ninth = await traveler(browser, baseURL!);
     participants.push(ninth);
     const rejection = await ninth.page.evaluate(async (code) => {

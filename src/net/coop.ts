@@ -1,6 +1,14 @@
 import Peer, { type DataConnection, type PeerOptions } from "peerjs";
+import { MAX_DRAW_DISTANCE, MAX_NPCS, MIN_DRAW_DISTANCE } from "../engine/limits.ts";
 import { type Input, idleInput, type Simulation } from "../engine/simulation.ts";
-import { decodeSnapshot, encodeSnapshot, PROTOCOL_VERSION, snapshotBuffer } from "./protocol.ts";
+import { WORLD_LIMIT } from "../engine/world.ts";
+import {
+  decodeSnapshot,
+  encodeSnapshot,
+  PROTOCOL_VERSION,
+  type SnapshotView,
+  snapshotBuffer,
+} from "./protocol.ts";
 
 export type NetworkStatus = {
   role: "solo" | "host" | "guest";
@@ -29,7 +37,7 @@ export class Coop {
   private readonly connections = new Map<string, DataConnection>();
   private readonly lastInput = new Map<string, number>();
   private readonly lastSequence = new Map<string, number>();
-  private readonly interest = new Map<string, number>();
+  private readonly interest = new Map<string, SnapshotView>();
   private readonly getSim: () => Simulation;
   private readonly replaceSim: (sim: Simulation) => void;
   private readonly changed: () => void;
@@ -171,8 +179,18 @@ export class Coop {
       });
       this.lastInput.set(conn.peer, now);
       this.lastSequence.set(conn.peer, data.seq);
-      if (typeof data.radius === "number" && Number.isFinite(data.radius))
-        this.interest.set(conn.peer, Math.max(400, Math.min(15000, data.radius)));
+      if (
+        [data.radius, data.viewX, data.viewY, data.entityLimit].every(
+          (v) => typeof v === "number" && Number.isFinite(v),
+        )
+      ) {
+        this.interest.set(conn.peer, {
+          x: Math.max(-WORLD_LIMIT, Math.min(WORLD_LIMIT, data.viewX as number)),
+          y: Math.max(-WORLD_LIMIT, Math.min(WORLD_LIMIT, data.viewY as number)),
+          radius: Math.max(MIN_DRAW_DISTANCE, Math.min(MAX_DRAW_DISTANCE, data.radius as number)),
+          entityLimit: Math.max(0, Math.min(MAX_NPCS, Math.floor(data.entityLimit as number))),
+        });
+      }
     });
     conn.on("close", () => {
       if (this.connections.get(conn.peer) !== conn) return;
@@ -295,12 +313,20 @@ export class Coop {
     this.status.message = error instanceof Error ? error.message : "Connection failed";
     this.changed();
   }
-  update(dt: number, input: Input, radius = 1500): void {
+  update(dt: number, input: Input, view: SnapshotView): void {
     const now = performance.now();
     if (this.status.role === "guest" && this.status.state === "connected") {
       const conn = this.connections.values().next().value;
       if (conn?.open && now - this.lastSent > 30) {
-        conn.send({ type: "input", seq: this.sequence++, radius, ...input });
+        conn.send({
+          type: "input",
+          seq: this.sequence++,
+          radius: view.radius,
+          viewX: view.x,
+          viewY: view.y,
+          entityLimit: view.entityLimit,
+          ...input,
+        });
         this.lastSent = now;
       }
       if (now - this.lastSnapshot > 10000) {

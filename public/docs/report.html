@@ -12,6 +12,48 @@
 <nav aria-label="Documentation"><a href="/">fern. <span>Back to the world</span></a><a href="/docs/report.html">Design report</a><a href="/docs/agent-protocol.html">Agent protocol</a><a href="/docs/verification.html">Verification</a></nav>
 <main><h1 id="fern-building-a-world-engine-for-coding-agents">Fern:
 building a world engine for coding agents</h1>
+<h2 id="version-1.1-more-room-to-explore">Version 1.1: more room to
+explore</h2>
+<p>The follow-up adds persistent settings for draw distance, visible
+creatures and active world population, together with a proper fullscreen
+game mode. The engine capacity is now <strong>65,536 creatures</strong>,
+eight times the original limit. View settings are independent:
+decreasing the number drawn does not remove creatures from the
+simulation, and a co-op guest’s settings do not change the shared
+population.</p>
+<p>The performance work focused on the measured bottleneck. At distant
+zooms, tens of thousands of individual Canvas drawing calls were
+expensive. The renderer now plots those creatures into one reusable
+pixel buffer and composites it once, while caching the coarse terrain
+view. Near-camera sprites keep their original appearance. Large
+populations expand across a wider area, the spatial hash scales with
+capacity, and distant contacts use a lower update frequency while nearby
+physics retains full fidelity. A bounded frame budget prevents an
+overloaded simulation from trapping the interface in catch-up work.</p>
+<p>The 300-frame game-mode benchmark measured about <strong>60 FPS with
+16,384 visible creatures</strong>, <strong>54 FPS with 32,768</strong>,
+and <strong>37 FPS with 65,536</strong> on this machine. At the highest
+settings the fixed-step simulation also slows; both the benchmark and
+settings expose its actual tick rate. These limits give the user room to
+tune, rather than promising the same performance on every device. <a
+href="verification.html">The verification record</a> contains exact values
+and captures.</p>
+<p>Fullscreen uses the browser’s actual API. The workspace navigation,
+development sidebar and footer give way to a compact HUD, with map,
+journal, sound, settings, abilities and save/load still available. Esc,
+G, an exit button and browser-initiated fullscreen exits all restore the
+workspace. Where native fullscreen is unavailable, the same layout fills
+the window. Portrait and landscape touch layouts are tested. Quality
+preferences remain small localStorage records, while larger game saves
+use IndexedDB and preserve compatibility with earlier saves.</p>
+<p>This extension was implemented in the engine, renderer and packet
+validation as well as the controls. Protocol 2 can carry the expanded
+entity range and honors each guest’s camera and budget. Tests cover
+full-capacity checkpoints, slot 65,535 in binary packets, guest
+authority, settings persistence, actual native fullscreen,
+denial/fallback behavior and large saved worlds. The original design
+rationale below remains relevant; its benchmark paragraphs describe the
+initial release.</p>
 <h2 id="the-result">The result</h2>
 <p>The result is a working engine and a playable cooperative exploration
 game, not an editor mockup. Fern generates a large forest from a seed,

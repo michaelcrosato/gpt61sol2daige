@@ -78,7 +78,7 @@ browser</td>
 </tr>
 <tr>
 <td><code>population</code></td>
-<td><code>count</code>, 0…8,192</td>
+<td><code>count</code>, 0…65,536</td>
 <td>Resizes active NPC pool</td>
 </tr>
 <tr>
@@ -161,11 +161,42 @@ sequentially; it is not transactional. Pause before deterministic
 browser experiments so the animation loop does not advance between
 commands. Browser <code>input</code> commands remain active until
 changed or real movement/view input takes over.</p>
+<p>Version 1.1 adds persistent view settings and game mode:</p>
+<pre class="js"><code>window.fern.settings.set({drawDistance: 8192, entityLimit: 32768, population: 32768});
+window.fern.settings.get();
+await window.fern.display.enterGame(false); // Fill the window for automation, without a native request.
+window.fern.display.get(); // {gameMode, fullscreen}
+await window.fern.display.exitGame();
+window.fern.settings.reset();</code></pre>
+<p>Draw distance is an integer from 256 to 16,384 world units.
+Visible-creature limit and simulated population are integers from 0 to
+65,536; invalid values are rejected before applying any change.
+<code>showPerformance</code> controls the compact game HUD readout.
+Presentation settings do not change simulation state or replay hashes; a
+population change goes through the recorded engine command. Settings
+persist on the current origin/device. Guests may set their draw distance
+and creature limit, but cannot change population.</p>
+<p><code>enterGame()</code> defaults to a native fullscreen request and
+requires a user activation when the browser demands it; test the real
+button to verify native fullscreen. <code>enterGame(false)</code> uses
+the same game UI inside the browser window. <code>observe()</code>
+reports display state, viewport dimensions, draw distance, entity limit,
+eligible/drawn/limited counts, FPS and actual simulation Hz. The view
+budget affects network snapshots as well as drawing. To benchmark every
+active creature, make the world population and visible limit equal and
+zoom out enough to include the active region.
+<code>npm run bench:quality</code> measures four populations with 300
+real frames each.</p>
 <p>Browser checkpoint loading normalizes the session to one
 <code>local</code> traveler. Engine/CLI checkpoint restoration preserves
 the original players exactly. Solo replay recording restarts after
 leaving an online room; online replay is deliberately unavailable.
 Exported snapshots remain available for online inspection.</p>
+<p>Browser save/load is asynchronous and uses IndexedDB; wait for the
+saved toast or restored state in browser automation. Legacy
+<code>fern:save:v1</code> localStorage checkpoints remain readable.
+Game-mode settings provide Save game and Load game controls, while the
+lab retains its original controls.</p>
 <h2 id="actual-online-sessions">Actual online sessions</h2>
 <pre class="js"><code>const room = await window.fern.network.host();
 // In another independently loaded browser/context:

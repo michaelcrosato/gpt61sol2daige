@@ -201,7 +201,7 @@ test("untrusted checkpoints are rejected before allocating an invalid world", ()
   duplicate.players.push(duplicate.players[0]);
   assert.throws(() => Simulation.restore(duplicate), /Invalid saved player/);
 });
-test("population can reach 8192 and safely shrink and expand without nonfinite state", () => {
+test("population can reach 65536 and safely shrink and expand without nonfinite state", () => {
   const sim = new Simulation(142, MAX_NPCS);
   sim.addPlayer("local");
   sim.step(4);

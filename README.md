@@ -25,6 +25,7 @@ npm run preview        # serve dist/ locally
 npm run test:e2e       # game, mobile controls, eight real WebRTC clients
 npm run bench          # CPU simulation benchmark → artifacts/benchmark.json
 npm run bench:browser  # 300 rendered frames; requires npm run dev
+npm run bench:quality  # 6k / 16k / 32k / 65,536 creatures in game mode
 ```
 
 E2E starts its own app on **5187** and local signaling server on **9018**. Those ports must be free. It uses `/usr/bin/google-chrome`; set `CHROME_PATH` for another installed Chrome. With `BASE_URL=https://…`, the same suite targets a deployment and its configured signaling service. Screenshots and traces go to `artifacts/`, `test-results/`, and `playwright-report/`.
@@ -33,12 +34,18 @@ E2E starts its own app on **5187** and local signaling server on **9018**. Those
 
 WASD or arrows move; Space/2 pulses light; Shift/3 dashes; E collects crystals or lights a nearby beacon; 1 toggles your lantern. Scroll or +/− zooms, right-drag pans, F follows your traveler, and M opens the atlas. Mobile has directional and action buttons. Enable sound explicitly. Save/load your trail in Agent lab; saves live on your device.
 
+**Settings** now exposes independent **draw distance (256–16,384 world units)**, **visible-creature limit (0–65,536)** and **world population (0–65,536)**, with Balanced, Expansive and Maximum presets. Apply saves your preferences on this device. The view limit prioritizes nearby creatures without removing them from the simulation. In co-op, each guest controls their view; only the host changes the shared population.
+
+Use **Play fullscreen** or **G** for native fullscreen and a compact game HUD. **Esc**, **G** or the exit button returns to the workspace. Map, journal, audio, settings, save/load, abilities and touch controls remain accessible in game mode. If native fullscreen is unavailable, game mode fills the browser window. Preferences include a live performance overlay; settings also show actual simulation ticks per second. Large world saves use IndexedDB, and previous localStorage saves still load.
+
+At 1440×1000 in this workstation's headless Chrome, the 1.1 game-mode benchmark measured approximately **60 FPS at 16,384 visible creatures**, **54 FPS at 32,768**, and **37 FPS at 65,536**. The highest loads also slow fixed-step simulation; this is an adjustable ceiling rather than a guaranteed frame rate. [Measurements and test scope](docs/VERIFICATION.md).
+
 Each un-attuned wisp within a pulse contributes a shard. Each of the three beacons needs three shards. Their journal entries mark the atlas. Shallow water slows movement; deep water and trunks are solid. Travel across the river using the path. The expedition has no timer.
 
 ## What is implemented
 
 - **Massive streaming world:** coordinates −16,000,000…+16,000,000; 16-unit tiles, 256-unit chunks. A 1,024-chunk LRU bounds terrain memory; content regenerates exactly.
-- **Thousands of creatures:** typed-array storage for up to 8,192 active NPCs, spatial broad phase, distance-based steering/contact updates, view culling and zoom-dependent detail.
+- **Thousands of creatures:** typed-array storage for up to 65,536 active NPCs, spatial broad phase, distance-based steering/contact updates, independent view budgets, cached overview terrain and batched pixel rendering.
 - **Physics:** fixed 60 Hz steps, circle impulses, unequal masses, restitution, separation, static tile/trunk contacts, wading, dash substeps and pulse forces.
 - **Eight-player co-op:** host-authoritative simulation over WebRTC, validated inputs, compact binary snapshots, camera interest filtering, smoothing, slot limits and disconnect recovery.
 - **Code-made assets:** pixel sprite recipes and eight animation poses; procedural sound effects and an ambient score. Font files are bundled with OFL licenses.

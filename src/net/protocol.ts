@@ -6,10 +6,15 @@ import {
   type Player,
   Simulation,
 } from "../engine/simulation.ts";
+import { EntityVisibility, type ViewRegion } from "../engine/visibility.ts";
 import { type TerrainPatch, validatePatches, WORLD_LIMIT } from "../engine/world.ts";
 
-export const PROTOCOL_VERSION = 1;
-export const MAX_PACKET = 262144;
+export const PROTOCOL_VERSION = 2;
+export const MAX_PACKET = MAX_NPCS * 16 + 100_008;
+export interface SnapshotView extends ViewRegion {
+  entityLimit: number;
+}
+const visible = new EntityVisibility(MAX_NPCS);
 const encoder = new TextEncoder(),
   decoder = new TextDecoder();
 
@@ -20,7 +25,7 @@ export function snapshotBuffer(value: ArrayBuffer | ArrayBufferView): ArrayBuffe
   return new Uint8Array(value.buffer, value.byteOffset, value.byteLength).slice().buffer;
 }
 interface Header {
-  version: 1;
+  version: 2;
   seed: number;
   tick: number;
   population: number;
@@ -35,15 +40,22 @@ interface Header {
 }
 
 /** 16-byte entity records, relative float positions keep precision at distant coordinates. */
-export function encodeSnapshot(sim: Simulation, playerId: string, radius = 1500): ArrayBuffer {
+export function encodeSnapshot(
+  sim: Simulation,
+  playerId: string,
+  interest: number | SnapshotView = 1500,
+): ArrayBuffer {
   const p = sim.players.get(playerId),
     originX = p?.x ?? 0,
     originY = p?.y ?? 0;
-  const ids: number[] = [];
-  for (let i = 0; i < sim.count; i++)
-    if ((sim.x[i] - originX) ** 2 + (sim.y[i] - originY) ** 2 <= radius * radius) ids.push(i);
+  const region =
+    typeof interest === "number"
+      ? { x: originX, y: originY, radius: interest, entityLimit: MAX_NPCS }
+      : interest;
+  const { radius } = region;
+  visible.select(sim.x, sim.y, sim.count, region, region.entityLimit);
   const header: Header = {
-    version: 1,
+    version: PROTOCOL_VERSION,
     seed: sim.world.seed,
     tick: sim.tick,
     population: sim.count,
@@ -53,7 +65,7 @@ export function encodeSnapshot(sim: Simulation, playerId: string, radius = 1500)
     collected: [...sim.collected]
       .filter((s) => {
         const [x, y] = s.split(",").map(Number);
-        return Math.abs(x * 16 - originX) < radius && Math.abs(y * 16 - originY) < radius;
+        return Math.abs(x * 16 - region.x) < radius && Math.abs(y * 16 - region.y) < radius;
       })
       .slice(-1024),
     players: [...sim.players.values()],
@@ -62,13 +74,14 @@ export function encodeSnapshot(sim: Simulation, playerId: string, radius = 1500)
     originY,
   };
   const json = encoder.encode(JSON.stringify(header)),
-    packet = new ArrayBuffer(8 + json.length + ids.length * 16),
+    packet = new ArrayBuffer(8 + json.length + visible.count * 16),
     view = new DataView(packet);
   view.setUint32(0, json.length, true);
-  view.setUint32(4, ids.length, true);
+  view.setUint32(4, visible.count, true);
   new Uint8Array(packet, 8, json.length).set(json);
   let offset = 8 + json.length;
-  for (const i of ids) {
+  for (let n = 0; n < visible.count; n++) {
+    const i = visible.ids[n];
     view.setUint16(offset, i, true);
     view.setUint8(offset + 2, sim.kind[i]);
     view.setUint8(offset + 3, sim.attuned[i]);
