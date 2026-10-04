@@ -116,6 +116,7 @@ export class Coop {
     if (this.getSim().playground)
       throw new Error("Close the solo physics playground before hosting an expedition");
     this.disconnect();
+    this.getSim().useLegacyPhysics();
     const generation = this.generation;
     try {
       const room = `fern-${crypto.randomUUID()}`,
@@ -300,6 +301,7 @@ export class Coop {
   }
   private async joinOnce(room: string, timeout: number): Promise<void> {
     this.disconnect(false);
+    this.getSim().useLegacyPhysics(true);
     const generation = this.generation;
     try {
       const peer = await this.open();
@@ -521,6 +523,7 @@ export class Coop {
       received: 0,
       sent: 0,
     });
+    sim.resumeSoloPhysics();
     this.changed();
   }
 }

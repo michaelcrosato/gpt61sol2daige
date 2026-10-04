@@ -2,6 +2,7 @@ import { hash, random } from "../engine/math.ts";
 import { collideCircles, moveBody } from "../engine/physics.ts";
 import type { Player, Simulation } from "../engine/simulation.ts";
 import { World } from "../engine/world.ts";
+import { enemyBodyId, playerBodyId } from "../physics/adventure.ts";
 import type { AreaRecipe } from "./content.ts";
 import {
   ARCHETYPES,
@@ -248,6 +249,7 @@ export class Adventure {
             name: s.recipe.name,
           },
     );
+    sim.physical?.synchronizeLand(sim);
   }
   onJoin(sim: Simulation, player: Player): void {
     const other = Object.values(this.state.heroes)[0];
@@ -261,14 +263,11 @@ export class Adventure {
     const hero = this.hero(player.id);
     hero.hp = this.stats(player.id).health;
     if (this.state.mode === "area")
-      this.place(
-        player,
-        this.state.recipe.x - 240,
-        this.state.recipe.y + player.color * 12,
-        sim.tick,
-      );
+      this.place(player, this.state.recipe.x - 240, this.state.recipe.y + player.color * 12, sim);
   }
-  private place(p: Player, x: number, y: number, tick: number): void {
+  private place(p: Player, x: number, y: number, sim: Simulation): void {
+    const tick = sim.tick;
+    sim.physical?.teleport(playerBodyId(p.id), x, y);
     p.x = p.px = x;
     p.y = p.py = y;
     p.vx = p.vy = 0;
@@ -326,7 +325,7 @@ export class Adventure {
       const hero = this.hero(player.id);
       hero.dead = false;
       hero.hp = Math.max(hero.hp, this.stats(player.id).health * 0.5);
-      this.place(player, s.recipe.x - 230, s.recipe.y + (player.color - 2) * 12, sim.tick);
+      this.place(player, s.recipe.x - 230, s.recipe.y + (player.color - 2) * 12, sim);
     }
     for (let k = 0; k < s.recipe.mechanics.length; k++)
       for (let n = 0; n < 3; n++) {
@@ -373,7 +372,7 @@ export class Adventure {
       h.potions = 3;
       h.bought = [];
       p.energy = 100;
-      this.place(p, -20 + p.color * 16, 55, sim.tick);
+      this.place(p, -20 + p.color * 16, 55, sim);
     }
     this.emit(sim, "portal", 0, 30, "", `${townName(land)} · Rest, resupply, then travel outward.`);
   }
@@ -439,7 +438,7 @@ export class Adventure {
           h.hp = this.stats(id).health;
           h.potions = 3;
           p.energy = 100;
-          this.place(p, s.recipe.x - 230, s.recipe.y + p.color * 12, sim.tick);
+          this.place(p, s.recipe.x - 230, s.recipe.y + p.color * 12, sim);
           this.emit(sim, "portal", p.x, p.y, id, "Your lantern rekindles at the trailhead.");
         } else this.enterTown(sim);
         break;
@@ -707,8 +706,7 @@ export class Adventure {
         angle,
         stats.powers.includes("cleave") && h.combo === 2 ? Math.PI : 1.1 + h.combo * 0.18,
       );
-      p.vx += Math.cos(angle) * 28;
-      p.vy += Math.sin(angle) * 28;
+      sim.actorImpulse(playerBodyId(p.id), Math.cos(angle) * 28, Math.sin(angle) * 28);
     } else if (ability === "lance") {
       h.lanceReady = tick + Math.round(48 * stats.cooldown);
       this.projectile(p.x, p.y, angle, 470, stats.damage * 2.7, p.id, false, 54, 5);
@@ -815,8 +813,11 @@ export class Adventure {
       e.timer = 12;
     }
     const d = Math.hypot(e.x - fromX, e.y - fromY) || 1;
-    e.vx += ((e.x - fromX) / d) * (e.boss ? 12 : 65);
-    e.vy += ((e.y - fromY) / d) * (e.boss ? 12 : 65);
+    sim.actorImpulse(
+      enemyBodyId(e.id),
+      ((e.x - fromX) / d) * (e.boss ? 12 : 65),
+      ((e.y - fromY) / d) * (e.boss ? 12 : 65),
+    );
     this.emit(
       sim,
       "hit",
@@ -967,8 +968,7 @@ export class Adventure {
     h.lastHit = sim.tick;
     h.recallUntil = 0;
     const d = Math.hypot(p.x - x, p.y - y) || 1;
-    p.vx += ((p.x - x) / d) * 80;
-    p.vy += ((p.y - y) / d) * 80;
+    sim.actorImpulse(playerBodyId(p.id), ((p.x - x) / d) * 80, ((p.y - y) / d) * 80);
     this.emit(sim, "hurt", p.x, p.y - 20, p.id, "", damage, 0, "#ef9b8f");
     if (h.hp <= 0) {
       h.dead = true;
@@ -1120,8 +1120,10 @@ export class Adventure {
     if (behavior === "charger") {
       e.phase = "charge";
       e.timer = e.boss ? 32 : 25;
-      e.vx = Math.cos(e.facing) * (e.boss ? 280 : 240);
-      e.vy = Math.sin(e.facing) * (e.boss ? 280 : 240);
+      if (!sim.physical) {
+        e.vx = Math.cos(e.facing) * (e.boss ? 280 : 240);
+        e.vy = Math.sin(e.facing) * (e.boss ? 280 : 240);
+      }
     } else if (behavior === "spitter" || behavior === "orbiter") {
       const amount = e.boss ? (phase2 ? 9 : 5) : e.elite ? 3 : 1;
       for (let i = 0; i < amount; i++)
@@ -1218,8 +1220,7 @@ export class Adventure {
       for (const e of s.enemies) {
         const d = Math.hypot(e.x - x, e.y - y);
         if (d < 170 && !e.boss) {
-          e.vx += (x - e.x) * 4;
-          e.vy += (y - e.y) * 4;
+          sim.actorImpulse(enemyBodyId(e.id), (x - e.x) * 4, (y - e.y) * 4);
           e.rootUntil = sim.tick + 40;
         }
       }
@@ -1246,7 +1247,7 @@ export class Adventure {
     if (kind === "rift") {
       const other = s.mechanics.find((m) => m.id === mechanic.pair);
       if (other) {
-        this.place(p, other.x, other.y, sim.tick);
+        this.place(p, other.x, other.y, sim);
         h.invulnerableUntil = sim.tick + 20;
         other.readyAt = Math.max(other.readyAt, sim.tick + 60);
         this.damageArea(sim, owner, other.x, other.y, 115, stats.damage * 2.2);
@@ -1375,9 +1376,13 @@ export class Adventure {
         }
       }
       if (!target) continue;
+      let intentX = 0,
+        intentY = 0;
       if (e.phase === "windup") {
         if (--e.timer <= 0) this.enemyAttack(sim, e, target);
       } else if (e.phase === "charge") {
+        intentX = Math.cos(e.facing) * (e.boss ? 280 : 240);
+        intentY = Math.sin(e.facing) * (e.boss ? 280 : 240);
         for (const p of sim.players.values())
           if (Math.hypot(e.x - p.x, e.y - p.y) < e.radius + 10)
             this.damageHero(sim, p, e.damage * 1.3, e.x, e.y);
@@ -1386,8 +1391,10 @@ export class Adventure {
           e.timer = 25;
         }
       } else if (e.phase === "recover") {
-        e.vx *= 0.86;
-        e.vy *= 0.86;
+        if (!sim.physical) {
+          e.vx *= 0.86;
+          e.vy *= 0.86;
+        }
         if (--e.timer <= 0) e.phase = "walk";
       } else {
         const archetype = ARCHETYPES[e.behavior],
@@ -1399,7 +1406,7 @@ export class Adventure {
             16,
             Math.round((e.boss ? 46 : archetype.windup) / Math.sqrt(s.tuning.enemySpeed)),
           );
-          e.vx = e.vy = 0;
+          if (!sim.physical) e.vx = e.vy = 0;
         } else {
           let direction = angle,
             speed =
@@ -1413,28 +1420,35 @@ export class Adventure {
           if (e.behavior === "orbiter")
             direction += (Math.PI / 2) * (e.id % 2 ? 1 : -1) * (distance < 170 ? 1 : 0.35);
           if (e.rootUntil > tick) speed = 0;
-          e.vx += (Math.cos(direction) * speed - e.vx) * 0.1;
-          e.vy += (Math.sin(direction) * speed - e.vy) * 0.1;
+          intentX = Math.cos(direction) * speed;
+          intentY = Math.sin(direction) * speed;
+          if (!sim.physical) {
+            e.vx += (intentX - e.vx) * 0.1;
+            e.vy += (intentY - e.vy) * 0.1;
+          }
         }
       }
-      if (e.phase !== "windup") moveBody(sim.world, e, 1 / 60);
+      if (sim.physical) sim.physical.enemyIntent(sim, e, intentX, intentY, e.phase === "walk");
+      else if (e.phase !== "windup") moveBody(sim.world, e, 1 / 60);
     }
-    for (let i = 0; i < s.enemies.length; i++)
-      if (s.enemies[i].hp > 0)
-        for (let j = i + 1; j < s.enemies.length; j++)
-          if (s.enemies[j].hp > 0)
-            collideCircles(
-              s.enemies[i],
-              s.enemies[j],
-              s.enemies[i].boss ? 8 : 1,
-              s.enemies[j].boss ? 8 : 1,
-              0.05,
-            );
-    for (const enemy of s.enemies)
-      if (enemy.hp > 0)
-        for (const p of sim.players.values())
-          if (!this.hero(p.id).dead && this.hero(p.id).dashUntil <= tick)
-            collideCircles(p, enemy, 2.5, enemy.boss ? 8 : 1, 0.05);
+    if (!sim.physical)
+      for (let i = 0; i < s.enemies.length; i++)
+        if (s.enemies[i].hp > 0)
+          for (let j = i + 1; j < s.enemies.length; j++)
+            if (s.enemies[j].hp > 0)
+              collideCircles(
+                s.enemies[i],
+                s.enemies[j],
+                s.enemies[i].boss ? 8 : 1,
+                s.enemies[j].boss ? 8 : 1,
+                0.05,
+              );
+    if (!sim.physical)
+      for (const enemy of s.enemies)
+        if (enemy.hp > 0)
+          for (const p of sim.players.values())
+            if (!this.hero(p.id).dead && this.hero(p.id).dashUntil <= tick)
+              collideCircles(p, enemy, 2.5, enemy.boss ? 8 : 1, 0.05);
     s.enemies = s.enemies.filter((e) => e.hp > 0 || tick - e.deadAt < 40);
     for (const projectile of s.projectiles) {
       projectile.px = projectile.x;

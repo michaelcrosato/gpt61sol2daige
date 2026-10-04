@@ -1,6 +1,14 @@
 import { Adventure } from "../game/adventure.ts";
 import type { AdventureState } from "../game/types.ts";
 import { validateAdventure } from "../game/validation.ts";
+import {
+  AdventurePhysics,
+  type AdventurePhysicsSnapshot,
+  ambientBodyId,
+  enemyBodyId,
+  playerBodyId,
+  validateAdventurePhysics,
+} from "../physics/adventure.ts";
 import { rapier } from "../physics/bootstrap.ts";
 import { PhysicsWorld, validatePhysicsSnapshot } from "../physics/runtime.ts";
 import type { PhysicsSnapshot } from "../physics/types.ts";
@@ -70,6 +78,8 @@ export interface SaveState {
   players: Player[];
   adventure?: AdventureState;
   playground?: PhysicsSnapshot;
+  actorPhysics?: AdventurePhysicsSnapshot;
+  movementBackend?: "legacy" | "replica";
   npcs: {
     x: number[];
     y: number[];
@@ -82,6 +92,8 @@ export interface SaveState {
 }
 export class Simulation {
   playground: PhysicsWorld | null = null;
+  physical: AdventurePhysics | null = null;
+  movementBackend: "rapier" | "legacy" | "replica" = "rapier";
   private disposed = false;
   world: World;
   adventure: Adventure;
@@ -107,12 +119,40 @@ export class Simulation {
   private readonly a: Body = { x: 0, y: 0, vx: 0, vy: 0, radius: 3 };
   private readonly b: Body = { x: 0, y: 0, vx: 0, vy: 0, radius: 3 };
 
-  constructor(seed = 142, population = 2400) {
+  constructor(seed = 142, population = 2400, backend: "rapier" | "legacy" | "replica" = "rapier") {
     rapier();
     this.world = new World(seed);
     this.adventure = new Adventure(seed);
     this.adventure.configureWorld(this);
     this.setPopulation(population);
+    this.movementBackend = backend;
+    if (backend === "rapier") this.physical = new AdventurePhysics(this);
+  }
+  useLegacyPhysics(replica = false): void {
+    this.physical?.dispose();
+    this.physical = null;
+    this.movementBackend = replica ? "replica" : "legacy";
+  }
+  resumeSoloPhysics(): void {
+    if (this.physical) return;
+    this.movementBackend = "rapier";
+    this.physical = new AdventurePhysics(this);
+  }
+  actorImpulse(id: string, x: number, y: number): void {
+    if (this.physical?.world.has(id)) this.physical.world.velocityChange(id, x, y);
+    else if (id.startsWith("player-")) {
+      const p = this.players.get(id.slice(7));
+      if (p) {
+        p.vx += x;
+        p.vy += y;
+      }
+    } else {
+      const e = this.adventure.state.enemies.find((e) => enemyBodyId(e.id) === id);
+      if (e) {
+        e.vx += x;
+        e.vy += y;
+      }
+    }
   }
   addPlayer(id: string, name = "Wayfarer"): Player {
     const existing = this.players.get(id);
@@ -121,6 +161,7 @@ export class Simulation {
       throw new Error("Physics playground is solo-only until M04");
     if (this.players.size >= MAX_PLAYERS) throw new Error("This expedition is full (8 players).");
     if (!/^[\w-]{1,80}$/.test(id)) throw new Error("Invalid player id");
+    if (this.players.size) this.useLegacyPhysics(); // Explicit M03 rollout boundary.
     const color = [...Array(MAX_PLAYERS).keys()].find(
       (i) => ![...this.players.values()].some((p) => p.color === i),
     )!;
@@ -186,6 +227,7 @@ export class Simulation {
       this.spawn(i, anchor?.x ?? 0, anchor?.y ?? 0, radius);
     }
     this.count = count;
+    this.physical?.trimPopulation(count);
   }
   private populationRadius(count = this.count): number {
     const regions: Player[] = [];
@@ -219,6 +261,7 @@ export class Simulation {
     p.x = p.px = x;
     p.y = p.py = y;
     p.vx = p.vy = 0;
+    this.physical?.teleport(playerBodyId(id), x, y);
   }
   private emit(type: GameEvent["type"], p: Player, message: string): void {
     this.events.push({ tick: this.tick, type, x: p.x, y: p.y, player: p.id, message });
@@ -275,8 +318,16 @@ export class Simulation {
         d = Math.hypot(dx, dy);
       if (d > 100) continue;
       const force = (1 - d / 110) * 200;
-      this.vx[i] += (dx / Math.max(d, 1)) * force;
-      this.vy[i] += (dy / Math.max(d, 1)) * force;
+      if (this.physical?.ownsAmbient(i))
+        this.physical.world.velocityChange(
+          ambientBodyId(i, this.generation[i]),
+          (dx / Math.max(d, 1)) * force,
+          (dy / Math.max(d, 1)) * force,
+        );
+      else {
+        this.vx[i] += (dx / Math.max(d, 1)) * force;
+        this.vy[i] += (dy / Math.max(d, 1)) * force;
+      }
       if (this.kind[i] === 0 && !this.attuned[i]) {
         this.attuned[i] = 1;
         found++;
@@ -304,6 +355,7 @@ export class Simulation {
     this.metrics.contacts = 0;
     this.metrics.near = 0;
     this.metrics.far = 0;
+    this.physical?.begin(this);
     const players = [...this.players.values()];
     for (const p of players) {
       const hero = this.adventure.hero(p.id),
@@ -323,26 +375,47 @@ export class Simulation {
       if (length > 0) p.facing = Math.atan2(iy, ix);
       const wading = this.world.at(p.x, p.y).terrain === Terrain.Water;
       const speed = (wading ? 58 : 115) * heroStats.speed;
-      p.vx += (ix * speed - p.vx) * 0.18;
-      p.vy += (iy * speed - p.vy) * 0.18;
+      let intentX = ix * speed,
+        intentY = iy * speed;
+      if (!this.physical) {
+        p.vx += (intentX - p.vx) * 0.18;
+        p.vy += (intentY - p.vy) * 0.18;
+      }
       if (!hero.dead && p.input.dash && p.dashCooldown === 0 && p.energy >= 28) {
-        p.vx = Math.cos(p.facing) * 520;
-        p.vy = Math.sin(p.facing) * 520;
+        if (!this.physical) {
+          p.vx = Math.cos(p.facing) * 520;
+          p.vy = Math.sin(p.facing) * 520;
+        }
         p.energy -= 28;
         p.dashCooldown = 0.55;
         this.emit("dash", p, "");
         this.adventure.dash(this, p);
       }
       if (hero.dashUntil > this.tick && !hero.dead) {
-        p.vx = Math.cos(hero.dashAngle) * 490 * Math.max(1, heroStats.speed / 1.4);
-        p.vy = Math.sin(hero.dashAngle) * 490 * Math.max(1, heroStats.speed / 1.4);
+        intentX = Math.cos(hero.dashAngle) * 490 * Math.max(1, heroStats.speed / 1.4);
+        intentY = Math.sin(hero.dashAngle) * 490 * Math.max(1, heroStats.speed / 1.4);
+        if (!this.physical) {
+          p.vx = intentX;
+          p.vy = intentY;
+        }
       }
+      if (this.physical)
+        this.physical.world.motor(
+          playerBodyId(p.id),
+          intentX,
+          intentY,
+          hero.dashUntil > this.tick ? 1 : 0.18,
+          this.physical.world.tick + Math.max(0, hero.hurtUntil - this.tick),
+          hero.dead || hero.dashUntil > this.tick,
+        );
       if (p.input.pulse && !hero.dead) this.pulse(p);
       if (p.input.interact && !p.lastInteract && !hero.dead && !this.adventure.interact(this, p))
         this.interact(p);
       p.lastInteract = p.input.interact;
-      this.metrics.contacts += moveBody(this.world, p, STEP);
-      p.steps += distance(p.px, p.py, p.x, p.y);
+      if (!this.physical) {
+        this.metrics.contacts += moveBody(this.world, p, STEP);
+        p.steps += distance(p.px, p.py, p.x, p.y);
+      }
     }
     const spawnRadius = this.populationRadius();
     const recycleDistance2 = Math.max(2200, spawnRadius * 1.7) ** 2;
@@ -364,8 +437,9 @@ export class Simulation {
       if (players.length && this.tick % 60 === i % 60) {
         const anchor = players[i % players.length];
         if ((anchor.x - this.x[i]) ** 2 + (anchor.y - this.y[i]) ** 2 > recycleDistance2) {
-          this.generation[i]++;
+          const oldGeneration = this.generation[i]++;
           this.spawn(i, anchor.x, anchor.y, spawnRadius);
+          this.physical?.recycleAmbient(this, i, oldGeneration);
           continue;
         }
       }
@@ -374,7 +448,8 @@ export class Simulation {
       if (near) this.metrics.near++;
       else this.metrics.far++;
       // Expensive steering and static contacts use 15 Hz outside player interest. Bodies still integrate at 60 Hz.
-      if (near || (this.tick + i) % 4 === 0) {
+      const physicalOwner = this.physical?.ownsAmbient(i) ?? false;
+      if (physicalOwner || near || (this.tick + i) % 4 === 0) {
         const interval = near ? 1 : 4;
         const angle =
           random(i, this.generation[i], this.world.seed) * 6.283 +
@@ -387,9 +462,13 @@ export class Simulation {
           targetX += (this.x[i] - focus.x) * inv;
           targetY += (this.y[i] - focus.y) * inv;
         }
-        this.vx[i] += (targetX - this.vx[i]) * 0.035 * interval;
-        this.vy[i] += (targetY - this.vy[i]) * 0.035 * interval;
+        if (physicalOwner) this.physical!.ambientIntent(this, i, targetX, targetY);
+        else {
+          this.vx[i] += (targetX - this.vx[i]) * 0.035 * interval;
+          this.vy[i] += (targetY - this.vy[i]) * 0.035 * interval;
+        }
       }
+      if (physicalOwner) continue;
       this.a.x = this.x[i];
       this.a.y = this.y[i];
       this.a.vx = this.vx[i];
@@ -409,8 +488,10 @@ export class Simulation {
     this.grid.build(this.x, this.y, this.count);
     // Impulse collisions are applied in stable id order, preserving deterministic replays.
     for (let i = 0; i < this.count; i++) {
+      if (this.physical?.ownsAmbient(i)) continue;
       if (this.count > 8192 && !this.near[i] && (this.tick + i) % contactStride !== 0) continue;
       this.grid.query(this.x[i], this.y[i], 9, (j) => {
+        if (this.physical?.ownsAmbient(j)) return;
         if (j === i) return;
         if (
           j < i &&
@@ -446,11 +527,13 @@ export class Simulation {
         }
       });
     }
-    for (let a = 0; a < players.length; a++) {
-      for (let b = a + 1; b < players.length; b++)
-        if (collideCircles(players[a], players[b], 3, 3)) this.metrics.contacts++;
-    }
+    if (!this.physical)
+      for (let a = 0; a < players.length; a++) {
+        for (let b = a + 1; b < players.length; b++)
+          if (collideCircles(players[a], players[b], 3, 3)) this.metrics.contacts++;
+      }
     this.adventure.step(this);
+    this.physical?.solve(this);
     this.playground?.step();
   }
   stateHash(): string {
@@ -514,6 +597,15 @@ export class Simulation {
       for (let i = 0; i < physics.length; i++)
         h = Math.imul(h ^ physics.charCodeAt(i), 16777619) >>> 0;
     }
+    if (this.physical) {
+      const physics = JSON.stringify(this.physical.save());
+      for (let i = 0; i < physics.length; i++)
+        h = Math.imul(h ^ physics.charCodeAt(i), 16777619) >>> 0;
+    }
+    h = checksum(
+      Array.from(this.movementBackend, (c) => c.charCodeAt(0)),
+      h,
+    );
     return h.toString(16).padStart(8, "0");
   }
   observe() {
@@ -548,6 +640,7 @@ export class Simulation {
       },
       physics: { ...this.metrics },
       playground: this.playground?.inspect() ?? null,
+      actorPhysics: this.physical?.inspect() ?? { active: false, backend: this.movementBackend },
       events: this.events.slice(-8),
       adventure: this.adventure.observe(this.players.keys().next().value, this.tick),
     };
@@ -565,6 +658,9 @@ export class Simulation {
       players: structuredClone([...this.players.values()]),
       adventure: this.adventure.save(),
       ...(this.playground ? { playground: this.playground.save() } : {}),
+      ...(this.physical
+        ? { actorPhysics: this.physical.save() }
+        : { movementBackend: this.movementBackend as "legacy" | "replica" }),
       npcs: {
         x: Array.from(this.x.subarray(0, this.count)),
         y: Array.from(this.y.subarray(0, this.count)),
@@ -578,7 +674,7 @@ export class Simulation {
   }
   static restore(state: SaveState): Simulation {
     validateSave(state);
-    const sim = new Simulation(state.seed, 0);
+    const sim = new Simulation(state.seed, 0, state.movementBackend ?? "rapier");
     if (state.patches?.length) sim.world.setPatches(state.patches);
     sim.tick = state.tick;
     sim.count = state.count;
@@ -593,6 +689,16 @@ export class Simulation {
       sim[key].set(state.npcs[key]);
     sim.px.set(sim.x);
     sim.py.set(sim.y);
+    if (state.actorPhysics) {
+      try {
+        const next = AdventurePhysics.restore(sim, state.actorPhysics);
+        sim.physical?.dispose();
+        sim.physical = next;
+      } catch (error) {
+        sim.dispose();
+        throw error;
+      }
+    } else sim.physical?.synchronizeLand(sim);
     if (state.playground) {
       try {
         sim.playground = PhysicsWorld.restore(state.playground);
@@ -608,6 +714,8 @@ export class Simulation {
     this.disposed = true;
     this.playground?.dispose();
     this.playground = null;
+    this.physical?.dispose();
+    this.physical = null;
   }
 }
 
@@ -636,6 +744,12 @@ export function validateSave(state: SaveState): void {
   )
     throw new Error("Invalid save header");
   validatePatches(state.patches ?? []);
+  if (state.movementBackend !== undefined && !["legacy", "replica"].includes(state.movementBackend))
+    throw new Error("Invalid movement backend");
+  if (state.actorPhysics) {
+    if (state.movementBackend) throw new Error("Invalid saved movement backend");
+    validateAdventurePhysics(state.actorPhysics);
+  }
   if (state.playground) {
     if (state.players.length > 1) throw new Error("Saved physics playground must be solo-only");
     validatePhysicsSnapshot(state.playground);
@@ -689,6 +803,8 @@ export function validateSave(state: SaveState): void {
       throw new Error("Invalid saved player");
     ids.add(p.id);
   }
+  if (state.actorPhysics && state.players.length > 1)
+    throw new Error("Adventure physics is solo-only until M04");
   for (const key of ["x", "y", "vx", "vy", "kind", "attuned", "generation"] as const) {
     const values = state.npcs[key];
     if (

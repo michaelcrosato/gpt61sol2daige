@@ -151,21 +151,27 @@ test("repeated reset/restore/close/dispose frees worlds, queues and old handles"
       agent.execute({ op: "physics", action: "reset" });
       if (old) assert.throws(() => old.step(), /disposed/);
       assert.deepEqual(physicsResources(), {
-        worlds: baseline.worlds + 1,
-        queues: baseline.queues + 1,
+        worlds: baseline.worlds + 2,
+        queues: baseline.queues + 2,
       });
       agent.execute({ op: "restore", state: agent.sim.save() });
       assert.deepEqual(physicsResources(), {
-        worlds: baseline.worlds + 1,
-        queues: baseline.queues + 1,
+        worlds: baseline.worlds + 2,
+        queues: baseline.queues + 2,
       });
       assert.equal(agent.sim.playground?.poses().length, 10);
     }
     agent.execute({ op: "physics", action: "close" });
-    assert.deepEqual(physicsResources(), baseline);
+    assert.deepEqual(physicsResources(), {
+      worlds: baseline.worlds + 1,
+      queues: baseline.queues + 1,
+    });
     agent.execute({ op: "physics", action: "reset" });
     agent.execute({ op: "reset", seed: 142, count: 0 });
-    assert.deepEqual(physicsResources(), baseline);
+    assert.deepEqual(physicsResources(), {
+      worlds: baseline.worlds + 1,
+      queues: baseline.queues + 1,
+    });
   } finally {
     agent.sim.dispose();
     agent.sim.dispose();

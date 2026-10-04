@@ -127,6 +127,9 @@ test("full-size distant worlds save through the game menu and survive reload", a
     state.npcs.y = state.npcs.y.map((y) => y + 8_000_000);
     state.players[0].x = state.players[0].px = 8_000_000;
     state.players[0].y = state.players[0].py = 8_000_000;
+    // This authored legacy-coordinate fixture rebuilds fresh physical state; its previous
+    // raw registry belongs to the unshifted world and must not masquerade as that new pose.
+    delete state.actorPhysics;
     window.fern.command({ op: "restore", state });
     window.fern.command({ op: "paint", tx: 500000, ty: 500000, width: 32, height: 64, terrain: 6 });
   });

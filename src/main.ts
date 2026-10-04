@@ -110,6 +110,7 @@ const net = new Coop(
 );
 const physicsUI = mountPhysicsUI({
   world: () => runtime.sim.playground,
+  adventure: () => runtime.sim.physical,
   solo: () => net.status.role === "solo" && net.status.state !== "connecting",
   execute,
   pause: setPaused,
@@ -327,11 +328,11 @@ function ensureAuthority(): void {
 function execute(command: Command): unknown {
   if (!command || typeof command !== "object" || typeof command.op !== "string")
     throw new Error("Expected a command object");
-  if (command.op === "physics" && net.status.state === "connecting")
+  if (["physics", "actors"].includes(command.op) && net.status.state === "connecting")
     throw new Error(
       "Wait for the expedition connection to finish before using the solo playground",
     );
-  if (command.op === "physics" && command.action === "apply" && !paused)
+  if (["physics", "actors"].includes(command.op) && command.action === "apply" && !paused)
     throw new Error(
       "Pause the playground before deliberately applying policies; running edits apply on the next tick.",
     );
@@ -342,7 +343,9 @@ function execute(command: Command): unknown {
     ensureAuthority();
   if (
     net.status.role !== "solo" &&
-    ["reset", "restore", "join", "leave", "step", "teleport", "physics"].includes(command.op)
+    ["reset", "restore", "join", "leave", "step", "teleport", "physics", "actors"].includes(
+      command.op,
+    )
   )
     throw new Error("Leave the expedition before using this lab command.");
   if (command.op === "restore") {

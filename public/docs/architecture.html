@@ -15,8 +15,9 @@
 simulation. Its solo physics playground uses the official Rapier2D
 JavaScript/WASM package behind a local adapter. There is no imported
 game engine, scene editor, rendering framework, artwork pack or audio
-pack. Adventure actors and ambient wildlife retain the existing solver
-until their physics milestones.</p>
+pack. Solo adventure actors use Rapier in M03; ambient wildlife uses an
+explicit regional movement owner. Actual co-op retains its supported
+legacy path until M04 verifies physical replication.</p>
 <pre class="text"><code>JSONL / browser commands ─── AgentRuntime ─── Simulation (60 Hz)
                                                 │
                            World generation ────┤
@@ -469,7 +470,90 @@ operations. Only collider/region overlays persist in localStorage;
 policies live in simulation checkpoints and replay hashes. The solo-only
 transport boundary and network wire 3 remain unchanged. M04 must
 implement authorized shared physics, not infer it from disabled controls
-or room counts.</p></main>
+or room counts.</p>
+<h2 id="m03-adventure-motion-and-terrain">M03 adventure motion and
+terrain</h2>
+<p><code>Simulation.physical</code> owns one
+<code>AdventurePhysics</code> land registry.
+<code>src/physics/runtime.ts</code> keeps Rapier handles private; stable
+player/enemy/ambient IDs refer to locked-rotation dynamic circles. The
+motor saves desired velocity, controlled velocity, external velocity,
+acceleration, recovery, stagger deadline and dash contact phase. Walking
+acceleration is bounded at 6,000 units/s²; dash/charge bursts use a
+120,000 units/s² bound for immediate authored motion. Player/enemy
+smoothing is 0.18/0.1 per tick. External velocity recovers at 6/s and
+survives subsequent control/AI updates. Motor values use Rapier’s float
+precision; gameplay facing remains separate. Exact same-build Node and
+browser replays are tested within their own runtime; unrelated runtime
+trigonometry is not a bit-identity contract.</p>
+<p>Tick order: commit policy transactions and regional ownership at the
+boundary; synchronize actor lifecycle and occupied terrain; sample
+controls/AI and issue combat impulses; update newly spawned
+actors/terrain; solve Rapier once; publish solved poses/velocities to
+the existing render/observation arrays. Contacts are telemetry only at
+this stage. Authored hit damage, charge checks, rewards, projectiles and
+existing area mechanics remain gameplay-owned. No new impact damage,
+destruction, materials, joints or ragdolls are claimed. The legacy actor
+<code>moveBody</code>/<code>collideCircles</code> paths run only under
+the explicit online rollout selector; ambient-owned wildlife keeps its
+established integrator and never collides through both solvers.</p>
+<p>Interaction memberships distinguish terrain, props, players,
+monsters, bosses, NPCs, ambient creatures, loot and sensors.
+NPC/loot/sensor bits reserve the later role contracts; physical loot and
+sensor mechanics are not implemented. Actors always use essential
+obstacle CCD. Dash disables actor contacts while preserving terrain and
+permitted prop contacts. <code>sweptCollision</code> changes actual prop
+CCD. Crowd/prop contacts require both participants’ effective
+permission.</p>
+<p><code>src/physics/terrain.ts</code> samples seed plus validated tile
+patches directly: deep water becomes a 16×16 rectangle; trunks/rocks
+become radius-4/5 circles at the existing ground anchors. Keys contain
+land/run and tile/object identity. Occupied chunks include a safety
+margin around active actors, physical ambient participants and all
+persistent props, independent of cameras and renderer cache eviction.
+Changes replace affected runtime recipes at a command boundary.
+Canonical chunk/ID removal order preserves same-build continuation after
+crossings and restore. The adapter retains the finite world
+boundary.</p>
+<p>Land bindings are <code>land-&lt;run&gt;-&lt;land&gt;</code>,
+<code>town</code>, <code>wilderness</code>, and
+<code>area-&lt;index&gt;</code>. Each of the land’s four clearings has a
+quiet rectangle and reactive circle, inspectable/editable through the
+same policy system. The reactive circle opts ambient creatures into
+physics; an area/land live override can enable the entire selected
+population. There is no interest/FPS eligibility cap. Slot/generation
+and tick-start membership/position samples persist. Off removes the body
+and returns its solved pose/velocity to ambient steering; on creates
+exactly one body at that pose. Ordinary population recycling retains its
+explicit generation change. Physical participants render in normal
+encounters rather than being hidden with decorative wildlife.</p>
+<p>Four crates and a wheel per clearing are real optional props visible
+in ordinary play. Same-land recall/travel retains them. Outward travel
+archives old-land prop poses/motion, consequences, policies and tile
+patches; debug/save return restores mutations. The session master
+remains absolute across land changes. A new run clears the old run’s
+archive.</p>
+<p>The outer save remains version 1. <code>actorPhysics</code> version 1
+includes backend/land identity, world snapshot v3, occupied chunks,
+ambient ownership samples, navigation/stuck recovery, land archives and
+applied transition. Gameplay transitions pending the next physics
+boundary remain explicit; synchronized actor poses must match the game
+envelope. Restore validates binary mappings, shapes, mass, locked
+rotations, collision masks, freeze state, policy provenance, ownership
+and terrain recipes before replacing the old simulation. Legacy saves
+without this member get fresh physics while retaining progression;
+pre-M03 playground v2 imports explicitly.
+<code>PhysicalEntityState</code> defines stable IDs, land/area,
+blueprint revision/shape, solved pose/velocity, status, consequences and
+membership for M04. It is not a replicated wire section yet.</p>
+<p>Hosting/connecting selects the supported legacy actor path. Guests
+decode observations without allocating an authoritative Rapier world for
+each packet. Physical controls are disabled/rejected online or while
+connecting. Disconnect retains the received hero/world for solo
+continuation and initializes local physics. This deliberate rollout
+transition is distinct from master-off; shared prop
+persistence/replication is M04. Wire version stays 3 and actual
+eight-client WebRTC coverage remains mandatory.</p></main>
 <footer>Fern · A world engine built for agents · <a href="https://github.com/michaelcrosato/gpt61sol2daige">Source on GitHub</a></footer>
 </body>
 </html>

@@ -199,9 +199,8 @@ test("real WebRTC joins eight clients, syncs builds, combat and world, rejects n
     await host.page.evaluate(() => {
       const state = window.fern.command({ op: "save" }) as SaveState;
       state.shards = 9;
-      state.players[0].x = state.players[0].px = 960;
-      state.players[0].y = state.players[0].py = -720;
       window.fern.command({ op: "restore", state });
+      window.fern.command({ op: "teleport", x: 960, y: -720 });
     });
     const room = await host.page.evaluate(() => window.fern.network.host());
     for (let i = 0; i < 7; i++) {

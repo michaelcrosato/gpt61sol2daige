@@ -1,0 +1,9 @@
+{"area":1,"name":"Brambleburst","land":0,"cleared":true,"ticks":573,"dead":false,"level":5,"gold":251,"items":6,"mechanicUses":4}
+{"area":2,"name":"Slipstream","land":0,"cleared":true,"ticks":461,"dead":false,"level":6,"gold":371,"items":10,"mechanicUses":11}
+{"area":3,"name":"Stormglass","land":0,"cleared":true,"ticks":304,"dead":false,"level":8,"gold":530,"items":13,"mechanicUses":17}
+{"area":4,"name":"Echo Wells","land":0,"cleared":true,"ticks":594,"dead":false,"level":9,"gold":800,"items":19,"mechanicUses":23}
+{"area":5,"name":"Cinderwake","land":1,"cleared":true,"ticks":620,"dead":false,"level":11,"gold":1057,"items":25,"mechanicUses":30}
+{"area":6,"name":"Bloodbloom","land":1,"cleared":true,"ticks":621,"dead":false,"level":12,"gold":1295,"items":33,"mechanicUses":32}
+{"area":7,"name":"Gravity Knots","land":1,"cleared":true,"ticks":616,"dead":false,"level":14,"gold":1633,"items":40,"mechanicUses":39}
+{"area":8,"name":"Riftstep","land":1,"cleared":true,"ticks":782,"dead":false,"level":16,"gold":1985,"items":40,"mechanicUses":47}
+{"area":9,"name":"Ravenous Echo Wells","land":2,"cleared":true,"ticks":701,"dead":false,"level":18,"gold":2424,"items":40,"mechanicUses":62}

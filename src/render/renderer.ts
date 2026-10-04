@@ -13,6 +13,7 @@ import {
   type World,
 } from "../engine/world.ts";
 import { THEMES, themeOf } from "../game/content.ts";
+import type { BodyPose } from "../physics/types.ts";
 import { type AdventureActor, CombatRenderer } from "./combat.ts";
 import { PALETTE, type SpriteRecipe, spritePixels } from "./sprites.ts";
 
@@ -30,13 +31,14 @@ const PLAYER_COLORS = [
 ];
 type DrawItem = {
   y: number;
-  kind: "decor" | "npc" | "player" | "landmark" | "adventure";
+  kind: "decor" | "npc" | "player" | "landmark" | "adventure" | "physical";
   x: number;
   type: number;
   variant: number;
   player?: Player;
   id?: string;
   adventure?: AdventureActor;
+  physical?: BodyPose;
 };
 export class Renderer {
   readonly canvas: HTMLCanvasElement;
@@ -115,6 +117,7 @@ export class Renderer {
       const i = this.visible.ids[n];
       if (
         sim.adventure.state.mode === "area" &&
+        !sim.physical?.ownsAmbient(i) &&
         (sim.x[i] - sim.adventure.state.recipe.x) ** 2 +
           (sim.y[i] - sim.adventure.state.recipe.y) ** 2 <
           (sim.adventure.state.recipe.radius + 35) ** 2
@@ -392,6 +395,7 @@ export class Renderer {
           y = lerp(sim.py[i], sim.y[i], alpha);
         if (
           adventure.mode === "area" &&
+          !sim.physical?.ownsAmbient(i) &&
           (x - adventure.recipe.x) ** 2 + (y - adventure.recipe.y) ** 2 <
             (adventure.recipe.radius + 35) ** 2
         )
@@ -436,11 +440,53 @@ export class Renderer {
         variant: 0,
         player: p,
       });
+    for (const prop of sim.physical?.props() ?? [])
+      if (prop.x > left - 40 && prop.x < right + 40 && prop.y > top - 40 && prop.y < bottom + 40)
+        items.push({ kind: "physical", x: prop.x, y: prop.y, type: 0, variant: 0, physical: prop });
     items.sort((a, b) => a.y - b.y || a.x - b.x);
     const frame = Math.floor(time * 9);
     for (const item of items) {
       if (item.kind === "decor") this.drawDecor(item, player, time);
-      else if (item.kind === "adventure")
+      else if (item.kind === "physical") {
+        const prop = item.physical!;
+        ctx.save();
+        ctx.translate(prop.x, prop.y);
+        ctx.fillStyle = "#10201966";
+        ctx.beginPath();
+        ctx.ellipse(0, 5, 14, 7, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.rotate(prop.angle);
+        ctx.lineWidth = 2;
+        if (prop.shape.kind === "circle") {
+          const r = prop.shape.radius;
+          ctx.fillStyle = "#536257";
+          ctx.strokeStyle = "#b0b6a0";
+          ctx.beginPath();
+          ctx.arc(0, 0, r, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.moveTo(-r, 0);
+          ctx.lineTo(r, 0);
+          ctx.moveTo(0, -r);
+          ctx.lineTo(0, r);
+          ctx.stroke();
+        } else {
+          const w = prop.shape.width,
+            h = prop.shape.height;
+          ctx.fillStyle = prop.frozen ? "#646e60" : "#946e45";
+          ctx.strokeStyle = "#d1b582";
+          ctx.fillRect(-w / 2, -h / 2, w, h);
+          ctx.strokeRect(-w / 2, -h / 2, w, h);
+          ctx.beginPath();
+          ctx.moveTo(-w / 2 + 3, -h / 2 + 3);
+          ctx.lineTo(w / 2 - 3, h / 2 - 3);
+          ctx.moveTo(w / 2 - 3, -h / 2 + 3);
+          ctx.lineTo(-w / 2 + 3, h / 2 - 3);
+          ctx.stroke();
+        }
+        ctx.restore();
+      } else if (item.kind === "adventure")
         this.combat.actor(ctx, item.adventure!, sim, alpha, time, this.zoom);
       else if (item.kind === "landmark") this.drawLandmark(item, sim, time);
       else if (item.kind === "npc") {

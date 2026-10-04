@@ -24,12 +24,21 @@ export const COMMANDS = {
     profiles:
       "land {id,values}; area {id,landId,values}; region {id,areaId,priority,shape,values}. shape: circle {x,y,radius}, rectangle {x,y,width,height} (top-left), polygon {points:[{x,y}]}",
     values:
-      "worldReactions, dynamicProps, propBlocking: boolean; impulseStrength: finite 0..10. Omitted values inherit. More-specific debug overrides win; session master-off is absolute.",
+      "worldReactions, dynamicProps, propBlocking, crowdContacts, ambientPhysics (adventure), sweptCollision: boolean; impulseStrength: finite 0..10. Omitted values inherit. More-specific debug overrides win; session master-off is absolute.",
     areaId: "policy: inspect effective values/provenance at x,y in this area (default playground)",
     placement:
       "place: id,x,y relocates the existing lab body, clears motion and corrects wake overlaps; drive: id,x,y sets contact actor velocity (±600 units/s)",
     description:
-      "Solo Rapier development selector; step/save/restore/replay include this scene. No adventure actors use it yet.",
+      "Separate solo Rapier playground; step/save/restore/replay include it. Use actors for the integrated adventure physical world.",
+  },
+  actors: {
+    action: "inspect (default), body, configure, apply, policy, impulse, place, spawn",
+    description:
+      "Solo adventure physical world. Uses the same revisioned policies; active actors, occupied terrain, props and regional ambient handover. Actual co-op uses the supported legacy path until M04.",
+    values:
+      "worldReactions, dynamicProps, propBlocking, crowdContacts, ambientPhysics, sweptCollision: booleans; impulseStrength: 0..10",
+    id: "body/impulse/place: player-<player id>, enemy-<id>, ambient-<slot>-<generation>, crate-<area>-<ordinal>, wheel-<area>",
+    body: "spawn: prop BodyRecipe with id prefixed prop- and a current areaId",
   },
   adventure: {
     action:
@@ -120,6 +129,58 @@ export class AgentRuntime {
     const player = typeof command.player === "string" ? command.player : this.localId;
     let result: unknown;
     switch (command.op) {
+      case "actors": {
+        const physical = this.sim.physical;
+        if (!physical || this.sim.players.size > 1)
+          throw new Error("Adventure physical controls are solo-only until M04");
+        const action = command.action ?? "inspect",
+          world = physical.world;
+        if (action === "inspect") return physical.inspect();
+        if (action === "body") {
+          if (typeof command.id !== "string") throw new Error("Body id required");
+          return world.pose(command.id);
+        }
+        if (action === "policy")
+          return world.policyAt(
+            typeof command.areaId === "string"
+              ? command.areaId
+              : physical.areaAt(this.sim, num("x", 0), num("y", 0)),
+            num("x", 0),
+            num("y", 0),
+          );
+        if (action === "configure")
+          result = physical.configure({
+            expectedRevision: num("expectedRevision"),
+            edits: command.edits as PolicyEdit[],
+          });
+        else if (action === "apply") {
+          world.applyPolicies(num("expectedRevision"));
+          physical.begin(this.sim);
+        } else if (action === "spawn") {
+          const body = command.body as BodyRecipe;
+          if (body?.role !== "prop" || !body.id?.startsWith("prop-"))
+            throw new Error("Adventure spawns require prop- identity and prop role");
+          world.spawn(body);
+        } else if (action === "impulse" || action === "place") {
+          if (typeof command.id !== "string") throw new Error("Body id required");
+          if (action === "impulse")
+            world.impulse(
+              command.id,
+              num("x", 0),
+              num("y", 0),
+              command.atX === undefined ? undefined : num("atX"),
+              command.atY === undefined ? undefined : num("atY"),
+            );
+          else {
+            const pose = world.pose(command.id);
+            if (pose.role !== "prop")
+              throw new Error("Use teleport for players; place is for optional props");
+            world.place(command.id, num("x"), num("y"));
+          }
+        } else throw new Error(`Unknown actor physics action: ${String(action)}`);
+        result ??= physical.inspect();
+        break;
+      }
       case "physics": {
         const action = command.action ?? "inspect";
         if (action === "inspect") return this.sim.playground?.inspect() ?? { active: false };

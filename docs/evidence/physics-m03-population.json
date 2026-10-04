@@ -1,0 +1,19 @@
+{
+  "population": 65536,
+  "liveAmbientBodies": 65536,
+  "finite": true,
+  "elapsedMs": 6942.278795,
+  "owners": {
+    "actors": 1,
+    "rapierAmbient": 65536,
+    "ambient": 0
+  },
+  "encounterFullParticipation": {
+    "selected": 65536,
+    "liveAmbientBodies": 65536,
+    "firstTickMs": 3258.2969940000003,
+    "informational": true
+  },
+  "saveContinuation": true,
+  "sameBuildReplay": true
+}

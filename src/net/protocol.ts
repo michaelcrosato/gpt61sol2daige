@@ -190,7 +190,8 @@ export function decodeSnapshot(
   const oldProjectiles = new Map(
     continuous ? previous.adventure.state.projectiles.map((p) => [p.id, p]) : [],
   );
-  const sim = previous?.world.seed === h.seed ? previous : new Simulation(h.seed, 0);
+  const sim = previous?.world.seed === h.seed ? previous : new Simulation(h.seed, 0, "replica");
+  sim.useLegacyPhysics(true);
   sim.adventure.restore(h.adventure);
   sim.adventure.configureWorld(sim);
   for (const enemy of sim.adventure.state.enemies) {
