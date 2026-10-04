@@ -292,7 +292,7 @@ test("real WebRTC joins eight clients, syncs builds, combat and world, rejects n
       .poll(async () => (await guest.page.evaluate(() => window.fern.observe())).network.population)
       .toBe(32768);
     await expect
-      .poll(async () => (await guest.page.evaluate(() => window.fern.observe())).population)
+      .poll(async () => (await guest.page.evaluate(() => window.fern.observe())).render.drawn)
       .toBeLessThanOrEqual(512);
     const denied = await guest.page.evaluate(() => {
       try {

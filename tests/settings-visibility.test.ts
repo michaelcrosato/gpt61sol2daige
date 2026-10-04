@@ -81,7 +81,9 @@ test("high-population checkpoints remain deterministic while party regions rebal
   sim.addPlayer("p0");
   sim.addPlayer("p1");
   sim.step(2);
-  sim.players.get("p1")!.x = 10000;
+  const player = sim.players.get("p1")!;
+  player.x = 10000;
+  sim.physical!.teleport("player-p1", player.x, player.y);
   const restored = Simulation.restore(sim.save());
   sim.step(90);
   restored.step(90);

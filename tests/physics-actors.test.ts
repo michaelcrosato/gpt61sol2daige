@@ -423,6 +423,10 @@ test("original M02 master-off checkpoints import frozen consequences and continu
     const original = world.save(),
       api = rapier(),
       raw = api.World.restoreSnapshot(new Uint8Array(original.bytes));
+    original.version = 2;
+    delete original.scene;
+    delete original.continuation;
+    for (const entry of original.bodies) delete entry.state;
     try {
       for (const entry of original.bodies) {
         const role = entry.recipe.role ?? (entry.recipe.motion === "fixed" ? "terrain" : "prop"),

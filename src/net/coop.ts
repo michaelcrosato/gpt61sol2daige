@@ -3,13 +3,16 @@ import { MAX_DRAW_DISTANCE, MAX_NPCS, MIN_DRAW_DISTANCE } from "../engine/limits
 import { type Input, idleInput, type Simulation } from "../engine/simulation.ts";
 import { WORLD_LIMIT } from "../engine/world.ts";
 import type { AdventureAction } from "../game/types.ts";
+import { interactPhysics, type PhysicalInteraction } from "../physics/interaction.ts";
 import {
-  decodeSnapshot,
-  encodeSnapshot,
-  PROTOCOL_VERSION,
-  type SnapshotView,
-  snapshotBuffer,
-} from "./protocol.ts";
+  type BaselineChunk,
+  BaselineReceiver,
+  type BaselineStart,
+  frameTransfer,
+  type LifecycleEvent,
+  physicalScene,
+} from "./physical.ts";
+import { PROTOCOL_VERSION, type SnapshotView } from "./protocol.ts";
 
 export type NetworkStatus = {
   role: "solo" | "host" | "guest";
@@ -20,6 +23,8 @@ export type NetworkStatus = {
   received: number;
   sent: number;
   population: number;
+  physicalRevision: number;
+  baselineReady: boolean;
 };
 class RetryableJoinError extends Error {}
 export class Coop {
@@ -32,6 +37,8 @@ export class Coop {
     received: 0,
     sent: 0,
     population: 0,
+    physicalRevision: 0,
+    baselineReady: false,
   };
   localId = "local";
   lastSnapshot = 0;
@@ -54,6 +61,61 @@ export class Coop {
   private lastSent = 0;
   private generation = 0;
   private joinRequest = 0;
+  private readonly receiver = new BaselineReceiver();
+  private readonly transfers = new Map<string, { sequence: number; sentAt: number }>();
+  private readonly ready = new Set<string>();
+  private frameSequence = 0;
+  private revision = 0;
+  private scene = "";
+  private bodyIds = new Set<string>();
+  private policySignature = "";
+  private cachedTransfer?: ReturnType<typeof frameTransfer>;
+  private transferKey = "";
+  private sendPhysical(conn: DataConnection): void {
+    if (!conn.open || this.transfers.has(conn.peer)) return;
+    const sim = this.getSim();
+    const key = `${sim.tick}:${sim.world.revision}:${[...sim.players.keys()].join(",")}`;
+    if (this.transferKey === key && this.cachedTransfer) {
+      this.sendTransfer(conn, this.cachedTransfer);
+      return;
+    }
+    const state = this.getSim().save(true);
+    if (!state.actorPhysics) throw new Error("Host has no authoritative physical scene");
+    const scene = physicalScene(state),
+      ids = new Set(state.actorPhysics.world.bodies.map((b) => b.recipe.id));
+    const policy = JSON.stringify(state.actorPhysics.world.policies);
+    const events: LifecycleEvent[] = [];
+    if (scene !== this.scene) events.push({ type: "scene", id: state.actorPhysics.landId });
+    for (const id of ids) if (!this.bodyIds.has(id)) events.push({ type: "spawn", id });
+    for (const id of this.bodyIds) if (!ids.has(id)) events.push({ type: "remove", id });
+    if (policy !== this.policySignature)
+      events.push({ type: "policy", id: state.actorPhysics.landId });
+    if (events.length) this.revision++;
+    this.status.physicalRevision = this.revision;
+    this.scene = scene;
+    this.bodyIds = ids;
+    this.policySignature = policy;
+    const sequence = this.frameSequence++;
+    const transfer = frameTransfer({
+      version: 1,
+      sequence,
+      revision: this.revision,
+      scene,
+      events,
+      state,
+    });
+    this.cachedTransfer = transfer;
+    this.transferKey = key;
+    this.sendTransfer(conn, transfer);
+  }
+  private sendTransfer(conn: DataConnection, transfer: ReturnType<typeof frameTransfer>): void {
+    this.transfers.set(conn.peer, { sequence: transfer.start.sequence, sentAt: performance.now() });
+    conn.send(transfer.start);
+    for (const chunk of transfer.chunks) {
+      conn.send(chunk);
+      this.status.sent += chunk.bytes.byteLength;
+    }
+  }
   constructor(
     getSim: () => Simulation,
     replaceSim: (sim: Simulation) => void,
@@ -116,7 +178,7 @@ export class Coop {
     if (this.getSim().playground)
       throw new Error("Close the solo physics playground before hosting an expedition");
     this.disconnect();
-    this.getSim().useLegacyPhysics();
+    this.getSim().resumeSoloPhysics();
     const generation = this.generation;
     try {
       const room = `fern-${crypto.randomUUID()}`,
@@ -126,6 +188,7 @@ export class Coop {
       this.status.state = "connected";
       this.status.room = room;
       this.status.message = "Your expedition is open";
+      this.status.baselineReady = true;
       peer.on("connection", (conn) => this.accept(conn));
       this.changed();
       return room;
@@ -142,7 +205,15 @@ export class Coop {
       if (now - welcomeAt < 250) return;
       welcomeAt = now;
       conn.send({ type: "welcome", id: conn.peer, version: PROTOCOL_VERSION });
-      conn.send(encodeSnapshot(this.getSim(), conn.peer));
+      this.getSim().physical?.begin(this.getSim());
+      try {
+        this.sendPhysical(conn);
+      } catch (error) {
+        conn.send({
+          type: "error",
+          message: error instanceof Error ? error.message : "Physical baseline unavailable",
+        });
+      }
     };
     const admit = () => {
       if (!this.channelOpen(conn) || this.connections.get(conn.peer) === conn) return;
@@ -156,7 +227,7 @@ export class Coop {
           message:
             this.getSim().players.size >= 8
               ? "This expedition is full (8 players)."
-              : "Incompatible engine version.",
+              : "Incompatible physics protocol. Refresh all travelers to the same engine version.",
         });
         setTimeout(() => conn.close(), 200);
         return;
@@ -184,19 +255,32 @@ export class Coop {
         return;
       }
       if (this.connections.get(conn.peer) !== conn) return;
+      if (data.type === "physical-ack") {
+        if (data.sequence === this.transfers.get(conn.peer)?.sequence) {
+          this.transfers.delete(conn.peer);
+          this.ready.add(conn.peer);
+        }
+        return;
+      }
       if (
-        data.type === "action" &&
+        ["action", "physical-interaction"].includes(String(data.type)) &&
         Number.isSafeInteger(data.seq) &&
         Number(data.seq) > (this.lastAction.get(conn.peer) ?? -1)
       ) {
         this.lastAction.set(conn.peer, Number(data.seq));
         try {
-          const action = data.action as AdventureAction;
-          if (!action || ["tuning", "new-run"].includes(action.type))
-            throw new Error("Only the host can change the shared run or tuning");
-          this.getSim().adventure.action(this.getSim(), conn.peer, action);
+          if (!this.ready.has(conn.peer))
+            throw new Error("Wait for the complete physical baseline before interacting");
+          if (data.type === "physical-interaction")
+            interactPhysics(this.getSim(), conn.peer, data.interaction as PhysicalInteraction);
+          else {
+            const action = data.action as AdventureAction;
+            if (!action || ["tuning", "new-run"].includes(action.type))
+              throw new Error("Only the host can change the shared run or tuning");
+            this.getSim().adventure.action(this.getSim(), conn.peer, action);
+          }
           conn.send({ type: "action-result", seq: data.seq, ok: true });
-          conn.send(encodeSnapshot(this.getSim(), conn.peer, this.interest.get(conn.peer) ?? 1500));
+          this.sendPhysical(conn);
         } catch (error) {
           conn.send({
             type: "action-result",
@@ -258,6 +342,8 @@ export class Coop {
       this.lastSequence.delete(conn.peer);
       this.lastAction.delete(conn.peer);
       this.interest.delete(conn.peer);
+      this.transfers.delete(conn.peer);
+      this.ready.delete(conn.peer);
       this.getSim().removePlayer(conn.peer);
       this.status.peers = this.connections.size;
       this.changed();
@@ -301,7 +387,6 @@ export class Coop {
   }
   private async joinOnce(room: string, timeout: number): Promise<void> {
     this.disconnect(false);
-    this.getSim().useLegacyPhysics(true);
     const generation = this.generation;
     try {
       const peer = await this.open();
@@ -348,22 +433,33 @@ export class Coop {
         conn.on("data", (raw) => {
           if (generation !== this.generation) return;
           try {
-            if (raw instanceof ArrayBuffer || ArrayBuffer.isView(raw)) {
-              if (!welcomed) return;
-              const packet = snapshotBuffer(raw);
-              const { sim, population } = decodeSnapshot(packet, this.getSim());
-              if (!sim.players.has(this.localId)) throw new Error("Host removed this traveler");
-              this.replaceSim(sim);
-              this.status.population = population;
-              this.status.received += raw.byteLength;
-              this.status.peers = sim.players.size - 1;
-              this.lastSnapshot = performance.now();
-              this.status.state = "connected";
-              this.status.message = "Wandering together";
-              this.changed();
-              done();
-            } else if (raw && typeof raw === "object") {
+            if (raw && typeof raw === "object") {
               const data = raw as Record<string, unknown>;
+              if (data.type === "physical-start" && welcomed) {
+                this.receiver.begin(data as unknown as BaselineStart);
+                return;
+              }
+              if (data.type === "physical-chunk" && welcomed) {
+                const frame = this.receiver.chunk(data as unknown as BaselineChunk);
+                this.status.received += (data.bytes as Uint8Array)?.byteLength ?? 0;
+                if (!frame) return;
+                if (!frame.state.players.some((p) => p.id === this.localId))
+                  throw new Error("Host removed this traveler");
+                const sim = this.getSim();
+                sim.applyReplica(frame.state);
+                this.status.population = frame.state.count;
+                this.status.physicalRevision = frame.revision;
+                this.status.baselineReady = true;
+                this.status.peers = sim.players.size - 1;
+                this.lastSnapshot = performance.now();
+                this.status.state = "connected";
+                this.status.message = "Wandering together";
+                conn.send({ type: "physical-ack", sequence: frame.sequence });
+                this.replaceSim(sim);
+                this.changed();
+                done();
+                return;
+              }
               if (data.type === "action-result" && typeof data.seq === "number") {
                 const pending = this.pendingActions.get(data.seq);
                 if (pending) {
@@ -382,8 +478,7 @@ export class Coop {
                 this.localId = peer.id;
                 welcomed = true;
               } else if (data.type === "error") {
-                clearTimers();
-                reject(new Error(String(data.message).slice(0, 200)));
+                throw new Error(String(data.message).slice(0, 200));
               }
             }
           } catch (error) {
@@ -434,6 +529,20 @@ export class Coop {
     this.changed();
   }
   action(action: AdventureAction): Promise<void> {
+    return this.request("action", { action });
+  }
+  interact(interaction: PhysicalInteraction): Promise<void> {
+    if (this.status.role === "host" || this.status.role === "solo") {
+      try {
+        interactPhysics(this.getSim(), this.localId, interaction);
+        return Promise.resolve();
+      } catch (error) {
+        return Promise.reject(error);
+      }
+    }
+    return this.request("physical-interaction", { interaction });
+  }
+  private request(type: string, payload: Record<string, unknown>): Promise<void> {
     if (this.status.role !== "guest" || this.status.state !== "connected")
       return Promise.reject(new Error("No active guest connection"));
     if (this.pendingActions.size >= 8)
@@ -447,7 +556,7 @@ export class Coop {
         reject(new Error("The host did not respond to that action"));
       }, 5000);
       this.pendingActions.set(seq, { resolve, reject, timer });
-      conn.send({ type: "action", seq, action });
+      conn.send({ type, seq, ...payload });
     });
   }
   update(dt: number, input: Input, view: SnapshotView): void {
@@ -481,12 +590,18 @@ export class Coop {
     this.elapsed = 0;
     for (const [id, conn] of this.connections)
       if (conn.open && conn.dataChannel.bufferedAmount < 262144) {
-        const packet = encodeSnapshot(this.getSim(), id, this.interest.get(id) ?? 1500);
-        conn.send(packet);
-        this.status.sent += packet.byteLength;
+        const pending = this.transfers.get(id);
+        if (pending && now - pending.sentAt > 5000) this.transfers.delete(id);
+        try {
+          this.sendPhysical(conn);
+        } catch (error) {
+          this.status.message = error instanceof Error ? error.message : "Physical transfer failed";
+          conn.send({ type: "error", message: this.status.message });
+          this.changed();
+        }
       }
   }
-  disconnect(cancelJoin = true): void {
+  disconnect(cancelJoin = true, recover = true): void {
     if (cancelJoin) this.joinRequest++;
     this.generation++;
     for (const conn of this.connections.values()) conn.close();
@@ -500,20 +615,17 @@ export class Coop {
     }
     this.pendingActions.clear();
     this.interest.clear();
+    this.transfers.clear();
+    this.ready.clear();
+    this.receiver.clear();
+    this.cachedTransfer = undefined;
+    this.transferKey = "";
     this.peer?.destroy();
     this.peer = undefined;
-    const sim = this.getSim(),
-      me = sim.players.get(this.localId);
-    sim.adventure.retainPlayer(this.localId, "local");
-    sim.players.clear();
+    const sim = this.getSim();
+    const recovered = recover ? sim.continueSolo(this.localId) : null;
     this.localId = "local";
-    if (me) {
-      me.id = "local";
-      me.input = idleInput();
-      sim.players.set("local", me);
-    } else sim.addPlayer("local");
-    if (this.status.role === "guest" && this.status.population > sim.count)
-      sim.setPopulation(this.status.population);
+    if (recovered) this.replaceSim(recovered);
     Object.assign(this.status, {
       role: "solo",
       state: "offline",
@@ -522,8 +634,8 @@ export class Coop {
       message: "A little solitude",
       received: 0,
       sent: 0,
+      baselineReady: false,
     });
-    sim.resumeSoloPhysics();
     this.changed();
   }
 }

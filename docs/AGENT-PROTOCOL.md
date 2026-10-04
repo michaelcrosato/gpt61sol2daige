@@ -10,7 +10,7 @@ node tools/agent.ts --seed 142 --record artifacts/walk.json < examples/walk.json
 node tools/agent.ts replay artifacts/walk.json
 ```
 
-The command server reads one JSON object per line and returns one response per line. Errors are structured and do not terminate the session. Keep lines under 8 MB. When supplied, `id` is echoed as the request identifier (the `join`/`leave` command also uses `id` as its player identifier).
+The command server reads one JSON object per line and returns one response per line. Errors are structured and do not terminate the session. Keep lines under 8 MB. For larger checkpoints, send `{"op":"restore-file","file":"artifacts/checkpoint.json"}` to the Node tool; it validates/imports the file without embedding it in a command line. When supplied, `id` is echoed as the request identifier (the `join`/`leave` command also uses `id` as its player identifier).
 
 ```json
 {"op":"input","x":1,"y":0}
@@ -39,7 +39,9 @@ An accepted call returns `{"ok":true,"result":…}`; failure returns `{"ok":fals
 | `join` | `id`, `name?` | Adds a headless simulated player; maximum eight; **not an online connection** |
 | `leave` | `id` | Removes a headless simulated player |
 | `save` | none | Full versioned checkpoint including typed-array contents and terrain patches |
-| `restore` | `state` | Validates and restores a checkpoint |
+| `restore` | `state` | Validates and restores version-1 or version-2 checkpoints |
+| `restore-file` | `file` | Node CLI only: reads a complete checkpoint file, including expanded physical saves above 8 MB |
+| `interact-physics` | `id,x,y,atX?,atY?,player?` | Host/solo validates a nearby movable prop impulse; online guests use `network.interact` with connection-owned identity |
 | `replay` | none | Initial checkpoint, recorded commands and final checksum |
 
 Terrain values: `0 forest`, `1 meadow`, `2 sand`, `3 shallow water`, `4 solid deep water`, `5 path`, `6 stone`. Decoration values: `0 none`, `1 pine`, `2 oak`, `3 rock`, `4 flowers`, `5 reeds`, `6 mushroom`, `7 crystal`. Tile coordinates multiply by 16 to produce world coordinates. Painting under a body can create a solid tile; the next physics step resolves the overlap. Use paused QA when making structural changes.
@@ -111,7 +113,7 @@ The browser adapter executes locally as solo/host and sends acknowledged RPCs as
 
 `pulse` now casts Whorl as well as the existing wildlife impulse. `attack` repeats the melee combo; lance/nova require their unlocks. Held flags respect authoritative cooldowns. `(aimX, aimY) = (0, 0)` selects keyboard auto-aim toward a nearby enemy, falling back to movement direction. For explicit aim, normalize `(target.x − player.x, target.y − player.y)` to a unit direction vector. Every combat command, delayed echo, item roll and transition participates in deterministic replay.
 
-Solo dialogs and the atlas pause the live clock; explicit `step` still advances it for QA. Closing a dialog preserves an explicit `pause(true)`. Online menus never pause the party. Combat observations are bounded; `save` is the full inspectable state. The live-enemy limit is 100, distinct from the 65,536 ambient-creature pool. Other players' unequipped inventory items are omitted from guest snapshots.
+Solo dialogs and the atlas pause the live clock; explicit `step` still advances it for QA. Closing a dialog preserves an explicit `pause(true)`. Online menus never pause the party. Combat observations are bounded; `save` is the full inspectable state. The live-enemy limit is 100, distinct from the 65,536 ambient-creature pool. Complete M04 physical scenes carry all party builds; the bounded observational snapshot helper omits other players' unequipped items.
 
 ## Actual online sessions
 
@@ -165,7 +167,7 @@ node tools/adventure.ts playthrough 9           # Actual input-driven run; JSON 
 
 ## Physics playground (M01–M02)
 
-In solo **Agent lab**, choose **Open / reset playground**, select a body and use **Push right**, **Push off center** or **Launch swept body**. The collider checkbox is presentation-only. Pause/run and explicit tick controls use the same simulation clock. Save trail, Snapshot JSON and replay include the physical scene. Close the playground before hosting/joining; online and connecting rooms reject playground commands until M04.
+In solo **Agent lab**, choose **Open / reset playground**, select a body and use **Push right**, **Push off center** or **Launch swept body**. The collider checkbox is presentation-only. Pause/run and explicit tick controls use the same simulation clock. Save trail, Snapshot JSON and replay include the physical scene. Close the standalone playground before hosting/joining. Shared physical edits use the playable adventure scene.
 
 The discoverable `physics` operation supplies these actions:
 
@@ -199,9 +201,9 @@ node tools/physics.ts my-scene.jsonl      # runs an authored command sequence an
 node tools/agent.ts --count 0 < examples/physics-playground.jsonl
 ```
 
-When importing the engine directly, await `initializePhysics()` from `src/physics/bootstrap.ts` first; synchronous construction, restore, commands and replay follow that barrier. Dispose caller-owned `Simulation` instances when finished. Raw playground snapshots identify Rapier 0.21.0 and reject incompatible versions; old version-1 saves without this member retain the ordinary adventure path. FPS/throughput telemetry is informational, with no FPS acceptance threshold.
+When importing the engine directly, await `initializePhysics()` from `src/physics/bootstrap.ts` first; synchronous construction, restore, commands and replay follow that barrier. Dispose caller-owned `Simulation` instances when finished. World-v4 checkpoints identify the backend and retain complete semantic state for incompatible-backend rebuilding; original M01/M02 raw formats import explicitly, and old version-1 saves without this member retain their builds/terrain with fresh physical content. FPS/throughput telemetry is informational, with no FPS acceptance threshold.
 
-M02's policy document is version 1; the playground member is now version 2, with explicit M01 import. The outer save remains version 1 and network wire remains 3. Shared controls stay solo-only until M04. Collider/region overlays are local device preferences, absent from saves and hashes.
+M02's policy document remains version 1. M04 writes outer save 2, adventure envelope 2 and world 4, retaining explicit M01–M03 import. Room protocol is 4 with a separate physical channel. Collider/region overlays are local device preferences, absent from saves and hashes.
 
 Each policy edit has `type` and these fields:
 
@@ -241,7 +243,7 @@ node tools/agent.ts --count 0 < examples/physics-regions.jsonl
 
 ## M03 playable adventure physics
 
-Solo adventures use Rapier actors and occupied terrain automatically. In Agent lab choose **Physics scene → Playable adventure** to inspect and edit the real run. Select land/area/region, queue crowd contacts, ambient physics, prop blocking, prop dynamics, swept collision or the master switch, then step/run or apply while paused. The normal world renders solved actor/prop poses. Playground remains a separate scene. Shared physical controls stay unavailable online/connecting until M04; ordinary co-op remains supported.
+Solo adventures use Rapier actors and occupied terrain automatically. In Agent lab choose **Physics scene → Playable adventure** to inspect and edit the real run. Select land/area/region, queue crowd contacts, ambient physics, prop blocking, prop dynamics, swept collision or the master switch, then step/run or apply while paused. The normal world renders solved actor/prop poses. Playground remains a separate scene. Hosts can edit the shared adventure policies/bodies; guests inspect their received scene and request nearby prop impulses through the host.
 
 `actors` actions use the same command/replay route:
 
@@ -267,3 +269,25 @@ Stable IDs: `player-<player ID>`, `enemy-<enemy ID>`, `ambient-<slot>-<generatio
 ```
 
 `save` includes the complete versioned `actorPhysics` member. Same-build replay and save continuation retain motor/external velocity, policy samples, ownership, navigation and mutations. Node/Chrome trigonometry may differ in insignificant digits; compare actual physical outcomes with stated tolerances across runtimes, and use exact replay in the originating runtime. `node tools/physics-actors.ts` produces the M03 encounter receipt; `--population 65536` deliberately enables every selected creature and reports informational first-tick timing. This does not advertise later reaction systems.
+
+
+## M04 physical co-op and checkpoint import
+
+```js
+await window.fern.network.interact({id: "crate-1-0", x: 100, y: 0});
+window.fern.command({op: "actors", action: "body", id: "crate-1-0"});
+window.fern.network.status(); // baselineReady, physicalRevision, population, byte counters
+```
+
+A guest must finish its complete baseline before interacting. Requests accept a prop within 96 units, ±120 impulse components and optional paired application coordinates within 32 units of that prop. The host supplies identity and rejects policy fields, actor targets, unknown objects and excessive/far interactions. Frozen props discard impulses. Host `actors/configure` uses the same expectedRevision/atomic edits as solo; guests can read `inspect`, `body` and `policy` but cannot edit shared physics. The host lab's Playable adventure controls remain available online; explicit paused apply requires a solo pause.
+
+Physical wire 1 uses protocol-4 rooms and reliable 48,000-byte chunks with a checked manifest, complete portable scene and lifecycle events. Its 256 MB total bound is separate from the observational packet's 512 KB header. Missing/duplicate/reversed/stale chunks never publish partial state. All selected ambient creatures and physical bodies remain in the replica even when local draw settings show fewer. Large scene transmission can take longer; it never cuts physical eligibility. Portal/land transitions snap interpolation, and leaving/host loss retains the received scene and each guest's build for solo play.
+
+```bash
+node tools/agent.ts --count 0 <<'JSONL'
+{"op":"restore-file","file":"artifacts/checkpoint.json"}
+{"op":"observe"}
+JSONL
+```
+
+This file path supports expanded saves exceeding the unchanged 8 MB JSONL line limit. `describe` lists `restore-file` as CLI-only. Save 2 includes world-4 semantics, motor/knockback, policies/queues, stable IDs, terrain/land mutations, builds/progression and backend bytes; incompatible-backend restore rebuilds those facts. Original M01–M03 checkpoints migrate explicitly. See [save/transport contracts](ARCHITECTURE.md#m04-saves-replication-and-recovery).

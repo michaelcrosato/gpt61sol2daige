@@ -31,8 +31,12 @@ if (args[0] === "replay") {
       let id: unknown;
       try {
         if (line.length > 8_000_000) throw new Error("Command exceeds 8 MB");
-        const command = JSON.parse(line) as Command;
+        let command = JSON.parse(line) as Command;
         id = command.id;
+        if (command.op === "restore-file") {
+          if (typeof command.file !== "string") throw new Error("Checkpoint file path required");
+          command = { op: "restore", id, state: JSON.parse(await readFile(command.file, "utf8")) };
+        }
         console.log(JSON.stringify({ ok: true, id, result: agent.execute(command) }));
       } catch (error) {
         console.log(

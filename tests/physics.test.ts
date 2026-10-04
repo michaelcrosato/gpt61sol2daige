@@ -200,7 +200,10 @@ test("invalid bodies, mappings and corrupted snapshots fail atomically; lab cann
     assert.throws(() => agent.execute({ op: "restore", state: corrupt }), /snapshot/);
     const mismatch = agent.sim.save();
     mismatch.playground!.bodies[0].recipe.shape = { kind: "circle", radius: 7 };
-    assert.throws(() => agent.execute({ op: "restore", state: mismatch }), /shape mismatch/);
+    assert.throws(
+      () => agent.execute({ op: "restore", state: mismatch }),
+      /semantic|shape mismatch/,
+    );
     const duplicate = agent.sim.save();
     duplicate.playground!.bodies[1].handle = duplicate.playground!.bodies[0].handle;
     assert.throws(() => PhysicsWorld.restore(duplicate.playground!), /registry/);

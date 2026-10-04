@@ -11,7 +11,7 @@ import { type TerrainPatch, validatePatches, WORLD_LIMIT } from "../engine/world
 import type { AdventureState } from "../game/types.ts";
 import { validateAdventure } from "../game/validation.ts";
 
-export const PROTOCOL_VERSION = 3;
+export const PROTOCOL_VERSION = 4;
 export const MAX_HEADER = 512_000;
 export const MAX_PACKET = MAX_NPCS * 16 + MAX_HEADER + 8;
 export interface SnapshotView extends ViewRegion {
@@ -28,7 +28,7 @@ export function snapshotBuffer(value: ArrayBuffer | ArrayBufferView): ArrayBuffe
   return new Uint8Array(value.buffer, value.byteOffset, value.byteLength).slice().buffer;
 }
 interface Header {
-  version: 3;
+  version: 4;
   seed: number;
   tick: number;
   population: number;
@@ -49,7 +49,8 @@ export function encodeSnapshot(
   playerId: string,
   interest: number | SnapshotView = 1500,
 ): ArrayBuffer {
-  if (sim.playground) throw new Error("Physics playground snapshots are solo-only until M04");
+  if (sim.playground)
+    throw new Error("The standalone playground cannot be encoded as adventure observations");
   const p = sim.players.get(playerId),
     originX = p?.x ?? 0,
     originY = p?.y ?? 0;

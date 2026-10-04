@@ -8,6 +8,7 @@ import {
   enemyBodyId,
   playerBodyId,
   validateAdventurePhysics,
+  validateSemanticTerrain,
 } from "../physics/adventure.ts";
 import { rapier } from "../physics/bootstrap.ts";
 import { PhysicsWorld, validatePhysicsSnapshot } from "../physics/runtime.ts";
@@ -67,7 +68,7 @@ export interface GameEvent {
   message: string;
 }
 export interface SaveState {
-  version: 1;
+  version: 1 | 2;
   seed: number;
   tick: number;
   count: number;
@@ -76,6 +77,7 @@ export interface SaveState {
   collected: string[];
   patches: TerrainPatch[];
   players: Player[];
+  events?: GameEvent[];
   adventure?: AdventureState;
   playground?: PhysicsSnapshot;
   actorPhysics?: AdventurePhysicsSnapshot;
@@ -93,6 +95,9 @@ export interface SaveState {
 export class Simulation {
   playground: PhysicsWorld | null = null;
   physical: AdventurePhysics | null = null;
+  replicaPhysics: AdventurePhysicsSnapshot | null = null;
+  private previousProps = new Map<string, { x: number; y: number; angle: number }>();
+  private replicaAmbient = new Set<number>();
   movementBackend: "rapier" | "legacy" | "replica" = "rapier";
   private disposed = false;
   world: World;
@@ -138,6 +143,118 @@ export class Simulation {
     this.movementBackend = "rapier";
     this.physical = new AdventurePhysics(this);
   }
+  physicalProps(alpha = 1) {
+    if (this.physical) return this.physical.props();
+    return (this.replicaPhysics?.world.bodies ?? [])
+      .filter((entry) => entry.state?.role === "prop")
+      .map((entry) => {
+        const p = entry.state!,
+          old = this.previousProps.get(p.id) ?? p;
+        const angleDelta = Math.atan2(Math.sin(p.angle - old.angle), Math.cos(p.angle - old.angle));
+        return {
+          ...p,
+          x: old.x + (p.x - old.x) * alpha,
+          y: old.y + (p.y - old.y) * alpha,
+          angle: old.angle + angleDelta * alpha,
+        };
+      });
+  }
+  ownsPhysicalAmbient(slot: number): boolean {
+    return this.physical?.ownsAmbient(slot) ?? this.replicaAmbient.has(slot);
+  }
+  /** Validate a complete received scene before publishing any field. No Rapier allocation/solve. */
+  applyReplica(state: SaveState): void {
+    validateSave(state);
+    if (!state.actorPhysics || state.actorPhysics.world.continuation !== "rebuild")
+      throw new Error("Missing portable physical baseline");
+    const continuous =
+      this.replicaPhysics?.landId === state.actorPhysics.landId &&
+      this.adventure.state.run === state.adventure?.run &&
+      this.adventure.state.transition === state.adventure?.transition;
+    const props = this.physicalProps();
+    const players = new Map(this.players);
+    const enemies = new Map(this.adventure.state.enemies.map((e) => [e.id, e]));
+    const projectiles = new Map(this.adventure.state.projectiles.map((p) => [p.id, p]));
+    this.useLegacyPhysics(true);
+    this.world = this.world.seed === state.seed ? this.world : new World(state.seed);
+    this.adventure.restore(state.adventure!);
+    this.adventure.configureWorld(this);
+    if (JSON.stringify([...this.world.patches.values()]) !== JSON.stringify(state.patches))
+      this.world.setPatches(state.patches);
+    this.tick = state.tick;
+    this.count = state.count;
+    this.shards = state.shards;
+    this.events.length = 0;
+    this.events.push(...structuredClone(state.events ?? []));
+    this.beacons.clear();
+    for (const b of state.beacons) this.beacons.add(b);
+    this.collected.clear();
+    for (const c of state.collected) this.collected.add(c);
+    this.players.clear();
+    for (const p of state.players)
+      this.players.set(p.id, {
+        ...p,
+        input: idleInput(),
+        px: continuous ? (players.get(p.id)?.x ?? p.x) : p.x,
+        py: continuous ? (players.get(p.id)?.y ?? p.y) : p.y,
+      });
+    for (const e of this.adventure.state.enemies) {
+      e.px = continuous ? (enemies.get(e.id)?.x ?? e.x) : e.x;
+      e.py = continuous ? (enemies.get(e.id)?.y ?? e.y) : e.y;
+    }
+    for (const p of this.adventure.state.projectiles) {
+      p.px = continuous ? (projectiles.get(p.id)?.x ?? p.x) : p.x;
+      p.py = continuous ? (projectiles.get(p.id)?.y ?? p.y) : p.y;
+    }
+    for (const key of ["x", "y", "vx", "vy", "kind", "attuned", "generation"] as const)
+      this[key].set(state.npcs[key]);
+    for (let i = 0; i < this.count; i++) {
+      this.px[i] = continuous ? this.x[i] - this.vx[i] * 0.1 : this.x[i];
+      this.py[i] = continuous ? this.y[i] - this.vy[i] * 0.1 : this.y[i];
+    }
+    this.replicaPhysics = state.actorPhysics;
+    this.replicaAmbient = new Set(
+      state.actorPhysics.ambient.filter((s) => s.owner === "rapier").map((s) => s.slot),
+    );
+    this.previousProps = new Map((continuous ? props : []).map((p) => [p.id, p]));
+  }
+  /** Host loss/leave/load retains the received scene and only the selected traveler's build. */
+  continueSolo(id: string): Simulation {
+    if (id === "local" && this.players.size === 1 && this.movementBackend === "rapier")
+      return Simulation.restore(this.save());
+    const state = this.save(true),
+      player = state.players.find((p) => p.id === id) ?? state.players[0];
+    if (!player) throw new Error("Missing local traveler");
+    const oldId = player.id;
+    state.players = [{ ...player, id: "local", input: idleInput() }];
+    const game = new Adventure(state.seed);
+    game.restore(state.adventure!);
+    game.retainPlayer(oldId, "local");
+    state.adventure = game.save();
+    const snapshot = state.actorPhysics;
+    if (snapshot) {
+      const rekey = (bodyId: string) =>
+        bodyId === playerBodyId(oldId) ? playerBodyId("local") : bodyId;
+      snapshot.world.bodies = snapshot.world.bodies.filter(
+        (entry) =>
+          !entry.recipe.id.startsWith("player-") || entry.recipe.id === playerBodyId(oldId),
+      );
+      const retainedIds = new Set(snapshot.world.bodies.map((entry) => entry.recipe.id));
+      snapshot.world.events = snapshot.world.events.filter(
+        (e) => retainedIds.has(e.a) && retainedIds.has(e.b),
+      );
+      for (const entry of snapshot.world.bodies) {
+        entry.recipe.id = rekey(entry.recipe.id);
+        if (entry.state) entry.state.id = rekey(entry.state.id);
+      }
+      const ids = new Set(snapshot.world.bodies.map((entry) => entry.recipe.id));
+      snapshot.world.events = snapshot.world.events
+        .map((e) => ({ ...e, a: rekey(e.a), b: rekey(e.b) }))
+        .filter((e) => e.a !== e.b && ids.has(e.a) && ids.has(e.b));
+    }
+    delete state.movementBackend;
+    return Simulation.restore(state);
+  }
   actorImpulse(id: string, x: number, y: number): void {
     if (this.physical?.world.has(id)) this.physical.world.velocityChange(id, x, y);
     else if (id.startsWith("player-")) {
@@ -158,10 +275,9 @@ export class Simulation {
     const existing = this.players.get(id);
     if (existing) return existing;
     if (this.playground && this.players.size)
-      throw new Error("Physics playground is solo-only until M04");
+      throw new Error("The standalone physics playground is solo-only");
     if (this.players.size >= MAX_PLAYERS) throw new Error("This expedition is full (8 players).");
     if (!/^[\w-]{1,80}$/.test(id)) throw new Error("Invalid player id");
-    if (this.players.size) this.useLegacyPhysics(); // Explicit M03 rollout boundary.
     const color = [...Array(MAX_PLAYERS).keys()].find(
       (i) => ![...this.players.values()].some((p) => p.color === i),
     )!;
@@ -344,6 +460,8 @@ export class Simulation {
     );
   }
   step(steps = 1): void {
+    if (this.movementBackend === "replica")
+      throw new Error("Guest replicas do not advance authoritative physics");
     if (this.disposed) throw new Error("Simulation is disposed");
     if (!Number.isInteger(steps) || steps < 0 || steps > 36000)
       throw new Error("Step count must be 0–36000");
@@ -641,14 +759,26 @@ export class Simulation {
       },
       physics: { ...this.metrics },
       playground: this.playground?.inspect() ?? null,
-      actorPhysics: this.physical?.inspect() ?? { active: false, backend: this.movementBackend },
+      actorPhysics:
+        this.physical?.inspect() ??
+        (this.replicaPhysics
+          ? {
+              active: true,
+              replica: true,
+              backend: this.replicaPhysics.backend,
+              landId: this.replicaPhysics.landId,
+              bodyCount: this.replicaPhysics.world.bodies.length,
+              props: this.physicalProps(),
+              policies: this.replicaPhysics.world.policies,
+            }
+          : { active: false, backend: this.movementBackend }),
       events: this.events.slice(-8),
       adventure: this.adventure.observe(this.players.keys().next().value, this.tick),
     };
   }
-  save(): SaveState {
+  save(portable = false): SaveState {
     return {
-      version: 1,
+      version: 2,
       seed: this.world.seed,
       tick: this.tick,
       count: this.count,
@@ -657,11 +787,14 @@ export class Simulation {
       collected: [...this.collected],
       patches: [...this.world.patches.values()].map((p) => [...p]),
       players: structuredClone([...this.players.values()]),
+      events: structuredClone(this.events),
       adventure: this.adventure.save(),
       ...(this.playground ? { playground: this.playground.save() } : {}),
       ...(this.physical
-        ? { actorPhysics: this.physical.save() }
-        : { movementBackend: this.movementBackend as "legacy" | "replica" }),
+        ? { actorPhysics: this.physical.save(portable) }
+        : this.replicaPhysics
+          ? { actorPhysics: structuredClone(this.replicaPhysics) }
+          : { movementBackend: this.movementBackend as "legacy" | "replica" }),
       npcs: {
         x: Array.from(this.x.subarray(0, this.count)),
         y: Array.from(this.y.subarray(0, this.count)),
@@ -675,11 +808,16 @@ export class Simulation {
   }
   static restore(state: SaveState): Simulation {
     validateSave(state);
-    const sim = new Simulation(state.seed, 0, state.movementBackend ?? "rapier");
+    const sim = new Simulation(
+      state.seed,
+      0,
+      state.actorPhysics ? "replica" : (state.movementBackend ?? "rapier"),
+    );
     if (state.patches?.length) sim.world.setPatches(state.patches);
     sim.tick = state.tick;
     sim.count = state.count;
     sim.shards = state.shards;
+    sim.events.push(...structuredClone(state.events ?? []));
     for (const id of state.beacons) sim.beacons.add(id);
     for (const key of state.collected) sim.collected.add(key);
     for (const p of state.players) sim.players.set(p.id, structuredClone(p));
@@ -695,6 +833,7 @@ export class Simulation {
         const next = AdventurePhysics.restore(sim, state.actorPhysics);
         sim.physical?.dispose();
         sim.physical = next;
+        sim.movementBackend = "rapier";
       } catch (error) {
         sim.dispose();
         throw error;
@@ -717,13 +856,14 @@ export class Simulation {
     this.playground = null;
     this.physical?.dispose();
     this.physical = null;
+    this.replicaPhysics = null;
   }
 }
 
 export function validateSave(state: SaveState): void {
   if (
     !state ||
-    state.version !== 1 ||
+    ![1, 2].includes(state.version) ||
     !Number.isInteger(state.seed) ||
     state.seed < 0 ||
     state.seed > 0xffffffff ||
@@ -745,6 +885,25 @@ export function validateSave(state: SaveState): void {
   )
     throw new Error("Invalid save header");
   validatePatches(state.patches ?? []);
+  if (
+    state.events !== undefined &&
+    (!Array.isArray(state.events) ||
+      state.events.length > 128 ||
+      state.events.some(
+        (e) =>
+          !e ||
+          !Number.isSafeInteger(e.tick) ||
+          e.tick < 0 ||
+          e.tick > state.tick ||
+          !["pulse", "dash", "shard", "beacon", "rest"].includes(e.type) ||
+          ![e.x, e.y].every((n) => Number.isFinite(n) && Math.abs(n) <= WORLD_LIMIT) ||
+          typeof e.player !== "string" ||
+          !/^[\w-]{1,80}$/.test(e.player) ||
+          typeof e.message !== "string" ||
+          e.message.length > 256,
+      ))
+  )
+    throw new Error("Invalid saved observation events");
   if (state.movementBackend !== undefined && !["legacy", "replica"].includes(state.movementBackend))
     throw new Error("Invalid movement backend");
   if (state.actorPhysics) {
@@ -804,8 +963,6 @@ export function validateSave(state: SaveState): void {
       throw new Error("Invalid saved player");
     ids.add(p.id);
   }
-  if (state.actorPhysics && state.players.length > 1)
-    throw new Error("Adventure physics is solo-only until M04");
   for (const key of ["x", "y", "vx", "vy", "kind", "attuned", "generation"] as const) {
     const values = state.npcs[key];
     if (
@@ -828,5 +985,47 @@ export function validateSave(state: SaveState): void {
       )
     )
       throw new Error("Invalid NPC attributes");
+  }
+  if (state.actorPhysics) {
+    const snapshot = state.actorPhysics;
+    if (
+      !state.adventure ||
+      snapshot.seed !== state.seed ||
+      snapshot.run !== state.adventure.run ||
+      snapshot.landId !== `land-${state.adventure.run}-${state.adventure.townLand}`
+    )
+      throw new Error("Physical land identity mismatch");
+    if (snapshot.world.version === 4) {
+      const game = new Adventure(state.adventure.seed);
+      game.restore(state.adventure);
+      const terrain = game.configureTerrain(new World(state.seed));
+      if (terrain.seed !== state.seed) throw new Error("Game/physical world seed mismatch");
+      terrain.setPatches(state.patches);
+      validateSemanticTerrain(snapshot, terrain, state.adventure);
+    }
+    for (const sample of snapshot.ambient)
+      if (sample.slot >= state.count || sample.generation !== state.npcs.generation[sample.slot])
+        throw new Error("Ambient identity mismatch");
+    if (snapshot.world.version === 4 && snapshot.appliedTransition === state.adventure.transition) {
+      const expected = new Map<string, { x: number; y: number; radius: number; boss?: boolean }>();
+      for (const p of state.players) expected.set(playerBodyId(p.id), p);
+      for (const e of state.adventure.enemies) if (e.hp > 0) expected.set(enemyBodyId(e.id), e);
+      for (const entry of snapshot.world.bodies) {
+        if (!["player", "monster", "boss"].includes(entry.recipe.actorKind ?? "")) continue;
+        const entity = expected.get(entry.recipe.id),
+          p = entry.state!;
+        if (
+          !entity ||
+          p.shape.kind !== "circle" ||
+          p.shape.radius !== entity.radius ||
+          p.actorKind !==
+            (entry.recipe.id.startsWith("player-") ? "player" : entity.boss ? "boss" : "monster") ||
+          Math.hypot(p.x - entity.x, p.y - entity.y) > 0.001
+        )
+          throw new Error("Physical/game actor pose mismatch or invalid blueprint");
+        expected.delete(entry.recipe.id);
+      }
+      if (expected.size) throw new Error("Missing physical actor");
+    }
   }
 }
