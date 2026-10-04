@@ -761,6 +761,12 @@ export class PhysicsWorld {
             entry.policySample!.y,
             entry.policy!.regions,
           );
+          if (body.isCcdEnabled() !== (entry.recipe.ccd ?? true))
+            throw new Error("Legacy CCD setting mismatch");
+          body.enableCcd(
+            (entry.recipe.ccd ?? true) &&
+              (role !== "prop" || entry.policy.effective.sweptCollision),
+          );
           collider.setCollisionGroups(collisionGroups(entry));
         }
         if (

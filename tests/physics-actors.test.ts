@@ -1,12 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { AgentRuntime, type Replay, replay } from "../src/engine/agent.ts";
+import { checksum } from "../src/engine/math.ts";
 import { MAX_NPCS, Simulation } from "../src/engine/simulation.ts";
 import { Decor, Terrain } from "../src/engine/world.ts";
 import { ambientBodyId, enemyBodyId, playerBodyId } from "../src/physics/adventure.ts";
-import { initializePhysics } from "../src/physics/bootstrap.ts";
+import { initializePhysics, rapier } from "../src/physics/bootstrap.ts";
 import type { PolicyEdit } from "../src/physics/policies.ts";
-import { physicsResources } from "../src/physics/runtime.ts";
+import { createPlayground, PhysicsWorld, physicsResources } from "../src/physics/runtime.ts";
 
 await initializePhysics();
 function scene(count = 0) {
@@ -411,5 +412,52 @@ test("paused terrain edits remain complete checkpoints before their next collisi
     }
   } finally {
     sim.dispose();
+  }
+});
+
+test("original M02 master-off checkpoints import frozen consequences and continue with the new controls", () => {
+  const world = createPlayground();
+  try {
+    world.configure({ expectedRevision: 0, edits: [{ type: "master", enabled: false }] });
+    world.applyPolicies(1);
+    const original = world.save(),
+      api = rapier(),
+      raw = api.World.restoreSnapshot(new Uint8Array(original.bytes));
+    try {
+      for (const entry of original.bodies) {
+        const role = entry.recipe.role ?? (entry.recipe.motion === "fixed" ? "terrain" : "prop"),
+          membership = role === "terrain" ? 1 : role === "prop" ? 2 : 4;
+        const filter = role === "terrain" ? 7 : role === "prop" ? 3 : 5;
+        raw.getCollider(entry.collider).setCollisionGroups((membership << 16) | filter);
+        raw.getRigidBody(entry.handle).enableCcd(entry.recipe.ccd ?? true);
+        for (const group of ["values", "effective", "provenance"] as const)
+          for (const key of ["crowdContacts", "ambientPhysics", "sweptCollision"])
+            delete (entry.policy![group] as unknown as Record<string, unknown>)[key];
+      }
+      original.bytes = Array.from(raw.takeSnapshot());
+      original.checksum = checksum(original.bytes);
+    } finally {
+      raw.free();
+    }
+    const imported = PhysicsWorld.restore(original);
+    try {
+      assert.equal(imported.pose("wheel").frozen, true);
+      assert.equal(imported.pose("wheel").ccdEnabled, false);
+      imported.impulse("wheel", 500, 0);
+      imported.step();
+      assert.equal(imported.pose("wheel").vx, 0);
+      const restored = PhysicsWorld.restore(imported.save());
+      try {
+        imported.step();
+        restored.step();
+        assert.deepEqual(imported.save(), restored.save());
+      } finally {
+        restored.dispose();
+      }
+    } finally {
+      imported.dispose();
+    }
+  } finally {
+    world.dispose();
   }
 });
