@@ -2,6 +2,7 @@ import Peer, { type DataConnection, type PeerOptions } from "peerjs";
 import { MAX_DRAW_DISTANCE, MAX_NPCS, MIN_DRAW_DISTANCE } from "../engine/limits.ts";
 import { type Input, idleInput, type Simulation } from "../engine/simulation.ts";
 import { WORLD_LIMIT } from "../engine/world.ts";
+import type { AdventureAction } from "../game/types.ts";
 import {
   decodeSnapshot,
   encodeSnapshot,
@@ -38,6 +39,12 @@ export class Coop {
   private readonly connections = new Map<string, DataConnection>();
   private readonly lastInput = new Map<string, number>();
   private readonly lastSequence = new Map<string, number>();
+  private readonly lastAction = new Map<string, number>();
+  private actionSequence = 0;
+  private readonly pendingActions = new Map<
+    number,
+    { resolve: () => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout> }
+  >();
   private readonly interest = new Map<string, SnapshotView>();
   private readonly getSim: () => Simulation;
   private readonly replaceSim: (sim: Simulation) => void;
@@ -175,6 +182,29 @@ export class Coop {
       }
       if (this.connections.get(conn.peer) !== conn) return;
       if (
+        data.type === "action" &&
+        Number.isSafeInteger(data.seq) &&
+        Number(data.seq) > (this.lastAction.get(conn.peer) ?? -1)
+      ) {
+        this.lastAction.set(conn.peer, Number(data.seq));
+        try {
+          const action = data.action as AdventureAction;
+          if (!action || ["tuning", "new-run"].includes(action.type))
+            throw new Error("Only the host can change the shared run or tuning");
+          this.getSim().adventure.action(this.getSim(), conn.peer, action);
+          conn.send({ type: "action-result", seq: data.seq, ok: true });
+          conn.send(encodeSnapshot(this.getSim(), conn.peer, this.interest.get(conn.peer) ?? 1500));
+        } catch (error) {
+          conn.send({
+            type: "action-result",
+            seq: data.seq,
+            ok: false,
+            message: error instanceof Error ? error.message : "Action rejected",
+          });
+        }
+        return;
+      }
+      if (
         data.type !== "input" ||
         typeof data.seq !== "number" ||
         !Number.isSafeInteger(data.seq) ||
@@ -196,6 +226,12 @@ export class Coop {
         dash: data.dash === true,
         pulse: data.pulse === true,
         interact: data.interact === true,
+        attack: data.attack === true,
+        lance: data.lance === true,
+        nova: data.nova === true,
+        potion: data.potion === true,
+        aimX: typeof data.aimX === "number" ? data.aimX : 0,
+        aimY: typeof data.aimY === "number" ? data.aimY : 0,
       });
       this.lastInput.set(conn.peer, now);
       this.lastSequence.set(conn.peer, data.seq);
@@ -217,6 +253,7 @@ export class Coop {
       this.connections.delete(conn.peer);
       this.lastInput.delete(conn.peer);
       this.lastSequence.delete(conn.peer);
+      this.lastAction.delete(conn.peer);
       this.interest.delete(conn.peer);
       this.getSim().removePlayer(conn.peer);
       this.status.peers = this.connections.size;
@@ -321,6 +358,16 @@ export class Coop {
               done();
             } else if (raw && typeof raw === "object") {
               const data = raw as Record<string, unknown>;
+              if (data.type === "action-result" && typeof data.seq === "number") {
+                const pending = this.pendingActions.get(data.seq);
+                if (pending) {
+                  clearTimeout(pending.timer);
+                  this.pendingActions.delete(data.seq);
+                  if (data.ok === true) pending.resolve();
+                  else pending.reject(new Error(String(data.message).slice(0, 200)));
+                }
+                return;
+              }
               if (
                 data.type === "welcome" &&
                 data.version === PROTOCOL_VERSION &&
@@ -380,6 +427,23 @@ export class Coop {
     this.status.message = error instanceof Error ? error.message : "Connection failed";
     this.changed();
   }
+  action(action: AdventureAction): Promise<void> {
+    if (this.status.role !== "guest" || this.status.state !== "connected")
+      return Promise.reject(new Error("No active guest connection"));
+    if (this.pendingActions.size >= 8)
+      return Promise.reject(new Error("Wait for the previous actions to finish"));
+    const conn = this.connections.values().next().value;
+    if (!conn?.open) return Promise.reject(new Error("Connection unavailable"));
+    const seq = this.actionSequence++;
+    return new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.pendingActions.delete(seq);
+        reject(new Error("The host did not respond to that action"));
+      }, 5000);
+      this.pendingActions.set(seq, { resolve, reject, timer });
+      conn.send({ type: "action", seq, action });
+    });
+  }
   update(dt: number, input: Input, view: SnapshotView): void {
     const now = performance.now();
     if (this.status.role === "guest" && this.status.state === "connected") {
@@ -423,11 +487,18 @@ export class Coop {
     this.connections.clear();
     this.lastInput.clear();
     this.lastSequence.clear();
+    this.lastAction.clear();
+    for (const pending of this.pendingActions.values()) {
+      clearTimeout(pending.timer);
+      pending.reject(new Error("Expedition disconnected"));
+    }
+    this.pendingActions.clear();
     this.interest.clear();
     this.peer?.destroy();
     this.peer = undefined;
     const sim = this.getSim(),
       me = sim.players.get(this.localId);
+    sim.adventure.retainPlayer(this.localId, "local");
     sim.players.clear();
     this.localId = "local";
     if (me) {

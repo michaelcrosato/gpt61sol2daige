@@ -4,22 +4,45 @@ The evidence here distinguishes tested behavior from operating limits. Source te
 
 ## Reproduction gates
 
-Version 1.1 passes **26 headless tests**, TypeScript, lint/format checks, the production build, and **10 browser scenarios**. These cover desktop gameplay, mobile controls, actual eight-player co-op, independent guest view budgets, settings persistence, native fullscreen, fullscreen denial, browser-initiated exits, landscape touch controls, full-size world saves and legacy-save compatibility. The original release was also verified on GitHub Actions and against production, including public signaling; one earlier public connection attempt timed out before the subsequent complete eight-client rerun succeeded.
+Version 2.0 passes **41 headless tests** and **14 browser scenarios**, including the earlier streaming, settings, fullscreen and actual WebRTC coverage. The new checks exercise combat, skills, shop purchases, equipment, drops, death, outward progression, guest action authority, shared party XP/gold, personal respawn and exact save/replay continuation. Version 1.1 had 26 headless tests and 10 browser scenarios; its measurements remain labeled below.
 
 ```bash
 npm ci
 npm run check
 npm run build
 npm run test:e2e
+npm run verify:run
 npm run bench
 # With npm run dev running:
 npm run bench:browser
 npm run bench:quality
+npm run bench:combat
 ```
 
 The browser suite starts isolated app/signaling processes on ports 5187 and 9018. `BASE_URL` targets an existing app, including production. No simulated WebRTC adapter is used. Chrome runs headlessly with background throttling disabled for multiple test tabs. The eight-client test places most clients in the lab to avoid conflating connection correctness with eight competing renderers on one workstation; one guest renders a 32,768-creature view and also switches to a 512-creature budget without changing the host population. Native fullscreen tests assert `document.fullscreenElement` and the canvas's actual viewport bounds. A separate denial test deliberately rejects the native API to verify the fallback.
 
 The local-signaling test configuration supplies an empty ICE server list so same-machine connections do not depend on external STUN/TURN availability. In CI only, Chromium uses direct host candidates instead of multicast-resolved mDNS names, removing another container-network dependency. It still opens real WebRTC data channels between isolated contexts. Production testing retains browser defaults and the site's public signaling and ICE configuration.
+
+## Version 2.0 adventure evidence
+
+| Requirement | Acceptance evidence |
+| --- | --- |
+| Fluid hack-and-slash with the original hero | Real-time browser controller fights through Brambleburst using attack/Whorl/movement/flasks; original sprite stays beneath sword and dodge effects |
+| Deep skills and equipment | 48-node DOM tree; learning changes derived damage; shop purchase deducts gold, equipping applies stats; headless prerequisite, active-unlock, cleave and respec checks |
+| XP, gold, rarity and drops | Browser gains levels and gold, sees a guaranteed rare warden drop, collects gear with actual E input; fourth/eighth boss legendary rewards tested |
+| Outward areas, lands and towns | Input-driven run clears areas 1–9, visits Emberrest after 4 and Tideglass Haven after 8, and retains build/loot across transitions |
+| Optional named mechanics | Eight distinct authored introductions; an encounter clears with all mechanic cooldowns disabled; delayed Echo/linked-effect state survives save/restore |
+| Modular endless continuation | Procedural ninth area clears; browser previews area 10,001; recipe export/validation includes index 1,000,000,000 with bounded coordinates |
+| Difficulty/debug controls | Browser slider changes authoritative health tuning; headless checks verify all six multipliers affect stats, motion or incoming damage |
+| Monster rigs and procedural effects | Six distinct shared runtime/export rigs; 80 pose frames exported from the example recipe; desktop/mobile screenshots inspected |
+| Multiplayer progression | Eight actual clients; guest learns a skill, buys/equips boots, fights, shares earned XP with host, cannot tune the room, and retains its build after host disconnect |
+| Recovery and usability | Death preserves build and takes 10% gold; guest respawn leaves others' fight intact; solo menus/atlas pause and retain manual pause; mobile HUD has no horizontal overflow |
+
+`npm run verify:run` uses seed 142 and **2× player damage/health**, with the remaining tuning at defaults. It finishes all nine areas without death, reaches level 19 with 2,505 gold and a full 40-slot satchel. It drives normal combat inputs and legitimate skill/equipment actions; it does not mark areas cleared or award rewards directly. This smoke test establishes reachable progression, not balance across every seed, party or depth. [Raw playthrough](evidence/adventure-playthrough.json).
+
+The separate combat benchmark measures 300 consecutive frames after 60 warmup frames in generated area 9, at 1440×1000, normal 1.8× zoom, with 2,400 ambient creatures simulated. Its input controller attacks, casts Whorl, dashes and heals. It uses 5× player health and 0.1× enemy damage to sustain the encounter; outgoing damage and movement stay at defaults. The measured result was **60.00 FPS**, **16.7 ms p95 frame interval**, **60.00 simulation ticks/s**, **11 peak enemies**, and **5 kills** during the sample. [Raw combat benchmark](evidence/combat-benchmark.json), [combat capture](evidence/adventure-procedural.png). It measures a typical encounter, not the 100-live-enemy ceiling.
+
+Inspected captures: [warden fight](evidence/adventure-boss.png), [48-node tree](evidence/adventure-skills.png), [equipment](evidence/adventure-equipment.png), [new land's town](evidence/adventure-town.png), [mobile game HUD](evidence/adventure-mobile.png). The boss capture uses increased player health for demonstration; the town capture uses the documented area-preview/recall tools. They demonstrate rendering, while the executable tests establish progression.
 
 ## Requirement-to-evidence map
 
@@ -43,6 +66,19 @@ The local-signaling test configuration supplies an empty ICE server list so same
 | Environment reproducibility | Node 24, pinned lockfile, local Chrome, locally bundled assets/fonts | Successful install/typecheck/tests/build and documented commands; no runtime LLM or GPU API |
 | Approach/design/time-allocation report | `docs/REPORT.md` and hosted static documentation | Report covers decisions, alternatives, procedural investment, work allocation, measured results and limits |
 | Public GitHub repository and Vercel production | Repository and deployment configuration | Final delivery checks inspect GitHub visibility, remote commit, Vercel readiness, public HTTP response and deployed browser behavior |
+
+## Version 2.0 ambient regression measurements
+
+A fresh run of `bench:quality` uses the same 300-frame, 1440×1000, 0.12× game-mode workload as version 1.1, in the safe town with no active combat encounter. This verifies that the new adventure systems preserve the expanded ambient budget; it is separate from the close-up combat sample above.
+
+| Active and visible ambient creatures | Mean FPS | p95 frame interval | Actual simulation ticks/s |
+| --- | --- | --- | --- |
+| 6,000 | 60.07 | 16.7 ms | 60.07 |
+| 16,384 | 60.08 | 16.7 ms | 60.08 |
+| 32,768 | 60.12 | 16.7 ms | 60.12 |
+| 65,536 | 49.70 | 33.4 ms | 49.70 |
+
+[Raw version 2.0 quality benchmark](evidence/quality-benchmark-v2.json). These are measurements on a shared workstation under the load present at capture time; differences from the older run do not isolate an individual optimization.
 
 ## Version 1.1 quality measurements
 

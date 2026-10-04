@@ -22,7 +22,7 @@ test("documentation and generated assets are served from the deployed package", 
   const assets = await manifest.json();
   expect(assets.version).toBe(1);
   expect(assets.sprites).toHaveLength(8);
-  expect(assets.audio).toHaveLength(6);
+  expect(assets.audio).toHaveLength(10);
 });
 
 test("exploration, abilities, atlas, audio, lab commands, saving and deterministic browser replay", async ({
@@ -32,16 +32,16 @@ test("exploration, abilities, atlas, audio, lab commands, saving and determinist
   page.on("pageerror", (e) => errors.push(e.message));
   await page.goto("/");
   await page.waitForFunction(() => !!window.fern);
-  await expect(page.getByRole("heading", { name: "Go where the green grows." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "A quiet town. A hungry wild." })).toBeVisible();
   await page.screenshot({ path: "artifacts/desktop.png" });
-  await page.getByRole("button", { name: "Begin wandering" }).click();
+  await page.evaluate(() => window.fern.start());
   const start = await page.evaluate(() => window.fern.observe().players[0]);
   await page.keyboard.down("d");
   await expect
     .poll(async () => (await page.evaluate(() => window.fern.observe().players[0])).x)
     .toBeGreaterThan(start.x + 25);
   await page.keyboard.up("d");
-  await page.getByRole("button", { name: "Light pulse", exact: true }).click();
+  await page.getByRole("button", { name: "Whorl", exact: true }).click();
   await expect
     .poll(async () =>
       (await page.evaluate(() => window.fern.observe())).events.some((e) => e.type === "pulse"),
@@ -110,7 +110,7 @@ test("mobile layout, touch movement and journal work without horizontal overflow
   await page.waitForFunction(() => !!window.fern);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
   await page.screenshot({ path: "artifacts/mobile.png" });
-  await page.getByRole("button", { name: "Begin wandering" }).click();
+  await page.evaluate(() => window.fern.start());
   const before = await page.evaluate(() => window.fern.observe().players[0].x);
   const move = await page.getByRole("button", { name: "Move east", exact: true }).boundingBox();
   await page.mouse.move(move!.x + move!.width / 2, move!.y + move!.height / 2);
@@ -120,8 +120,8 @@ test("mobile layout, touch movement and journal work without horizontal overflow
     .toBeGreaterThan(before + 8);
   await page.mouse.up();
   await page.getByRole("button", { name: "Toggle expedition journal" }).click();
-  await expect(page.getByRole("heading", { name: "A small light. A vast world." })).toBeVisible();
-  await page.getByRole("button", { name: "The Elder Grove", exact: false }).click();
+  await expect(page.getByRole("heading", { name: "Roots beneath. Wilds ahead." })).toBeVisible();
+  await page.getByRole("button", { name: "Atlas", exact: true }).click();
   await expect(page.getByRole("heading", { name: "The world is wider." })).toBeVisible();
   await page.getByRole("button", { name: "Controls and help" }).click();
   await expect(page.getByRole("heading", { name: "Take the long way." })).toBeVisible();
@@ -184,7 +184,7 @@ test("joining recovers after the first native data channel is interrupted", asyn
     await host.context.close();
   }
 });
-test("real WebRTC joins eight isolated clients, syncs movement and quest, rejects ninth, releases slots", async ({
+test("real WebRTC joins eight clients, syncs builds, combat and world, rejects ninth and releases slots", async ({
   browser,
   baseURL,
 }) => {
@@ -314,6 +314,109 @@ test("real WebRTC joins eight isolated clients, syncs movement and quest, reject
     await expect
       .poll(async () => (await host.page.evaluate(() => window.fern.observe())).players.length)
       .toBe(8);
+    // Exercise the same adventure actions as the UI over a real guest RPC channel.
+    await host.page.evaluate(() => window.fern.command({ op: "population", count: 64 }));
+    await guest.page.evaluate(() => window.fern.command({ op: "population", count: 0 }));
+    const fighterId = await ninth.page.evaluate(() => window.fern.network.localId());
+    const hostGold = await host.page.evaluate(() => window.fern.game.observe().hero!.gold);
+    await ninth.page.evaluate(async () => {
+      await window.fern.game.action({ type: "skill", id: "blade-0" });
+      await window.fern.game.action({ type: "buy", index: 2 });
+    });
+    await expect
+      .poll(async () =>
+        ninth.page.evaluate(() => window.fern.game.observe().hero!.inventory.length),
+      )
+      .toBe(3);
+    const boots = await ninth.page.evaluate(
+      () => window.fern.game.observe().hero!.inventory.find((item) => item.slot === "boots")!,
+    );
+    await ninth.page.evaluate((id) => window.fern.game.action({ type: "equip", id }), boots.id);
+    await expect
+      .poll(async () =>
+        host.page.evaluate((id) => {
+          const save = window.fern.command({ op: "save" }) as SaveState;
+          return save.adventure!.heroes[id].equipment.boots;
+        }, fighterId),
+      )
+      .toBe(boots.id);
+    expect(await host.page.evaluate(() => window.fern.game.observe().hero!.gold)).toBe(hostGold);
+    expect(
+      await ninth.page.evaluate(() => window.fern.game.observe().hero!.skills["blade-0"]),
+    ).toBe(1);
+    expect(
+      await ninth.page.evaluate(async () => {
+        try {
+          await window.fern.game.action({ type: "tuning", values: { playerDamage: 5 } });
+          return false;
+        } catch {
+          return true;
+        }
+      }),
+    ).toBe(true);
+    await host.page.evaluate(async () => {
+      await window.fern.game.action({
+        type: "tuning",
+        values: {
+          playerDamage: 5,
+          playerHealth: 5,
+          enemyDamage: 0.1,
+        },
+      });
+      await window.fern.game.action({ type: "depart" });
+    });
+    for (const participant of [...participants.slice(2), host])
+      await expect
+        .poll(async () => participant.page.evaluate(() => window.fern.game.observe().name))
+        .toBe("Brambleburst");
+    await ninth.page.evaluate(() => {
+      const controller = setInterval(() => {
+        const game = window.fern.game.observe(),
+          player = window.fern
+            .observe()
+            .players.find((p) => p.id === window.fern.network.localId())!;
+        if (game.hero!.xp > 0 || game.hero!.level > 1 || game.hero!.dead) {
+          clearInterval(controller);
+          window.fern.network.input({});
+          return;
+        }
+        const enemy = game.enemies.sort(
+          (a, b) =>
+            Math.hypot(a.x - player.x, a.y - player.y) - Math.hypot(b.x - player.x, b.y - player.y),
+        )[0];
+        if (!enemy) return;
+        const dx = enemy.x - player.x,
+          dy = enemy.y - player.y,
+          distance = Math.hypot(dx, dy);
+        window.fern.network.input({
+          x: distance > 24 ? dx / Math.max(1, distance) : 0,
+          y: distance > 24 ? dy / Math.max(1, distance) : 0,
+          attack: true,
+          pulse: distance < 100,
+          aimX: dx / Math.max(1, distance),
+          aimY: dy / Math.max(1, distance),
+        });
+      }, 80);
+    });
+    await expect
+      .poll(
+        async () =>
+          ninth.page.evaluate(() => {
+            const h = window.fern.game.observe().hero!;
+            return h.level > 1 || h.xp > 0;
+          }),
+        { timeout: 20000 },
+      )
+      .toBe(true);
+    await expect
+      .poll(async () =>
+        host.page.evaluate(() => {
+          const h = window.fern.game.observe().hero!;
+          return h.level > 1 || h.xp > 0;
+        }),
+      )
+      .toBe(true);
+    expect(await host.page.evaluate(() => window.fern.game.observe().kills)).toBeGreaterThan(0);
     const evidence = await host.page.evaluate(() => window.fern.observe());
     await test.info().attach("eight-player host", {
       body: JSON.stringify(evidence, null, 2),
@@ -323,6 +426,12 @@ test("real WebRTC joins eight isolated clients, syncs movement and quest, reject
     await expect
       .poll(async () => (await ninth.page.evaluate(() => window.fern.network.status())).role)
       .toBe("solo");
+    expect(
+      await ninth.page.evaluate(() => window.fern.game.observe().hero!.skills["blade-0"]),
+    ).toBe(1);
+    expect(await ninth.page.evaluate(() => window.fern.game.observe().hero!.equipment.boots)).toBe(
+      boots.id,
+    );
   } catch (error) {
     const diagnostics = await Promise.all(
       participants.map(async (p, index) => ({

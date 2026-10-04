@@ -1,0 +1,14 @@
+I want you to build out the game further building on the vibe you have established. Let's make it a fast, fluid hack-and-slash. Keep the main character, add a deep skill tree system, and implement a modern progression loop (XP, gold, and loot drops) reminiscent of *Path of Exile 2* or *Diablo IV*.
+
+Key distinction: Rather than purely going down further into a dungeon, have the game expand outwards into "area" on "lands" as the game expand outward place key portals to new towns where the player and rest and resupply.
+
+### Core Gameplay & Systems
+- **Level Progression & Mechanics:** Introduce one unique level element or gameplay mechanic per level, and name the level after that mechanic. As the game progresses, combine these mechanics in novel ways. Keep the core focus on hack-and-slash combat—casual players should be able to bypass the mechanics and clear the level, while speedrunners and power-levelers can exploit them to their full potential.
+- **Town Hub & Story:** There is no extensive story—it is purely run-based progression from one level to the next. Flesh out the town hub with a few core, fluidly animated NPCs.
+- **Difficulty & Tuning:** Make the game challenging, but don't worry about overtuning it right now. Include a difficulty slider in the debug/pause menu to adjust player and enemy damage, health, and speed for rapid playtesting.
+- **Infinite Modularity:** The game should scale infinitely. Ensure monsters, bosses, the loot system, and level layouts are completely modular. Once the player ventures past pre-designed content, procedurally generate endless encounters by combining mechanics, behavioral archetypes, and color palettes.
+- **Engine Showcase:** Emphasize high-quality monster rigs, responsive combat abilities, dynamic lighting, and expressive animations. Treat all modular systems—loot, enemies, level architecture, themes, and mechanics—as a cohesive, extensible design language.
+
+Expand on this design wherever you see fit, especially where I have left out specifics.
+
+P.S. Remember: after every commit, push to GitHub and merge (always).

@@ -1,12 +1,12 @@
 # Fern
 
-**A procedural 2D world engine built for coding agents, with a small cooperative exploration game.**
+**A fast, outward-growing hack-and-slash built on a deterministic, agent-native 2D engine.**
 
-Explore a seeded forest, gather light from wisps, and wake three ancient beacons. Every in-world sprite, animation and sound comes from code. The engine runs in Node without a browser; the game uses Canvas 2D and Web Audio.
+Keep your familiar wayfarer, carve through monster packs, shape a build across four skill paths, and carry your finds to the next town. Eight authored areas introduce optional mechanics; beyond them, seeded encounters combine those mechanics, monster behaviors, layouts and palettes. Every in-world sprite, animation and sound comes from code. Node runs the same simulation headlessly; the browser uses Canvas 2D and Web Audio.
 
 [Play Fern](https://gpt61sol2daige.vercel.app) · [Design report](docs/REPORT.md) · [Architecture](docs/ARCHITECTURE.md) · [Agent protocol](docs/AGENT-PROTOCOL.md)
 
-![Fern's procedural forest and expedition journal](docs/evidence/desktop.png)
+![The familiar wayfarer fighting Brambleheart in the Verdant March](docs/evidence/adventure-boss.png)
 
 ## Run in this environment
 
@@ -22,35 +22,62 @@ npm run dev
 npm run check          # formatting/lint, TypeScript and headless tests
 npm run build          # typecheck + production dist/
 npm run preview        # serve dist/ locally
-npm run test:e2e       # game, mobile controls, eight real WebRTC clients
+npm run test:e2e       # combat/build loop, mobile, eight real WebRTC clients
+npm run verify:run     # nine areas through real inputs, including two new towns
 npm run bench          # CPU simulation benchmark → artifacts/benchmark.json
 npm run bench:browser  # 300 rendered frames; requires npm run dev
 npm run bench:quality  # 6k / 16k / 32k / 65,536 creatures in game mode
+npm run bench:combat   # 300 close-up combat frames in a generated encounter
 ```
 
 E2E starts its own app on **5187** and local signaling server on **9018**. Those ports must be free. It uses `/usr/bin/google-chrome`; set `CHROME_PATH` for another installed Chrome. With `BASE_URL=https://…`, the same suite targets a deployment and its configured signaling service. Screenshots and traces go to `artifacts/`, `test-results/`, and `playwright-report/`.
 
 ## Play
 
-WASD or arrows move; Space/2 pulses light; Shift/3 dashes; E collects crystals or lights a nearby beacon; 1 toggles your lantern. Scroll or +/− zooms, right-drag pans, F follows your traveler, and M opens the atlas. Mobile has directional and action buttons. Enable sound explicitly. Save/load your trail in Agent lab; saves live on your device.
+**Begin the hunt** leaves Mosslight Hollow for Brambleburst. Defeat the packs and their warden, collect equipment with **E**, then follow the outward gate. Every fourth area opens a portal to the next land's town. Spend gold with Rowan, refill your flasks with Iona, and travel onward with Orin. Their stalls, gestures and town lighting are procedural.
 
-**Settings** now exposes independent **draw distance (256–16,384 world units)**, **visible-creature limit (0–65,536)** and **world population (0–65,536)**, with Balanced, Expansive and Maximum presets. Apply saves your preferences on this device. The view limit prioritizes nearby creatures without removing them from the simulation. In co-op, each guest controls their view; only the host changes the shared population.
+| Action | Controls |
+| --- | --- |
+| Move / aim | WASD or arrows / mouse; keyboard attacks auto-aim if the pointer has not aimed |
+| Slash combo | Hold left mouse or J |
+| Whorl / Thornlance / Bloom Nova | Q or 2 / R or 3 or right mouse / F or 4; unlock the latter two in the tree |
+| Dodge / healing flask | Shift or Space / 1 |
+| Pick up gear, use a mechanic, talk or travel | E |
+| Equipment / skill tree / pause and tuning | I / K / P |
+| Recall to town | T; stand still and avoid damage for 2.5 simulation seconds |
+| Atlas / recenter / lantern | M / C / L |
+| Zoom / pan / fullscreen | Scroll or +/− / middle-drag / G |
 
-Use **Play fullscreen** or **G** for native fullscreen and a compact game HUD. **Esc**, **G** or the exit button returns to the workspace. Map, journal, audio, settings, save/load, abilities and touch controls remain accessible in game mode. If native fullscreen is unavailable, game mode fills the browser window. Preferences include a live performance overlay; settings also show actual simulation ticks per second. Large world saves use IndexedDB, and previous localStorage saves still load.
+Touch controls and the compact fullscreen HUD expose the same actions. Enable sound explicitly. Solo dialogs and the atlas pause the world; co-op keeps running. Save/load in display settings or Agent lab; checkpoints live in IndexedDB on this device. Death takes 10% of carried gold and retains levels, skills and equipment. When party members are still fighting, a fallen player can revive at the trailhead without resetting their encounter.
 
-At 1440×1000 in this workstation's headless Chrome, the 1.1 game-mode benchmark measured approximately **60 FPS at 16,384 visible creatures**, **54 FPS at 32,768**, and **37 FPS at 65,536**. The highest loads also slow fixed-step simulation; this is an adjustable ceiling rather than a guaranteed frame rate. [Measurements and test scope](docs/VERIFICATION.md).
+### Build and progression
 
-Each un-attuned wisp within a pulse contributes a shard. Each of the three beacons needs three shards. Their journal entries mark the atlas. Shallow water slows movement; deep water and trunks are solid. Travel across the river using the path. The expedition has no timer.
+**48 skill nodes** span Blade, Ember, Root and Gale, with prerequisite links, rank investment, active ability unlocks, keystones and repeatable mastery. Three starting points let you choose a direction immediately; leveling grants more. Respec in town costs 10 gold per allocated point.
 
-## What is implemented
+Four equipment slots—weapon, armor, boots and charm—carry deterministic base power, stat affixes and common/magic/rare/legendary rarities. Legendary powers change combat. Wardens guarantee at least rare gear; every fourth area's warden guarantees a legendary. The 40-slot satchel supports comparison, equipping, individual sales and bulk sales of unequipped common/magic gear. XP and gold pickups reward the entire party; equipment goes to its collector.
 
-- **Massive streaming world:** coordinates −16,000,000…+16,000,000; 16-unit tiles, 256-unit chunks. A 1,024-chunk LRU bounds terrain memory; content regenerates exactly.
-- **Thousands of creatures:** typed-array storage for up to 65,536 active NPCs, spatial broad phase, distance-based steering/contact updates, independent view budgets, cached overview terrain and batched pixel rendering.
-- **Physics:** fixed 60 Hz steps, circle impulses, unequal masses, restitution, separation, static tile/trunk contacts, wading, dash substeps and pulse forces.
-- **Eight-player co-op:** host-authoritative simulation over WebRTC, validated inputs, compact binary snapshots, camera interest filtering, smoothing, slot limits and disconnect recovery.
-- **Code-made assets:** pixel sprite recipes and eight animation poses; procedural sound effects and an ambient score. Font files are bundled with OFL licenses.
-- **Agent tools:** JSONL CLI, browser command API, state hashes, observations, entity inspection, checkpoints, replay, terrain painting, sprite/level recipes and asset export.
-- **Playable reference:** an exploration loop, shared beacon progression, minimap, atlas, waypoint markers, spirit/dash/pulse, audio, save/load, responsive QA controls and an inspectable lab.
+| Area | Optional advantage |
+| --- | --- |
+| Brambleburst | Strike pods to burst thorns and root packs |
+| Slipstream | Wind lanes grant haste and spirit |
+| Stormglass | Hit pylons for chain lightning |
+| Echo Wells | Repeat an ability from a nearby well |
+| Cinderwake | Cross vents for burning strikes; avoid lingering |
+| Bloodbloom | Trade life for damage and bonus XP |
+| Gravity Knots | Pull scattered monsters into your area attacks |
+| Riftstep | Blink between arches with an arrival shockwave |
+
+Clearing requires combat, never solving a mechanic. Later generated areas combine two or three mechanics and link their effects. Six behavior archetypes, six articulated monster rigs, five palettes and six terrain layouts form the shared content vocabulary. Bosses mix telegraphed attacks and a second phase. The run has no authored endpoint; area indices use safe integers and each new land reuses bounded local coordinates. Runtime collections and visual caches remain capped.
+
+**P → difficulty** exposes an overall slider, Story/Wild/Savage presets, and separate player/enemy damage, health and speed multipliers. Changes affect the running simulation immediately. Encounter preview can jump to any supported area for playtesting. The default challenge is intentionally demanding; the full-run QA controller explicitly uses 2× player damage and health, while a separate test clears the first area at defaults.
+
+### Engine and display
+
+The fixed-step engine retains deterministic replay, complete checkpoints, spatial physics, tile editing and seeded streaming across a ±16-million-unit world. Up to **65,536 ambient creatures** can surround the party; encounters have a separate **100-live-enemy** budget. Ambient wildlife is hidden inside the active combat clearing to keep attacks readable. Local draw distance and wildlife limits never hide combatants, loot or mechanics.
+
+**Settings** offers independent draw distance (256–16,384 units), ambient view limit and world population, with saved presets. Only the host changes shared population and encounter tuning. **Play fullscreen** or **G** uses native fullscreen; the same game layout fills the window when native fullscreen is unavailable. Esc/G restores the workspace. Settings report rendered FPS and actual simulation Hz; high populations can slow both. [Versioned measurements and test scope](docs/VERIFICATION.md) keep old ambient stress results separate from combat measurements.
+
+The original beacon, crystal and wildlife interactions remain available as engine examples. The adventure HUD focuses on the outward run.
 
 ## Agent workflow
 
@@ -61,6 +88,10 @@ npm run assets
 npm run assets -- sprite examples/autumn-traveler.sprite.json --out artifacts/autumn
 npm run assets -- level examples/moss-courtyard.level.json --out artifacts/courtyard
 npm run assets -- chunk -1 2 142 --out artifacts/chunks
+npm run adventure -- area 25 142
+npm run adventure -- validate artifacts/adventure/area-25.json
+npm run adventure -- rig examples/glass-warden.rig.json
+npm run verify:run
 ```
 
 For clean JSONL stdout without npm's banner, invoke `node tools/agent.ts` directly. Create your output directory before writing a recording into it.
@@ -69,15 +100,15 @@ For clean JSONL stdout without npm's banner, invoke `node tools/agent.ts` direct
 window.fern.pause(true);
 window.fern.command({op: "input", x: 1, y: 0});
 window.fern.command({op: "step", ticks: 60});
-window.fern.observe();
+window.fern.game.observe();
 window.fern.command({op: "paint", tx: 10, ty: 10, width: 6, height: 4, terrain: 6});
 ```
 
-See the protocol for schemas, limits, replay semantics, and recipes. The game never calls an LLM service: “agent-native” describes the engineering interface.
+Use `catalog` to inspect all game registries, `adventure` for validated player actions, and `encounter` for area/recipe previews. See the protocol for schemas, limits, replay semantics, and recipes. The game never calls an LLM service: “agent-native” describes the engineering interface.
 
 ## Co-op and hosting
 
-Open **Invite a friend → Open an expedition**, copy the link, and share it with up to seven travelers. The default uses PeerJS Cloud for signaling; world data travels over WebRTC. Keep the host tab active. Closing the host ends the shared session; guests retain the received world and continue solo. Rooms are unlisted bearer links, with no accounts or matchmaking.
+Open **Invite a friend → Open an expedition**, copy the link, and share it with up to seven travelers. The default uses PeerJS Cloud for signaling; world data travels over WebRTC. Keep the host tab active. Closing the host ends the shared session; guests retain the received world and continue solo. Rooms are unlisted bearer links, with no accounts or matchmaking. The host controls the shared route; guests learn skills, buy/equip items and fight through validated actions. Joining creates a session build at the party's catch-up level, not an account import. Leaving preserves that local build for solo continuation; save it on your device.
 
 Some NAT/firewall combinations need TURN. `.env.example` documents optional ICE and self-hosted signaling configuration. Only use short-lived public client TURN credentials in a frontend build; do not embed a private service secret. Internet connectivity across arbitrary networks is not guaranteed by a same-machine eight-client test.
 

@@ -88,7 +88,18 @@ if (args[0] === "sprite") {
         resolve(out, `${kind}-${frame}.svg`),
         spriteSvg({ version: 1, kind, seed: 142 }, frame),
       );
-  const sounds: SoundName[] = ["pulse", "shard", "beacon", "dash", "step", "ambient"];
+  const sounds: SoundName[] = [
+    "pulse",
+    "shard",
+    "beacon",
+    "dash",
+    "step",
+    "ambient",
+    "slash",
+    "hit",
+    "hurt",
+    "level",
+  ];
   for (const sound of sounds) await writeFile(resolve(out, `${sound}.wav`), wav(synthesize(sound)));
   await writeFile(
     resolve(out, "manifest.json"),

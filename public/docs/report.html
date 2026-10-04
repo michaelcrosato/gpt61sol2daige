@@ -12,6 +12,67 @@
 <nav aria-label="Documentation"><a href="/">fern. <span>Back to the world</span></a><a href="/docs/report.html">Design report</a><a href="/docs/agent-protocol.html">Agent protocol</a><a href="/docs/verification.html">Verification</a></nav>
 <main><h1 id="fern-building-a-world-engine-for-coding-agents">Fern:
 building a world engine for coding agents</h1>
+<h2 id="version-2.0-the-unfurling-wilds">Version 2.0: The Unfurling
+Wilds</h2>
+<p>Fern now has a complete outward-growing action-RPG loop: leave a
+town, fight packs and a warden, collect XP/gold/equipment, develop a
+build, and cross four areas into another land’s town. The original
+wayfarer and woodland palette remain the visual anchor. The new brief is
+preserved in <code>ARPG-BRIEF.txt</code>.</p>
+<p>The main investment was the shared content and state model.
+<code>Adventure</code> runs inside the existing fixed-step engine, so
+the browser, co-op host, headless agent and replay all execute identical
+combat rules. Area recipes compose mechanics, layouts, palettes and
+behavior archetypes. Skills and equipment feed derived stats rather than
+displaying unconnected numbers. The full run, including pending echoes
+and timed buffs, survives checkpoints. Eight authored mechanic
+introductions establish the vocabulary; generated encounters then
+combine it without requiring a separate procedural game mode.</p>
+<p>Combat emphasizes fast choices and readable consequences: a
+directional three-hit slash, Whorl, unlockable Thornlance and Bloom
+Nova, sustained dodges, telegraphed monster attacks, stagger, knockback
+and flasks. Six articulated pixel rigs share five themed palettes and
+reusable animation poses. Bosses add their own attack sequencing and
+phase change. Directional sword animation, impact flashes, damage text,
+projected danger, additive lighting and layered synthesized sounds
+connect input to visible feedback. The town’s three NPCs have distinct
+services, props and gestures, with no lengthy story gate.</p>
+<p>The 48-node tree supports four interwoven build themes through rank
+investment and prerequisites, including actual active unlocks and
+combat-changing keystones. Loot has four slots, four rarities, seeded
+affixes and four legendary powers. A compact comparison panel, town
+respec, bulk sale of low-rarity spares and refill services keep the
+progression loop usable. Player death preserves investment while taking
+gold; co-op awards shared XP/gold and lets an individual rejoin living
+teammates without resetting their fight.</p>
+<p>Optional mechanics are advantages, not mandatory puzzles. A
+combat-only test clears an area while every mechanic is unavailable.
+Another controller completes all eight introductions, visits the two
+subsequent towns, and clears a ninth procedural encounter using ordinary
+inputs. Its documented 2× player damage/health setting verifies
+progression, not final balance; a separate test clears the first area at
+default tuning. Six individual multipliers and an overall difficulty
+control make continued playtesting quick. The generator has no authored
+ending, while safe numeric ranges, bounded actors and per-land
+coordinates make its operational limits explicit.</p>
+<p>Verification covered 41 headless cases and 14 browser scenarios,
+including actual eight-client WebRTC actions, shared rewards, guest
+ownership, death recovery, menu pause semantics, native fullscreen,
+mobile controls and large saves. The initial 300-frame combat sample at
+normal close zoom measured <strong>60.00 FPS and 60.00 simulation
+ticks/s</strong>, with 11 peak active enemies and 2,400 ambient
+creatures simulated. These are observations on this workstation, not
+guarantees for arbitrary builds or devices. <a
+href="verification.html">Verification and reproducible evidence</a>
+document the workload and earlier releases separately.</p>
+<p>Work was concentrated on four connected layers: deterministic
+combat/progression, reusable content/rigs, the playable UI and controls,
+and complete browser/network verification. The engine’s existing world
+streaming, asset recipes and replay tools paid off: new enemies and
+encounters could be tested through the same input API and exported
+without introducing editor-only state. The next substantive design work
+is player-driven balance and more authored content using these
+registries, rather than replacing the underlying architecture.</p>
 <h2 id="version-1.1-more-room-to-explore">Version 1.1: more room to
 explore</h2>
 <p>The follow-up adds persistent settings for draw distance, visible

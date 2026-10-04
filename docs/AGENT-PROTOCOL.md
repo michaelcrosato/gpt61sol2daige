@@ -25,8 +25,11 @@ An accepted call returns `{"ok":true,"result":…}`; failure returns `{"ok":fals
 | `op` | Fields | Result / contract |
 | --- | --- | --- |
 | `describe` | none | Version, commands, limits and landmarks |
-| `observe` | none | Compact state, checksum, players, quest, streaming/physics counters, last eight events |
-| `input` | `player?`, `x?`, `y?`, `dash?`, `pulse?`, `interact?` | Replaces input; missing axes/buttons become idle; axes clamp to −1…1 |
+| `observe` | none | Compact state, checksum, players, adventure, quest and streaming/physics counters |
+| `input` | `player?`, `x?`, `y?`, `dash?`, `pulse?`, `interact?`, `attack?`, `lance?`, `nova?`, `potion?`, `aimX?`, `aimY?` | Replaces input; missing axes/buttons become idle; axes clamp to −1…1; aim is a direction vector clamped to −1…1 per axis |
+| `catalog` | none | Mechanics, themes, archetypes, 48 skill nodes and a sample recipe |
+| `adventure` | `player?`, `action?` | Inspect the selected build/run, or execute a validated game action |
+| `encounter` | `index`, `recipe?` | Debug-preview a positive safe-integer area or a validated custom `AreaRecipe`; changes the party encounter |
 | `step` | `ticks`, 0…36,000 | Advances exactly that many fixed ticks; prefer small batches in the browser |
 | `inspect` | `x`, `y`, `radius?` (0…5,000), `limit?` (0…100) | Tile, biome and a bounded set of nearby entities |
 | `population` | `count`, 0…65,536 | Resizes active NPC pool |
@@ -80,6 +83,36 @@ Browser checkpoint loading normalizes the session to one `local` traveler. Engin
 
 Browser save/load is asynchronous and uses IndexedDB; wait for the saved toast or restored state in browser automation. Legacy `fern:save:v1` localStorage checkpoints remain readable. Game-mode settings provide Save game and Load game controls, while the lab retains its original controls.
 
+## Adventure actions (2.0)
+
+```js
+window.fern.game.observe(); // Run, live enemies/drops, local hero, derived stats, recent combat events.
+await window.fern.game.action({type: "skill", id: "blade-0"});
+await window.fern.game.action({type: "buy", index: 2});
+await window.fern.game.action({type: "depart"});
+window.fern.game.panel("skills"); // Also inventory, town, pause, mechanics.
+```
+
+The browser adapter executes locally as solo/host and sends acknowledged RPCs as a guest. The same headless call is `{"op":"adventure","action":{"type":"skill","id":"blade-0"}}`. Never call a guest's `command` to simulate authority; use `game.action` and `network.input`.
+
+| Action `type` | Fields and effect |
+| --- | --- |
+| `depart`, `advance` | Leader leaves town for the next uncleared area, or advances after defeating the warden |
+| `return` | Leader channels recall for 150 ticks; movement/damage interrupts |
+| `respawn` | Revives a dead hero; preserves a live party encounter or returns a defeated party to town |
+| `rest` | Town-only free life/spirit/flask refill |
+| `skill` | `id`: catalog node; checks level, prerequisite, path investment, rank and unspent points |
+| `respec` | Town-only refund; costs 10 gold per allocated point |
+| `equip`, `sell` | `id`: owned item; selling requires town and an unequipped item |
+| `sell-spares` | Town-only sale of unequipped common/magic gear; preserves rare/legendary finds |
+| `buy` | `index`: 0–5; validates stock, funds and 40-slot bag capacity |
+| `tuning` | Leader-only `values` partial object: `difficulty`, `playerDamage`, `playerHealth`, `enemyDamage`, `enemyHealth` (0.1–10), `playerSpeed`, `enemySpeed` (0.1–3); UI sliders use narrower maxima of 3 for difficulty and 5 for damage/health |
+| `new-run` | Leader starts a newly seeded run, clearing builds/progression while retaining tuning |
+
+`pulse` now casts Whorl as well as the existing wildlife impulse. `attack` repeats the melee combo; lance/nova require their unlocks. Held flags respect authoritative cooldowns. `(aimX, aimY) = (0, 0)` selects keyboard auto-aim toward a nearby enemy, falling back to movement direction. For explicit aim, normalize `(target.x − player.x, target.y − player.y)` to a unit direction vector. Every combat command, delayed echo, item roll and transition participates in deterministic replay.
+
+Solo dialogs and the atlas pause the live clock; explicit `step` still advances it for QA. Closing a dialog preserves an explicit `pause(true)`. Online menus never pause the party. Combat observations are bounded; `save` is the full inspectable state. The live-enemy limit is 100, distinct from the 65,536 ambient-creature pool. Other players' unequipped inventory items are omitted from guest snapshots.
+
 ## Actual online sessions
 
 ```js
@@ -103,11 +136,21 @@ npm run assets -- level examples/moss-courtyard.level.json --out artifacts/court
 npm run assets -- chunk -1 2 142 --out artifacts/chunks
 ```
 
-The default creates 64 SVG frames, six WAV files and a manifest in `public/generated`. The runtime generates its own matching sprites/audio in memory, so it does not need to fetch the exported examples. A sprite recipe supplies version, kind, seed, and optional palette of 5–16 six-digit colors. Add new silhouettes by extending `spritePixels` once; Canvas and SVG export will agree.
+The default creates 64 SVG frames, ten WAV files and a manifest in `public/generated`. The runtime generates its own matching sprites/audio in memory, so it does not need to fetch the exported examples. A sprite recipe supplies version, kind, seed, and optional palette of 5–16 six-digit colors. Add new silhouettes by extending `spritePixels` once; Canvas and SVG export will agree.
 
 Level recipes supply a seed and an ordered list of rectangular brushes. The exporter produces a patch file and a 48×48-tile SVG preview centered on the origin. Apply the same recipe interactively with `window.fern.batch(recipe.brushes.map(b => ({op:"paint", ...b})))`, after resetting to the recipe seed. From Node, `world.setPatches(level.patches)` loads the exported patch file. Snapshots and network packets preserve the resulting edits.
 
 Chunk export returns terrain, decoration and variant arrays in row-major order. Coordinate hashing lets agents search seeds or generate distant chunks without first visiting intervening terrain. Do not edit generated PNG/SVG/WAV outputs and expect the runtime to change: recipes and source are authoritative.
+
+```bash
+node tools/adventure.ts                         # Catalog: mechanics, themes, rigs, layouts, skills
+node tools/adventure.ts area 25 142             # Seeded AreaRecipe JSON
+node tools/adventure.ts validate artifacts/adventure/area-25.json
+node tools/adventure.ts rig examples/glass-warden.rig.json  # 80 SVG frames
+node tools/adventure.ts playthrough 9           # Actual input-driven run; JSON evidence
+```
+
+`--out` selects an export directory. Rig recipes supply `version:1`, `rig`, `theme` and integer `seed`; runtime and SVG share `monsterPixels`. Area recipes select a theme, layout, signature/secondary mechanics, links, archetypes, power and kill goal. Read `catalog` for an example, validate edits, then preview with `encounter`. The playthrough accepts 1–64 areas and uses 2× player damage/health explicitly; its controller buys skills, equips upgrades, dodges and fights using ordinary inputs. It is a progression smoke test, not proof of balance at every generated depth.
 
 ## A useful change loop
 

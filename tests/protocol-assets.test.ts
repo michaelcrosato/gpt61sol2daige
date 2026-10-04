@@ -34,6 +34,35 @@ test("relative float encoding preserves subpixel precision millions of units fro
   assert.ok(Math.abs(decoded.y[0] - sim.y[0]) < 0.0001);
 });
 
+test("combat snapshots preserve personal builds, interpolate motion and snap across portals", () => {
+  const host = new Simulation(142, 0);
+  host.addPlayer("host");
+  host.addPlayer("guest");
+  host.adventure.action(host, "host", { type: "buy", index: 2 });
+  host.adventure.action(host, "guest", { type: "buy", index: 2 });
+  host.adventure.action(host, "guest", { type: "skill", id: "blade-0" });
+  host.adventure.action(host, "host", { type: "depart" });
+  host.step(1);
+  const client = decodeSnapshot(encodeSnapshot(host, "guest")).sim;
+  assert.equal(client.adventure.hero("guest").inventory.length, 3);
+  assert.equal(client.adventure.hero("host").inventory.length, 2);
+  assert.equal(client.adventure.hero("guest").skills["blade-0"], 1);
+  const enemy = host.adventure.state.enemies[0],
+    oldX = enemy.x,
+    oldPlayerX = client.players.get("guest")!.x;
+  enemy.x += 20;
+  host.players.get("guest")!.x += 30;
+  host.tick += 6;
+  decodeSnapshot(encodeSnapshot(host, "guest"), client);
+  assert.equal(client.adventure.state.enemies[0].px, oldX);
+  assert.equal(client.adventure.state.enemies[0].x, oldX + 20);
+  assert.equal(client.players.get("guest")!.px, oldPlayerX);
+  host.adventure.startArea(host, 2);
+  decodeSnapshot(encodeSnapshot(host, "guest"), client);
+  assert.equal(client.players.get("guest")!.px, client.players.get("guest")!.x);
+  assert.ok(client.adventure.state.enemies.every((e) => e.px === e.x && e.py === e.y));
+});
+
 test("chunked PeerJS Uint8Array payloads preserve offsets and decode large snapshots", () => {
   const sim = new Simulation(142, 2400);
   sim.addPlayer("p");
@@ -79,7 +108,18 @@ test("sprite recipes are deterministic, animated and restrict palette injection"
   );
 });
 test("every procedural sound is deterministic, non-silent, bounded, and encodes valid PCM WAV", () => {
-  for (const name of ["pulse", "shard", "beacon", "dash", "step", "ambient"] as SoundName[]) {
+  for (const name of [
+    "pulse",
+    "shard",
+    "beacon",
+    "dash",
+    "step",
+    "ambient",
+    "slash",
+    "hit",
+    "hurt",
+    "level",
+  ] as SoundName[]) {
     const samples = synthesize(name),
       bytes = wav(samples),
       view = new DataView(bytes.buffer);

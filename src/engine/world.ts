@@ -42,6 +42,14 @@ export interface Chunk {
   decor: Uint8Array;
   variants: Uint8Array;
 }
+export interface WorldRegion {
+  kind: "town" | "area";
+  x: number;
+  y: number;
+  radius: number;
+  layout: string;
+  name: string;
+}
 export type TerrainPatch = [tx: number, ty: number, terrain: number, decor: number];
 export const MAX_PATCHES = 2048;
 export function validatePatches(patches: TerrainPatch[]): void {
@@ -68,6 +76,8 @@ export class World {
   readonly maxChunks: number;
   readonly chunks = new Map<string, Chunk>();
   readonly patches = new Map<string, TerrainPatch>();
+  region: WorldRegion | null = null;
+  regions: WorldRegion[] = [];
   revision = 0;
   generated = 0;
   evicted = 0;
@@ -84,6 +94,43 @@ export class World {
       y = ty * TILE + 8;
     const h = hash(tx, ty, this.seed);
     const variant = h & 255;
+    const regionAt =
+      this.regions.find(
+        (r) =>
+          Math.abs(x - r.x) < r.radius &&
+          Math.abs(y - r.y) < r.radius &&
+          (x - r.x) ** 2 + (y - r.y) ** 2 < r.radius ** 2,
+      ) ?? this.region;
+    if (regionAt) {
+      const region = regionAt,
+        dx = x - region.x,
+        dy = y - region.y,
+        d = Math.hypot(dx, dy);
+      if (d < region.radius) {
+        let terrain: number = Terrain.Meadow;
+        if (region.kind === "town") {
+          if (Math.abs(dx) < 135 && Math.abs(dy) < 95) terrain = Terrain.Stone;
+          if (Math.abs(dy - 35) < 18 || Math.abs(dx) < 15) terrain = Terrain.Path;
+          if (Math.hypot(dx + 184, dy - 90) < 32) terrain = Terrain.Water;
+        } else {
+          const lane = Math.abs(dy - Math.sin(dx / 70) * 36) < 18;
+          if (lane || d < 45) terrain = Terrain.Path;
+          if (region.layout === "rings" && Math.abs(d - 165) < 20) terrain = Terrain.Stone;
+          if (region.layout === "crossroads" && (Math.abs(dx) < 22 || Math.abs(dy) < 22))
+            terrain = Terrain.Stone;
+          if (region.layout === "terraces" && Math.abs(((dy + 600) % 110) - 55) < 12)
+            terrain = Terrain.Stone;
+          if (region.layout === "causeway" && Math.abs(dy) > 190 && Math.abs(dx) < 200)
+            terrain = Terrain.Water;
+          if (region.layout === "orchard" && Math.abs(dx % 100) < 16) terrain = Terrain.Path;
+        }
+        const decor =
+          terrain === Terrain.Meadow && d > (region.kind === "town" ? 180 : 65) && h % 17 === 0
+            ? Decor.Flower
+            : Decor.None;
+        return { terrain, decor, variant };
+      }
+    }
     const origin = Math.hypot(x, y);
     let clearing = origin < 96;
     for (let i = 1; i < LANDMARKS.length; i++) {
@@ -123,6 +170,20 @@ export class World {
     for (const patch of patches) this.patches.set(`${patch[0]},${patch[1]}`, [...patch]);
     this.chunks.clear();
     this.revision++;
+  }
+  setRegion(region: WorldRegion | null): void {
+    if (JSON.stringify(this.region) === JSON.stringify(region)) return;
+    this.region = region ? { ...region } : null;
+    this.chunks.clear();
+    this.revision++;
+  }
+  setRegions(regions: WorldRegion[], current: WorldRegion): void {
+    if (JSON.stringify(this.regions) !== JSON.stringify(regions)) {
+      this.regions = structuredClone(regions);
+      this.chunks.clear();
+      this.revision++;
+    }
+    this.region = { ...current };
   }
   paint(tx: number, ty: number, width: number, height: number, terrain: number, decor = 0): void {
     if (
@@ -201,6 +262,10 @@ export class World {
     return { x: centerX, y: centerY };
   }
   biome(x: number, y: number): string {
+    if (this.region && Math.hypot(x - this.region.x, y - this.region.y) < this.region.radius + 80)
+      return this.region.name;
+    const other = this.regions.find((r) => Math.hypot(x - r.x, y - r.y) < r.radius);
+    if (other) return other.name;
     for (const l of LANDMARKS) if (Math.hypot(x - l.x, y - l.y) < 190) return l.name;
     const t = this.at(x, y).terrain;
     return t === Terrain.Water || t === Terrain.DeepWater || t === Terrain.Sand

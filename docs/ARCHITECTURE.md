@@ -8,6 +8,7 @@ JSONL / browser commands ─── AgentRuntime ─── Simulation (60 Hz)
                            World generation ────┤
                            Spatial hash/physics ┤
                            Quest and players ───┤
+                           Adventure/builds ────┤
                                                 │
                       checkpoints/replays ◄─────┼────► binary network snapshots
                                                 │
@@ -23,6 +24,8 @@ JSONL / browser commands ─── AgentRuntime ─── Simulation (60 Hz)
 | `src/engine/physics.ts` | Spatial buckets, circle impulses, static contacts, swept substeps | Game UI or audio |
 | `src/engine/simulation.ts` | Fixed-step state, NPC arrays, players, shared quest, checkpoints | Browser or transport |
 | `src/engine/agent.ts` | Validated commands, observation and replay | Browser or filesystem |
+| `src/game/content.ts`, `skills.ts`, `loot.ts` | Area recipes, modular registries, skill gates and item rolls | DOM, transport, mutable RNG |
+| `src/game/adventure.ts`, `validation.ts` | Combat, AI, mechanics, progression, town services and bounded state validation | Browser, rendering or wall clock |
 | `src/net/protocol.ts` | Bounded packet validation and binary snapshots | PeerJS, DOM |
 | `src/net/coop.ts` | Connection lifecycle, host authority, input and snapshot delivery | World generation decisions |
 | `src/render/` | Camera, interpolation, culling, terrain caches, procedural sprites | Simulation ownership |
@@ -48,11 +51,27 @@ Collected crystal coordinates, lit beacons and terrain patches survive unloading
 
 The spatial hash uses fixed head/next/cell arrays, 24-unit cells, and a power-of-two bucket count scaled to capacity (131,072 buckets for 65,536 slots). Neighbor queries verify cell coordinates after hashing, preventing collisions in the hash table from returning unrelated or duplicate cells. Contact traversal follows deterministic ID and distance-tier rules. Circle response includes inverse-mass separation and an impulse with restitution. Players also collide with one another. Creature encounters are intentionally non-blocking for travelers; pulses provide the physical interaction with wildlife.
 
-Static collision handles deep-water tile rectangles, tree trunks and rocks. Motion is subdivided according to distance and radius, so a fast dash cannot skip a one-tile wall. Shallow water reduces player speed. Dash consumes spirit and has a cooldown; spirit regenerates. Pulse applies radial forces and attunes nearby wisps once per active lifetime.
+Static collision handles deep-water tile rectangles, tree trunks and rocks. Motion is subdivided according to distance and radius, so a fast dash cannot skip a one-tile wall. Shallow water reduces player speed. Dash consumes spirit and has a cooldown; spirit regenerates. Pulse applies radial forces and attunes nearby wisps once per active lifetime. Combat adds separate enemy/player and enemy/enemy contacts, stagger, knockback and dodge invulnerability; ambient wildlife remains non-blocking.
 
 Creatures within 420 units of a player retain full-rate steering and contacts. Far steering runs every fourth tick. Above 8,192 total creatures, distant static and creature contacts run every eighth tick; below that threshold, static contacts run every fourth tick and creature contacts run every tick. All positions integrate each fixed tick. Thus distant contact frequency is nominally 7.5 Hz at large populations, while nearby gameplay retains 60 Hz physics when the machine sustains the target tick rate. Wisp drift, beetle wandering and deer avoidance use deterministic functions of tick, seed and ID. No simulation decision reads real time.
 
+## Adventure and modular content
+
+`Simulation.adventure` owns the complete run and advances after player movement on the same fixed tick. Its state includes every hero's XP, level, gold, skill ranks, equipment, inventory, timed buffs, health, flasks and cooldowns; it also includes all encounter actors, projectiles, loot, mechanics, delayed effects and event counters. Saves and replay hashes cover these fields. Skill points plus allocated ranks must equal level plus two. Derived stats recompute from base growth, skill ranks, equipped affixes, legendary powers, timed buffs and live tuning.
+
+The first eight recipes introduce one named mechanic each. Subsequent recipes combine a signature mechanic with secondary mechanics and explicit effect links. No gate requires a mechanic activation: regular kills summon the warden and its death unlocks travel. Six AI behaviors choose pursuit, charging, ranged fire, orbiting, summoning or guarding, with telegraphed windups and per-enemy seeded parameters. Bosses add rotating attacks and a half-health phase change. Melee has a three-hit combo; Whorl, Thornlance and Bloom Nova have independent costs/cooldowns. Echo effects preserve the original ability and aim across checkpoint continuation.
+
+Each land contains a town and four connected encounter clearings. Generated layout rules alter terrain/obstacles while retaining entrances and exits. All four clearings stay stable while traveling in that land. Completing its fourth area opens the next town; the new land changes seed and returns actors to local coordinates. There is no ever-growing scene graph. Positive safe-integer area indices select recipes; power grows linearly early and logarithmically later. The generator has no authored ending, but finite numeric ranges and finite registries, rather than a claim of mathematically infinite unique content.
+
+Combat holds at most 100 live enemies (plus brief fading corpses), 180 projectiles, 150 drops, 96 recent events, 256 delayed effects and 40 items per hero. The skill tree has 48 nodes and repeatable mastery; hero/item levels are capped at one million. XP/gold magnet toward players; equipment pickup requires interaction, ahead of nearby optional mechanics or portals. Town services restore resources, sell deterministic stock, buy spare gear and refund skill ranks for gold. Death retains the build and charges 10% gold. A solo/all-dead party returns to town; a fallen guest with living teammates revives individually at the trailhead.
+
+Solo modal dialogs and the atlas pause fixed stepping without clearing a separately requested lab pause. Online menus leave the host clock running. Recall requires 150 uninterrupted ticks; movement and incoming damage cancel it. Difficulty and the six damage/health/speed multipliers are validated authoritative actions, so headless tests and browser controls tune the same system.
+
 ## Rendering and assets
+
+`monsterPixels()` shares six articulated skeletons between runtime and SVG export. Seeded proportions, five theme palettes, five poses and sixteen frames per pose produce readable silhouettes without independent opaque art files. Windups lift limbs before their corresponding damage frame; attack, hurt, walk and idle use different geometry. Boss scaling, glowing cores, death collapse, shadows, slash arcs, elemental effects and additive light share the same colors. The original wayfarer sprite remains intact beneath its sword, dodge trail and damage feedback. Town NPCs combine the existing humanoid recipe with role-specific props and gestures.
+
+The monster image cache holds at most 512 canvases. Combat event effects derive from authoritative ticks while their smooth interpolation remains presentation-only. Ambient wildlife inside a live encounter's clearing is hidden to preserve visual clarity. Combatants, projectiles, loot and mechanics sit outside the ambient view cap. Sound adds slash, impact, hurt and level cues with a 24-voice cap, per-effect rate limits and a compressor.
 
 Canvas 2D draws cached terrain, then sorts visible props/creatures/players by their ground y-coordinate. Tree canopies fade when they obscure the local traveler. High-detail sprites come from rectangle recipes, with eight generated poses and species-specific walk/bob motion. At distant zoom levels, creatures become readable colored marks. Zoom spans 0.08× to 5× (62.5:1). The minimap and atlas sample the same world function; they do not maintain a second map model.
 
@@ -70,7 +89,9 @@ Guests send input at approximately 30 Hz. The host clamps input, enforces monoto
 
 Each visible NPC costs 16 bytes: ID, species, attunement, relative float positions and quantized velocities. JSON metadata contains players, seed/tick, quest, nearby collected resources, patches and recent effects. Relative float encoding retains subpixel detail far from the origin. Total packet size, counts, values and enum ranges are validated before state mutation. Both ArrayBuffer and reassembled Uint8Array delivery are supported and regression-tested.
 
-The 1.1 release uses wire protocol 2: up to 65,536 records plus at most 100,000 metadata bytes (1,148,584 total bytes). The 16-bit ID field includes slot 65,535. Full-capacity packets and small camera budgets are both tested. Incompatible older clients must refresh before joining; checkpoint format remains version 1. Engine replays should be run against the engine revision that recorded them, especially across changes to population scheduling.
+The 2.0 release uses wire protocol 3: up to 65,536 ambient records plus at most 512,000 metadata bytes (1,560,584 total bytes). Adventure state includes combatants, mechanics, progression and the receiving player's full inventory; other inventories include only equipped items. All builds, enum values, numeric fields and collection limits are checked before mutation. The 16-bit ambient ID field includes slot 65,535. Full-capacity packets and small camera budgets are both tested. Incompatible older clients must refresh before joining; checkpoint format remains version 1 with a versioned adventure member. Older checkpoints without that member receive a fresh adventure profile. Replays belong to the engine revision that recorded them.
+
+Reliable adventure RPCs carry monotonically increasing action sequences. The host supplies player identity, validates skill prerequisites, stock, gold and item ownership, and acknowledges success or errors. Only the leader may change shared travel, difficulty or the run. Guest movement, aim and combat buttons still use the ordinary input stream. XP/gold pickups reward each party member with their own modifiers; gear belongs to its collector. Joining initializes a catch-up build for that room; no account persistence is implied. Disconnect rekeys the local hero and owned effects for solo continuation. Enemy/projectile/player interpolation uses prior snapshot positions, but a changed run or portal transition snaps all actors to their new land.
 
 Guests interpolate snapshots. They do not run a competing simulation or deterministic network lockstep. The host's open, active tab is a requirement; host loss ends the shared room, resets input and leaves guests with a solo copy. There is no automatic host migration, anti-cheat guarantee or server-side account ownership. NAT/firewall reachability may require a TURN relay. The default is suitable for invited cooperative play, with stronger deployment requirements documented separately from local verification.
 

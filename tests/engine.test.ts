@@ -159,6 +159,9 @@ test("eight widely separated travelers all receive streamed wildlife within the 
     p.y = 0;
   }
   sim.step(120);
+  const travelers = [...sim.players.values()];
+  for (let i = 1; i < travelers.length; i++)
+    assert.ok(travelers[i].x - travelers[i - 1].x > 8000, "travelers remain separated");
   for (const p of sim.players.values()) {
     let nearby = 0;
     for (let i = 0; i < sim.count; i++)
