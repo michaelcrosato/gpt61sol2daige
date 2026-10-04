@@ -10,7 +10,7 @@ Explore a seeded forest, gather light from wisps, and wake three ancient beacons
 
 ## Run in this environment
 
-Node **24+**, npm and Chrome. The committed lockfile pins dependencies; nothing requires a GUI, WebGPU, a game editor, an API key, or a paid service.
+Node **24.x**, npm and Chrome (`.node-version` records the tested 24.21.0 runtime). The committed lockfile pins dependencies; nothing requires a GUI, WebGPU, a game editor, an API key, or a paid service.
 
 ```bash
 npm ci
@@ -37,7 +37,7 @@ Each un-attuned wisp within a pulse contributes a shard. Each of the three beaco
 
 ## What is implemented
 
-- **Massive streaming world:** coordinates −16,000,000…+16,000,000; 16-unit tiles, 256-unit chunks. A 256-chunk LRU bounds terrain memory; content regenerates exactly.
+- **Massive streaming world:** coordinates −16,000,000…+16,000,000; 16-unit tiles, 256-unit chunks. A 1,024-chunk LRU bounds terrain memory; content regenerates exactly.
 - **Thousands of creatures:** typed-array storage for up to 8,192 active NPCs, spatial broad phase, distance-based steering/contact updates, view culling and zoom-dependent detail.
 - **Physics:** fixed 60 Hz steps, circle impulses, unequal masses, restitution, separation, static tile/trunk contacts, wading, dash substeps and pulse forces.
 - **Eight-player co-op:** host-authoritative simulation over WebRTC, validated inputs, compact binary snapshots, camera interest filtering, smoothing, slot limits and disconnect recovery.

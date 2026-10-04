@@ -573,7 +573,7 @@ function updateUI(): void {
     el("lab-tick").textContent = sim.tick.toLocaleString();
     el("lab-hash").textContent = sim.stateHash();
     el("lab-physics").textContent = `${stepMs.toFixed(2)} ms`;
-    el("lab-chunks").textContent = `${sim.world.chunks.size} / 256`;
+    el("lab-chunks").textContent = `${sim.world.chunks.size} / ${sim.world.maxChunks}`;
     if (document.activeElement !== el("world-seed"))
       el<HTMLInputElement>("world-seed").value = String(sim.world.seed);
     if (document.activeElement !== el("population")) {

@@ -71,7 +71,7 @@ export class World {
   revision = 0;
   generated = 0;
   evicted = 0;
-  constructor(seed = 142, maxChunks = 256) {
+  constructor(seed = 142, maxChunks = 1024) {
     this.seed = seed >>> 0;
     this.maxChunks = maxChunks;
   }

@@ -1,0 +1,42 @@
+{
+  "scenario": "6000 NPCs shared by eight travelers 10000 units apart",
+  "ticks": 120,
+  "p50Ms": 3.183471000000054,
+  "p95Ms": 4.636184999999955,
+  "cache": 671,
+  "cacheLimit": 1024,
+  "nearby": [
+    {
+      "id": "p0",
+      "count": 750
+    },
+    {
+      "id": "p1",
+      "count": 750
+    },
+    {
+      "id": "p2",
+      "count": 750
+    },
+    {
+      "id": "p3",
+      "count": 750
+    },
+    {
+      "id": "p4",
+      "count": 750
+    },
+    {
+      "id": "p5",
+      "count": 750
+    },
+    {
+      "id": "p6",
+      "count": 750
+    },
+    {
+      "id": "p7",
+      "count": 750
+    }
+  ]
+}

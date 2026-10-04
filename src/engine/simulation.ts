@@ -290,12 +290,15 @@ export class Simulation {
           focus = p;
         }
       }
-      // Recycle dormant population around every party member, regardless of their separation.
-      if (nearest > 2200 ** 2 && players.length && this.tick % 60 === i % 60) {
+      // Each slot has a stable party anchor, so a distant guest receives wildlife even if
+      // another player stays behind. Rebalancing is staggered over one second.
+      if (players.length && this.tick % 60 === i % 60) {
         const anchor = players[i % players.length];
-        this.generation[i]++;
-        this.spawn(i, anchor.x, anchor.y);
-        continue;
+        if ((anchor.x - this.x[i]) ** 2 + (anchor.y - this.y[i]) ** 2 > 2200 ** 2) {
+          this.generation[i]++;
+          this.spawn(i, anchor.x, anchor.y);
+          continue;
+        }
       }
       const near = nearest < 420 ** 2;
       if (near) this.metrics.near++;

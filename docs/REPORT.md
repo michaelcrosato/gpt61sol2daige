@@ -38,7 +38,7 @@ These are engineering judgments, not claims that the other approaches cannot wor
 
 Terrain generation uses stateless integer coordinate hashing and smooth noise. A chunk requested tomorrow has the same contents as one requested today, and loading a neighboring chunk first makes no difference. That property enables eviction, parallel exploration by different travelers, deterministic testing and distant map inspection with very little stored data.
 
-The world spans a bounded square of 32 million world units per side. With 16-unit tiles, that represents four trillion addressable tile positions; it does not allocate four trillion objects. Only 256 simulation chunks are resident. The renderer maintains a separate bounded image cache and switches to coarse terrain when the detailed working set would exceed that cache.
+The world spans a bounded square of 32 million world units per side. With 16-unit tiles, that represents four trillion addressable tile positions; it does not allocate four trillion objects. Only 1,024 simulation chunks are resident. The renderer maintains a separate bounded image cache and switches to coarse terrain when the detailed working set would exceed that cache.
 
 Procedural graphics are also shared code, not a collection of opaque outputs. A sprite recipe yields colored pixel rectangles. The renderer turns them into cached Canvas sprites; the asset tool exports matching SVG frames. A palette or silhouette change therefore reaches both outputs. Tree layers, deer legs, cloaks, wisps, crystals, stones, flowers, campsite props, particles and lighting are all generated in code.
 
@@ -52,9 +52,11 @@ The engine uses typed arrays for the hot entity state and a fixed spatial hash f
 
 Rendering has its own level of detail. A traveler at close zoom sees animated sprites and canopy layering. At far zoom, the same live creatures become small colored marks. That distinction is necessary: thousands of full-size silhouettes would be both expensive and unreadable when the entire region occupies one screen.
 
-A headless CPU benchmark measured a 3.53 ms p95 tick for 6,000 NPCs and 8.10 ms for 8,192 NPCs on the supplied Intel i7-14700F workstation. This is simulation time, not a claim about every machine's frame rate. A separate browser benchmark measured 300 consecutive frames at 1440×1000, with all 6,000 creatures visible at 0.18× zoom, averaging 60.1 FPS with a 16.8 ms p95 frame interval. See the committed JSON for methodology and exact values.
+A headless CPU benchmark measured a 2.93 ms p95 tick for 6,000 NPCs and 5.55 ms for 8,192 NPCs on the supplied Intel i7-14700F workstation. This is simulation time, not a claim about every machine's frame rate. A separate browser benchmark measured 300 consecutive frames at 1440×1000, with all 6,000 creatures visible at 0.18× zoom, averaging 60.2 FPS with a 16.7 ms p95 frame interval after closing the earlier QA browser sessions. The workstation is shared: a preceding run with those sessions open averaged 54.5 FPS, and that evidence is retained too. These are observed results rather than guaranteed budgets. See the committed JSON for methodology and exact values.
 
-There are limits behind those numbers. Active NPCs recycle when far from every traveler; they do not retain a lifetime history throughout the whole coordinate space. Detailed terrain rendering is bounded by cache capacity. Eight people zoomed out over thousands of creatures put more pressure on the host's upload bandwidth than people exploring a close-up scene. These are explicit operating characteristics that an agent can measure and reason about.
+There are limits behind those numbers. Active NPCs recycle when far from their assigned traveler; they do not retain a lifetime history throughout the whole coordinate space. Detailed terrain rendering is bounded by cache capacity. Eight people zoomed out over thousands of creatures put more pressure on the host's upload bandwidth than people exploring a close-up scene. These are explicit operating characteristics that an agent can measure and reason about.
+
+The final audit also tested travelers separating across the world. I changed population ownership so each slot follows a stable party anchor; a traveler no longer depends on the host leaving the starting area before encountering wildlife. With eight travelers 10,000 units apart, a 6,000-creature run placed 750 near each traveler and measured a 4.64 ms p95 tick. A 1,024-chunk cache accommodates those separate regions while remaining bounded.
 
 ## Physics and smoothness
 

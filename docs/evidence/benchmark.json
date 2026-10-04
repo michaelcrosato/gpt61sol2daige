@@ -1,5 +1,5 @@
 {
-  "measuredAt": "2026-10-04T02:24:46.505Z",
+  "measuredAt": "2026-10-04T02:58:39.161Z",
   "environment": {
     "node": "v24.21.0",
     "os": "linux 6.18.33.2-microsoft-standard-WSL2",
@@ -11,46 +11,46 @@
     {
       "count": 1000,
       "ticks": 360,
-      "p50Ms": 0.382,
-      "p95Ms": 0.739,
-      "maxMs": 1.564,
-      "averageMs": 0.43,
+      "p50Ms": 0.418,
+      "p95Ms": 0.792,
+      "maxMs": 1.276,
+      "averageMs": 0.454,
       "chunks": 86,
       "hash": "786a1579",
-      "snapshotBytes": 16510
+      "snapshotBytes": 16523
     },
     {
       "count": 2400,
       "ticks": 360,
-      "p50Ms": 0.901,
-      "p95Ms": 1.081,
-      "maxMs": 1.731,
-      "averageMs": 0.931,
+      "p50Ms": 0.875,
+      "p95Ms": 1.016,
+      "maxMs": 1.553,
+      "averageMs": 0.898,
       "chunks": 88,
       "hash": "7fb8559d",
-      "snapshotBytes": 38910
+      "snapshotBytes": 38923
     },
     {
       "count": 6000,
       "ticks": 360,
-      "p50Ms": 2.756,
-      "p95Ms": 3.534,
-      "maxMs": 4.809,
-      "averageMs": 2.828,
+      "p50Ms": 2.573,
+      "p95Ms": 2.931,
+      "maxMs": 4.94,
+      "averageMs": 2.615,
       "chunks": 88,
       "hash": "b344fd8a",
-      "snapshotBytes": 96510
+      "snapshotBytes": 96523
     },
     {
       "count": 8192,
       "ticks": 360,
-      "p50Ms": 5.271,
-      "p95Ms": 8.1,
-      "maxMs": 9.907,
-      "averageMs": 5.561,
+      "p50Ms": 3.757,
+      "p95Ms": 5.546,
+      "maxMs": 7.9,
+      "averageMs": 4.003,
       "chunks": 88,
       "hash": "accead89",
-      "snapshotBytes": 131582
+      "snapshotBytes": 131595
     }
   ]
 }

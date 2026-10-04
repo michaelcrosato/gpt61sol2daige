@@ -150,6 +150,27 @@ test("player slots enforce eight simultaneous travelers and release disconnected
   assert.equal(sim.players.size, 8);
   assert.equal(new Set([...sim.players.values()].map((p) => p.color)).size, 8);
 });
+
+test("eight widely separated travelers all receive streamed wildlife within the bounded cache", () => {
+  const sim = new Simulation(142, 800);
+  for (let i = 0; i < 8; i++) {
+    const p = sim.addPlayer(`p${i}`);
+    p.x = i * 10000;
+    p.y = 0;
+  }
+  sim.step(120);
+  for (const p of sim.players.values()) {
+    let nearby = 0;
+    for (let i = 0; i < sim.count; i++)
+      if (Math.hypot(sim.x[i] - p.x, sim.y[i] - p.y) < 1500) nearby++;
+    assert.ok(nearby >= 90, `${p.id} only has ${nearby} nearby creatures`);
+  }
+  assert.ok(sim.world.chunks.size <= 1024);
+  const restored = Simulation.restore(sim.save());
+  restored.step(20);
+  sim.step(20);
+  assert.deepEqual(restored.save(), sim.save());
+});
 test("agent commands validate inputs, support batch-style workflows, and replay exactly", () => {
   const agent = new AgentRuntime(new Simulation(142, 100));
   for (const command of [
