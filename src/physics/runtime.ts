@@ -1,7 +1,14 @@
 import type { EventQueue, RigidBody, World } from "@dimforge/rapier2d-compat";
 import { checksum } from "../engine/math.ts";
+import { WORLD_LIMIT } from "../engine/world.ts";
 import { rapier } from "./bootstrap.ts";
-import { compareIds, PolicyController, type PolicyTransaction, policyId } from "./policies.ts";
+import {
+  compareIds,
+  type PolicyCheckpoint,
+  PolicyController,
+  type PolicyTransaction,
+  policyId,
+} from "./policies.ts";
 import {
   type BodyEntry,
   type BodyPose,
@@ -23,16 +30,16 @@ export function finite(value: unknown, name: string, bound = 100_000): number {
     throw new Error(`${name} must be finite and within ±${bound}`);
   return value;
 }
-export function validateBody(recipe: BodyRecipe): void {
+export function validateBody(recipe: BodyRecipe, adventure = false): void {
   if (
     !recipe ||
     typeof recipe.id !== "string" ||
-    !/^[\w-]{1,80}$/.test(recipe.id) ||
+    !(adventure ? /^[\w-]{1,160}$/ : /^[\w-]{1,80}$/).test(recipe.id) ||
     !["fixed", "dynamic"].includes(recipe.motion)
   )
     throw new Error("Invalid physics body identity or motion");
-  finite(recipe.x, "x", 10_000);
-  finite(recipe.y, "y", 10_000);
+  finite(recipe.x, "x", adventure ? WORLD_LIMIT : 10_000);
+  finite(recipe.y, "y", adventure ? WORLD_LIMIT : 10_000);
   finite(recipe.angle ?? 0, "angle");
   const positive = (value: unknown, name: string, bound: number, minimum = 1) => {
     if (finite(value, name, bound) < minimum)
@@ -60,6 +67,13 @@ export function validateBody(recipe: BodyRecipe): void {
   )
     throw new Error("Invalid body role/motion");
   if (recipe.areaId !== undefined) policyId(recipe.areaId);
+  if (
+    recipe.actorKind !== undefined &&
+    (!adventure ||
+      recipe.role !== "actor" ||
+      !["player", "monster", "boss", "npc", "ambient", "loot", "sensor"].includes(recipe.actorKind))
+  )
+    throw new Error("Invalid adventure interaction kind");
   if (recipe.consequences !== undefined) {
     const state = recipe.consequences;
     if (
@@ -78,16 +92,41 @@ export function validateBody(recipe: BodyRecipe): void {
 export const bodyRole = (recipe: BodyRecipe) =>
   recipe.role ?? (recipe.motion === "fixed" ? "terrain" : "prop");
 const collisionGroups = (entry: BodyEntry) => {
+  if (entry.recipe.actorKind) return actorGroups(entry);
   const role = bodyRole(entry.recipe);
   const membership = role === "terrain" ? 1 : role === "prop" ? 2 : 4;
   const filter =
     role === "prop"
-      ? 3 | (entry.policy?.effective.propBlocking ? 4 : 0)
+      ? 3 | (entry.policy?.effective.propBlocking ? ACTORS : 0)
       : role === "actor"
-        ? 5 | (entry.policy?.effective.propBlocking ? 2 : 0)
-        : 7;
+        ? 1 |
+          (entry.policy?.effective.crowdContacts ? 4 : 0) |
+          (entry.policy?.effective.propBlocking ? 2 : 0)
+        : 511;
   return (membership << 16) | filter;
 };
+
+// Independent membership bits, reserved now for the later loot/sensor systems.
+export const INTERACTION_GROUPS = {
+  terrain: 1,
+  prop: 2,
+  player: 4,
+  monster: 8,
+  boss: 16,
+  npc: 32,
+  ambient: 64,
+  loot: 128,
+  sensor: 256,
+} as const;
+const ACTORS = 4 | 8 | 16 | 32 | 64;
+function actorGroups(entry: BodyEntry): number {
+  const member = INTERACTION_GROUPS[entry.recipe.actorKind!];
+  const optional = entry.policy!.effective;
+  const actors = optional.crowdContacts && !entry.motor?.phaseActors ? ACTORS : 0;
+  // Loot and sensors are reserved interaction roles, not delivered physical loot.
+  const filter = 1 | (optional.propBlocking ? 2 : 0) | actors;
+  return (member << 16) | filter;
+}
 
 /** The only owner of Rapier handles. All external coordinates and linear impulses use Fern units. */
 export class PhysicsWorld {
@@ -100,9 +139,12 @@ export class PhysicsWorld {
   contacts = 0;
   events: ContactEvent[] = [];
   private policies = new PolicyController();
+  readonly scene: "lab" | "adventure";
 
-  constructor(world?: World) {
+  constructor(world?: World, options?: { scene: "adventure"; policies?: PolicyCheckpoint }) {
     const api = rapier();
+    this.scene = options?.scene ?? "lab";
+    if (options?.policies) this.policies = new PolicyController(options.policies);
     this.world = world ?? new api.World({ x: 0, y: 0 });
     liveWorlds++;
     try {
@@ -124,11 +166,152 @@ export class PhysicsWorld {
     if (!entry) throw new Error(`Unknown physics body: ${id}`);
     return this.world.getRigidBody(entry.handle);
   }
+  has(id: string): boolean {
+    return this.registry.has(id);
+  }
+  motion(id: string, vx: number, vy: number, angularVelocity = 0): void {
+    const body = this.body(id);
+    body.setLinvel({ x: vx / UNITS, y: vy / UNITS }, true);
+    body.setAngvel(angularVelocity, true);
+    const motor = this.registry.get(id)!.motor;
+    if (motor) {
+      motor.x = Math.fround(vx);
+      motor.y = Math.fround(vy);
+      motor.externalX = 0;
+      motor.externalY = 0;
+    }
+  }
+  ids(): string[] {
+    return [...this.registry.keys()].sort(compareIds);
+  }
+  remove(id: string): void {
+    const entry = this.registry.get(id);
+    if (!entry) return;
+    this.world.removeRigidBody(this.body(id));
+    this.colliderIds.delete(entry.collider);
+    this.registry.delete(id);
+    this.events = this.events.filter((event) => event.a !== id && event.b !== id);
+  }
+  pose(id: string): BodyPose {
+    const entry = this.registry.get(id);
+    if (!entry) throw new Error(`Unknown physics body: ${id}`);
+    const body = this.body(id),
+      p = body.translation(),
+      v = body.linvel();
+    return {
+      ...structuredClone(entry.recipe),
+      x: p.x * UNITS,
+      y: p.y * UNITS,
+      angle: body.rotation(),
+      vx: v.x * UNITS,
+      vy: v.y * UNITS,
+      angularVelocity: body.angvel(),
+      sleeping: body.isSleeping(),
+      frozen: entry.frozen ?? false,
+      reactivationBlocked: entry.reactivationBlocked ?? false,
+      ccdEnabled: body.isCcdEnabled(),
+      policy: structuredClone(entry.policy!),
+    };
+  }
+  motor(
+    id: string,
+    x: number,
+    y: number,
+    acceleration = 0.18,
+    staggerUntil = 0,
+    phaseActors = false,
+  ): void {
+    finite(x, "motor x", 8000);
+    finite(y, "motor y", 8000);
+    const entry = this.registry.get(id);
+    if (!entry?.recipe.actorKind) throw new Error("Motor requires an adventure actor");
+    entry.motor ??= {
+      intentX: 0,
+      intentY: 0,
+      x: 0,
+      y: 0,
+      externalX: 0,
+      externalY: 0,
+      acceleration,
+      recovery: 6,
+      staggerUntil: 0,
+      phaseActors: false,
+    };
+    Object.assign(entry.motor, {
+      intentX: Math.fround(x),
+      intentY: Math.fround(y),
+      acceleration,
+      staggerUntil,
+      phaseActors,
+    });
+  }
+  velocityChange(id: string, x: number, y: number): void {
+    finite(x, "velocity change x", 8000);
+    finite(y, "velocity change y", 8000);
+    const entry = this.registry.get(id)!;
+    if (!entry.motor) this.motor(id, 0, 0);
+    entry.motor!.externalX = Math.fround(entry.motor!.externalX + x);
+    entry.motor!.externalY = Math.fround(entry.motor!.externalY + y);
+    const body = this.body(id),
+      velocity = body.linvel();
+    body.setLinvel({ x: velocity.x + x / UNITS, y: velocity.y + y / UNITS }, true);
+  }
+  bindArea(id: string, areaId: string): void {
+    const entry = this.registry.get(id)!;
+    this.policies.resolve(areaId, 0, 0);
+    if (entry.recipe.areaId !== areaId) {
+      entry.recipe.areaId = areaId;
+      entry.policy = undefined;
+    }
+  }
+  obstacleFraction(id: string, dx: number, dy: number, radius: number): number {
+    const entry = this.registry.get(id)!,
+      body = this.body(id),
+      position = body.translation();
+    let fraction = 1;
+    const api = rapier();
+    this.world.propagateModifiedBodyPositionsToColliders();
+    for (const other of this.registry.values()) {
+      if (other === entry || bodyRole(other.recipe) === "actor") continue;
+      if (
+        bodyRole(other.recipe) === "prop" &&
+        (!entry.policy!.effective.propBlocking || !other.policy!.effective.propBlocking)
+      )
+        continue;
+      const collider = this.world.getCollider(other.collider),
+        p = collider.translation();
+      // Local geometric rejection only accelerates the query; every obstacle remains in the world.
+      if (
+        Math.hypot((p.x - position.x) * UNITS, (p.y - position.y) * UNITS) >
+        Math.hypot(dx, dy) + radius + 512
+      )
+        continue;
+      const cast = collider.castShape(
+        { x: 0, y: 0 },
+        new api.Ball(radius / UNITS),
+        position,
+        0,
+        { x: dx / UNITS, y: dy / UNITS },
+        0,
+        1,
+        true,
+      );
+      if (cast) fraction = Math.min(fraction, cast.time_of_impact);
+    }
+    return fraction;
+  }
+  boundary(): void {
+    this.policies.apply();
+    this.synchronizePolicies();
+  }
+  policyState() {
+    return this.policies.inspect();
+  }
   spawn(recipe: BodyRecipe): void {
     this.alive();
-    validateBody(recipe);
+    validateBody(recipe, this.scene === "adventure");
     if (this.registry.has(recipe.id)) throw new Error("Duplicate physics body ID");
-    if (this.registry.size >= MAX_LAB_BODIES)
+    if (this.scene === "lab" && this.registry.size >= MAX_LAB_BODIES)
       throw new Error("Playground body limit reached (4096)");
     const policy = this.policies.resolve(recipe.areaId ?? "playground", recipe.x, recipe.y);
     const api = rapier();
@@ -140,6 +323,7 @@ export class PhysicsWorld {
       .setLinearDamping(recipe.damping ?? 0.35)
       .setAngularDamping(recipe.damping ?? 0.35)
       .setCcdEnabled(recipe.ccd ?? true);
+    if (recipe.actorKind) descriptor.lockRotations();
     const body = this.world.createRigidBody(descriptor);
     try {
       const shape = recipe.shape;
@@ -164,7 +348,7 @@ export class PhysicsWorld {
       };
       this.registry.set(recipe.id, entry);
       this.colliderIds.set(collider.handle, recipe.id);
-      this.synchronizePolicies();
+      this.synchronizePolicies([entry]);
     } catch (error) {
       this.world.removeRigidBody(body);
       throw error;
@@ -185,24 +369,76 @@ export class PhysicsWorld {
     const strength =
       bodyRole(entry.recipe) === "prop" ? entry.policy!.effective.impulseStrength : 1;
     const impulse = { x: (x * strength) / UNITS, y: (y * strength) / UNITS };
+    if (entry.recipe.actorKind) {
+      this.velocityChange(id, x / body.mass(), y / body.mass());
+      return;
+    }
     if (atX === undefined) body.applyImpulse(impulse, true);
     else body.applyImpulseAtPoint(impulse, { x: atX / UNITS, y: atY! / UNITS }, true);
   }
-  step(): void {
+  step(boundaryApplied = false): void {
     this.alive();
-    this.policies.apply();
-    this.synchronizePolicies();
+    if (!boundaryApplied) this.boundary();
     for (const entry of this.entries())
-      if (entry.drive) {
+      if (entry.motor) {
+        const motor = entry.motor,
+          body = this.body(entry.recipe.id);
+        this.world.getCollider(entry.collider).setCollisionGroups(collisionGroups(entry));
+        const alpha =
+          this.tick < motor.staggerUntil ? motor.acceleration * 0.25 : motor.acceleration;
+        const dx = (motor.intentX - motor.x) * alpha,
+          dy = (motor.intentY - motor.y) * alpha;
+        // Walking is limited to 6000 units/s²; authored dash/charge bursts start immediately.
+        // Impacts remain separate from both motor modes.
+        const length = Math.hypot(dx, dy),
+          scale = Math.min(1, (motor.acceleration === 1 ? 2000 : 100) / Math.max(length, 1));
+        motor.x = Math.fround(motor.x + dx * scale);
+        motor.y = Math.fround(motor.y + dy * scale);
+        const decay = Math.exp(-motor.recovery * PHYSICS_STEP);
+        motor.externalX = Math.fround(motor.externalX * decay);
+        motor.externalY = Math.fround(motor.externalY * decay);
+        body.setLinvel(
+          { x: (motor.x + motor.externalX) / UNITS, y: (motor.y + motor.externalY) / UNITS },
+          true,
+        );
+      } else if (entry.drive) {
         const body = this.body(entry.recipe.id);
         body.setLinvel({ x: entry.drive.x / UNITS, y: entry.drive.y / UNITS }, true);
         body.setAngvel(0, true);
       }
     this.world.step(this.queue);
+    if (this.scene === "adventure")
+      for (const entry of this.entries()) {
+        const body = this.body(entry.recipe.id);
+        if (!body.isDynamic()) continue;
+        const position = body.translation(),
+          velocity = body.linvel();
+        const radius =
+          entry.recipe.shape.kind === "circle"
+            ? entry.recipe.shape.radius
+            : Math.hypot(entry.recipe.shape.width, entry.recipe.shape.height) / 2;
+        const bound = (WORLD_LIMIT - radius) / UNITS;
+        const x = Math.max(-bound, Math.min(bound, position.x)),
+          y = Math.max(-bound, Math.min(bound, position.y));
+        if (x !== position.x || y !== position.y) {
+          body.setTranslation({ x, y }, false);
+          body.setLinvel(
+            { x: x === position.x ? velocity.x : 0, y: y === position.y ? velocity.y : 0 },
+            false,
+          );
+        }
+      }
+    for (const entry of this.entries())
+      if (entry.motor) {
+        const velocity = this.body(entry.recipe.id).linvel();
+        // Retain contact response as external motion instead of erasing it on the next AI update.
+        entry.motor.externalX = Math.fround(velocity.x * UNITS - entry.motor.x);
+        entry.motor.externalY = Math.fround(velocity.y * UNITS - entry.motor.y);
+      }
     this.tick++;
     this.queue.drainCollisionEvents((a, b, started) => {
       const ids = [this.colliderIds.get(a), this.colliderIds.get(b)].sort();
-      if (!ids[0] || !ids[1]) throw new Error("Unregistered physics contact");
+      if (!ids[0] || !ids[1]) return; // Removed colliders may emit their final stopped event.
       if (started) this.contacts++;
       this.events.push({ tick: this.tick, a: ids[0], b: ids[1], started });
     });
@@ -240,17 +476,22 @@ export class PhysicsWorld {
           sleeping: body.isSleeping(),
           frozen: frozen ?? false,
           reactivationBlocked: reactivationBlocked ?? false,
+          ccdEnabled: body.isCcdEnabled(),
           policy: structuredClone(policy!),
         };
       });
   }
-  inspect() {
+  inspect(limit = this.scene === "lab" ? MAX_LAB_BODIES : 100) {
     return {
       backend: `Rapier2D ${RAPIER_VERSION}`,
       units: UNITS,
       tick: this.tick,
       contacts: this.contacts,
-      bodies: this.poses(),
+      scene: this.scene,
+      bodyCount: this.registry.size,
+      bodies: this.ids()
+        .slice(0, limit)
+        .map((id) => this.pose(id)),
       events: structuredClone(this.events),
       policies: this.policies.inspect(),
     };
@@ -277,17 +518,20 @@ export class PhysicsWorld {
     this.synchronizePolicies();
     return this.inspect();
   }
-  policyAt(areaId: string, x: number, y: number) {
-    finite(x, "policy x", 10_000);
-    finite(y, "policy y", 10_000);
-    return this.policies.resolve(areaId, x, y);
+  policyAt(areaId: string, x: number, y: number, previous: string[] = []) {
+    finite(x, "policy x", this.scene === "adventure" ? WORLD_LIMIT : 10_000);
+    finite(y, "policy y", this.scene === "adventure" ? WORLD_LIMIT : 10_000);
+    return this.policies.resolve(areaId, x, y, previous);
   }
   place(id: string, x: number, y: number) {
-    finite(x, "placement x", 10_000);
-    finite(y, "placement y", 10_000);
+    finite(x, "placement x", this.scene === "adventure" ? WORLD_LIMIT : 10_000);
+    finite(y, "placement y", this.scene === "adventure" ? WORLD_LIMIT : 10_000);
     const body = this.body(id);
     body.setTranslation({ x: x / UNITS, y: y / UNITS }, true);
     this.clearMotion(body);
+    const motor = this.registry.get(id)!.motor;
+    if (motor)
+      Object.assign(motor, { x: 0, y: 0, externalX: 0, externalY: 0, intentX: 0, intentY: 0 });
     this.registry.get(id)!.reactivationBlocked = false;
     this.synchronizePolicies();
   }
@@ -332,8 +576,8 @@ export class PhysicsWorld {
     }
     return false; // Inspector offers deliberate placement when no valid pose can be found.
   }
-  private synchronizePolicies() {
-    const entries = this.entries(),
+  private synchronizePolicies(selected?: BodyEntry[]) {
+    const entries = selected ?? this.entries(),
       api = rapier(),
       waking: BodyEntry[] = [];
     for (const entry of entries) {
@@ -360,6 +604,13 @@ export class PhysicsWorld {
       }
       entry.frozen = frozen;
       this.world.getCollider(entry.collider).setCollisionGroups(collisionGroups(entry));
+      // Core characters always sweep solid obstacles, even under master-off.
+      body.enableCcd(
+        entry.recipe.actorKind
+          ? true
+          : (entry.recipe.ccd ?? true) &&
+              (bodyRole(entry.recipe) !== "prop" || entry.policy.effective.sweptCollision),
+      );
     }
     for (const entry of waking) {
       const body = this.body(entry.recipe.id),
@@ -433,10 +684,11 @@ export class PhysicsWorld {
   save(): PhysicsSnapshot {
     this.alive();
     const bytes = Array.from(this.world.takeSnapshot());
-    if (bytes.length > MAX_SNAPSHOT_BYTES)
+    if (this.scene === "lab" && bytes.length > MAX_SNAPSHOT_BYTES)
       throw new Error("Playground checkpoint exceeds its 4 MB binary bound");
     return {
-      version: 2,
+      version: this.scene === "adventure" ? 3 : 2,
+      ...(this.scene === "adventure" ? { scene: "adventure" as const } : {}),
       backend: RAPIER_VERSION,
       units: UNITS,
       tick: this.tick,
@@ -450,12 +702,21 @@ export class PhysicsWorld {
   }
   static restore(snapshot: PhysicsSnapshot): PhysicsWorld {
     validatePhysicsSnapshot(snapshot);
+    // M02 version-2 saves predate the new registered controls. Import their applied samples
+    // and legacy masks explicitly; do not reinterpret them as a current malformed snapshot.
+    const legacyPolicies =
+      snapshot.version === 2 &&
+      snapshot.bodies.some((entry) => entry.policy?.values.crowdContacts === undefined);
+    if (legacyPolicies) snapshot = structuredClone(snapshot);
     const api = rapier();
     let restored: PhysicsWorld | undefined;
     try {
       const world = api.World.restoreSnapshot(new Uint8Array(snapshot.bytes));
       if (!world) throw new Error("Rapier rejected snapshot");
-      restored = new PhysicsWorld(world);
+      restored = new PhysicsWorld(
+        world,
+        snapshot.scene === "adventure" ? { scene: "adventure" } : undefined,
+      );
       restored.policies = new PolicyController(snapshot.policies);
       if (
         world.bodies.len() !== snapshot.bodies.length ||
@@ -473,6 +734,8 @@ export class PhysicsWorld {
         if (
           !body ||
           !collider ||
+          body.handle !== entry.handle ||
+          collider.handle !== entry.collider ||
           collider.parent()?.handle !== body.handle ||
           body.numColliders() !== 1 ||
           body.isDynamic() !== (entry.recipe.motion === "dynamic" && !entry.frozen) ||
@@ -481,13 +744,45 @@ export class PhysicsWorld {
           throw new Error("Snapshot body mapping mismatch");
         const near = (a: number, b: number) =>
           Math.abs(a - b) <= Math.max(0.0001, Math.abs(b) * 0.0001);
+        if (legacyPolicies) {
+          const role = bodyRole(entry.recipe),
+            membership = role === "terrain" ? 1 : role === "prop" ? 2 : 4;
+          const filter =
+            role === "terrain"
+              ? 7
+              : role === "prop"
+                ? 3 | (entry.policy!.effective.propBlocking ? 4 : 0)
+                : 5 | (entry.policy!.effective.propBlocking ? 2 : 0);
+          if (collider.collisionGroups() !== ((membership << 16) | filter))
+            throw new Error("Legacy collision groups mismatch");
+          entry.policy = restored.policies.resolve(
+            entry.recipe.areaId ?? "playground",
+            entry.policySample!.x,
+            entry.policySample!.y,
+            entry.policy!.regions,
+          );
+          if (body.isCcdEnabled() !== (entry.recipe.ccd ?? true))
+            throw new Error("Legacy CCD setting mismatch");
+          body.enableCcd(
+            (entry.recipe.ccd ?? true) &&
+              (role !== "prop" || entry.policy.effective.sweptCollision),
+          );
+          collider.setCollisionGroups(collisionGroups(entry));
+        }
         if (
           !near(collider.mass(), entry.recipe.mass ?? 1) ||
           !near(collider.friction(), entry.recipe.friction ?? 0.6) ||
           !near(collider.restitution(), entry.recipe.restitution ?? 0.3) ||
           !near(body.linearDamping(), entry.recipe.damping ?? 0.35) ||
           !near(body.angularDamping(), entry.recipe.damping ?? 0.35) ||
-          body.isCcdEnabled() !== (entry.recipe.ccd ?? true)
+          body.isCcdEnabled() !==
+            (entry.recipe.actorKind
+              ? true
+              : (entry.recipe.ccd ?? true) &&
+                (bodyRole(entry.recipe) !== "prop" ||
+                  (entry.policy?.effective.sweptCollision ?? true))) ||
+          (entry.recipe.actorKind &&
+            (body.effectiveWorldInvInertia() !== 0 || body.rotation() !== 0 || body.angvel() !== 0))
         )
           throw new Error("Snapshot body properties mismatch");
         const shape = entry.recipe.shape;
@@ -586,7 +881,9 @@ export class PhysicsWorld {
 export function validatePhysicsSnapshot(snapshot: PhysicsSnapshot): void {
   if (
     !snapshot ||
-    ![1, 2].includes(snapshot.version) ||
+    ![1, 2, 3].includes(snapshot.version) ||
+    (snapshot.version === 3 && snapshot.scene !== "adventure") ||
+    (snapshot.version !== 3 && snapshot.scene !== undefined) ||
     snapshot.backend !== RAPIER_VERSION ||
     snapshot.units !== UNITS ||
     !Number.isSafeInteger(snapshot.tick) ||
@@ -594,17 +891,17 @@ export function validatePhysicsSnapshot(snapshot: PhysicsSnapshot): void {
     !Number.isSafeInteger(snapshot.contacts) ||
     snapshot.contacts < 0 ||
     !Array.isArray(snapshot.bodies) ||
-    snapshot.bodies.length > MAX_LAB_BODIES ||
+    (snapshot.version !== 3 && snapshot.bodies.length > MAX_LAB_BODIES) ||
     !Array.isArray(snapshot.bytes) ||
     snapshot.bytes.length < 32 ||
-    snapshot.bytes.length > MAX_SNAPSHOT_BYTES ||
+    snapshot.bytes.length > (snapshot.version === 3 ? 256_000_000 : MAX_SNAPSHOT_BYTES) ||
     snapshot.bytes.some((byte) => !Number.isInteger(byte) || byte < 0 || byte > 255) ||
     checksum(snapshot.bytes) !== snapshot.checksum ||
     !Array.isArray(snapshot.events) ||
     snapshot.events.length > 64
   )
     throw new Error("Invalid or incompatible physics snapshot header/bytes");
-  if (snapshot.version === 2) {
+  if (snapshot.version >= 2) {
     if (!snapshot.policies) throw new Error("Missing physics policies");
     new PolicyController(snapshot.policies);
   }
@@ -613,15 +910,21 @@ export function validatePhysicsSnapshot(snapshot: PhysicsSnapshot): void {
     colliders = new Set<number>();
   for (const entry of snapshot.bodies) {
     if (!entry) throw new Error("Invalid physics body registry");
-    validateBody(entry.recipe);
+    validateBody(entry.recipe, snapshot.version === 3);
     if (
-      snapshot.version === 2 &&
+      entry.recipe.actorKind &&
+      ["player", "monster", "boss", "ambient"].includes(entry.recipe.actorKind) &&
+      !entry.motor
+    )
+      throw new Error("Missing saved actor motor");
+    if (
+      snapshot.version >= 2 &&
       (typeof entry.frozen !== "boolean" ||
         typeof entry.reactivationBlocked !== "boolean" ||
         !entry.policy)
     )
       throw new Error("Invalid applied body policy");
-    if (snapshot.version === 2) {
+    if (snapshot.version >= 2) {
       if (!entry.policySample) throw new Error("Missing applied policy position");
       finite(entry.policySample.x, "policy sample x", 1e12);
       finite(entry.policySample.y, "policy sample y", 1e12);
@@ -630,6 +933,21 @@ export function validatePhysicsSnapshot(snapshot: PhysicsSnapshot): void {
       if (bodyRole(entry.recipe) !== "actor") throw new Error("Invalid saved actor drive");
       finite(entry.drive.x, "drive x", 600);
       finite(entry.drive.y, "drive y", 600);
+    }
+    if (entry.motor) {
+      if (snapshot.version !== 3 || !entry.recipe.actorKind) throw new Error("Invalid saved motor");
+      for (const key of ["intentX", "intentY", "x", "y", "externalX", "externalY"] as const)
+        finite(entry.motor[key], key, 16000);
+      if (
+        !Number.isSafeInteger(entry.motor.staggerUntil) ||
+        entry.motor.staggerUntil < 0 ||
+        typeof entry.motor.phaseActors !== "boolean" ||
+        !Number.isFinite(entry.motor.acceleration) ||
+        entry.motor.acceleration <= 0 ||
+        entry.motor.acceleration > 1 ||
+        entry.motor.recovery !== 6
+      )
+        throw new Error("Invalid motor configuration");
     }
     if (
       ids.has(entry.recipe.id) ||

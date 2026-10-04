@@ -238,3 +238,32 @@ In Agent lab, select land/area/region and its profile, queue individual override
 node tools/physics.ts examples/physics-regions.jsonl # asserts crossing, repeated-cause suppression, specificity, master-off, paused apply, save continuation and replay
 node tools/agent.ts --count 0 < examples/physics-regions.jsonl
 ```
+
+## M03 playable adventure physics
+
+Solo adventures use Rapier actors and occupied terrain automatically. In Agent lab choose **Physics scene → Playable adventure** to inspect and edit the real run. Select land/area/region, queue crowd contacts, ambient physics, prop blocking, prop dynamics, swept collision or the master switch, then step/run or apply while paused. The normal world renders solved actor/prop poses. Playground remains a separate scene. Shared physical controls stay unavailable online/connecting until M04; ordinary co-op remains supported.
+
+`actors` actions use the same command/replay route:
+
+| Action | Fields and behavior |
+| --- | --- |
+| `inspect` (default) | Backend, land ID, bounded first 100 bodies, total body count, policies/provenance, all optional props, occupied chunks and complete movement-owner counts. The body preview limit never limits physical participation. |
+| `body` | `id`: complete solved pose and effective policy for one stable ID |
+| `configure` | `expectedRevision`, `edits`: same atomic PolicyEdit queue; adventure area bindings cannot be removed while needed for entry/handovers |
+| `apply` | `expectedRevision`: deliberate paused boundary, including ambient ownership, without advancing game ticks |
+| `policy` | `areaId?`, `x?`, `y?`: effective values/provenance; default area follows coordinates |
+| `impulse` | `id,x?,y?,atX?,atY?`: same physical impulse units; props honor strength/freeze; character rotation stays locked |
+| `place` | `id,x,y`: relocate a prop and retain consequences; use normal `teleport` for the player |
+| `spawn` | `body`: prop BodyRecipe, explicit current `areaId`, unique ID starting `prop-`; no playground body cap applies to adventure |
+
+Stable IDs: `player-<player ID>`, `enemy-<enemy ID>`, `ambient-<slot>-<generation>`, `crate-<area>-<0..3>`, `wheel-<area>`. Terrain keys include `terrain-land-<run>-<land>-<tx>-<ty>-water|decor`. Default scoped IDs include `town`, `wilderness`, `area-1`, `quiet-1`, `reactive-1`; read inspection for the current land. `crowdContacts`, `ambientPhysics`, `sweptCollision` are booleans added to the registered M02 fields. Master-off suppresses optional contacts/ambient/prop dynamics while retaining core movement, solid terrain and base combat. Core actor CCD stays on even when optional swept checks turn off.
+
+```json
+{"op":"encounter","index":1}
+{"op":"actors","action":"configure","expectedRevision":0,"edits":[{"type":"override","scope":"area","id":"area-1","values":{"crowdContacts":false,"ambientPhysics":true}}]}
+{"op":"step","ticks":1}
+{"op":"actors","action":"body","id":"player-local"}
+{"op":"actors","action":"inspect"}
+```
+
+`save` includes the complete versioned `actorPhysics` member. Same-build replay and save continuation retain motor/external velocity, policy samples, ownership, navigation and mutations. Node/Chrome trigonometry may differ in insignificant digits; compare actual physical outcomes with stated tolerances across runtimes, and use exact replay in the originating runtime. `node tools/physics-actors.ts` produces the M03 encounter receipt; `--population 65536` deliberately enables every selected creature and reports informational first-tick timing. This does not advertise later reaction systems.

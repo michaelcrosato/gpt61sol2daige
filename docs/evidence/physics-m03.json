@@ -1,0 +1,74 @@
+{
+  "milestone": "M03",
+  "seed": 142,
+  "population": 32,
+  "hit": {
+    "id": "enemy-4",
+    "x": 521.96044921875,
+    "y": -24,
+    "vx": 117.62886810302734,
+    "vy": 0,
+    "angle": 0,
+    "ccdEnabled": true,
+    "frozen": false
+  },
+  "nextAiTick": {
+    "id": "enemy-4",
+    "x": 523.734375,
+    "y": -24,
+    "vx": 106.43499755859375,
+    "vy": 0,
+    "angle": 0,
+    "ccdEnabled": true,
+    "frozen": false
+  },
+  "prop": {
+    "before": {
+      "id": "crate-1-0",
+      "x": 665,
+      "y": 40,
+      "vx": 0,
+      "vy": 0,
+      "angle": 0,
+      "ccdEnabled": true,
+      "frozen": false
+    },
+    "after": {
+      "id": "crate-1-0",
+      "x": 710.5748291015625,
+      "y": 40,
+      "vx": 106.14790344238281,
+      "vy": 4.819558974133997e-9,
+      "angle": 6.214629366674274e-10,
+      "ccdEnabled": true,
+      "frozen": false
+    }
+  },
+  "fullParticipation": {
+    "selected": 32,
+    "liveAmbientBodies": 32,
+    "firstTickMs": 102.262876,
+    "informational": true
+  },
+  "masterOff": {
+    "prop": {
+      "id": "crate-1-0",
+      "x": 712.4049682617188,
+      "y": 40,
+      "vx": 0,
+      "vy": 0,
+      "angle": 6.336561275688268e-10,
+      "ccdEnabled": false,
+      "frozen": true
+    },
+    "owners": {
+      "actors": 2,
+      "rapierAmbient": 0,
+      "ambient": 32
+    },
+    "essentialPlayerCcd": true
+  },
+  "saveContinuation": true,
+  "sameBuildReplay": true,
+  "tuning": "Untuned combat; deliberate isolated target/position setup. Nine-area route uses separately documented 2x player damage/health."
+}

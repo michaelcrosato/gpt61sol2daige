@@ -1,4 +1,5 @@
 import type { Command } from "../engine/agent.ts";
+import type { AdventurePhysics } from "../physics/adventure.ts";
 import {
   POLICY_PRESETS,
   type PolicyEdit,
@@ -11,6 +12,7 @@ import type { PhysicsWorld } from "../physics/runtime.ts";
 
 export function mountPhysicsUI(options: {
   world: () => PhysicsWorld | null;
+  adventure: () => AdventurePhysics | null;
   solo: () => boolean;
   execute: (command: Command) => unknown;
   pause: (paused: boolean) => void;
@@ -22,6 +24,7 @@ export function mountPhysicsUI(options: {
   panel.innerHTML = `<div class="panel-heading">Physics playground <span>SOLO · EXPERIMENTAL</span></div>
     <p class="field-help">Push the crate pile, spin the wheel, or launch a fast body at the wall. This scene is separate from your adventure.</p>
     <div class="physics-controls">
+      <label>Physics scene <select id="physics-scene" aria-label="Physics scene"><option value="playground">Playground</option><option value="adventure">Playable adventure</option></select></label>
       <button class="secondary-button" id="physics-open">Open / reset playground</button>
       <button class="secondary-button" id="physics-close">Close playground</button>
       <label>Body <select id="physics-body" aria-label="Physics body"></select></label>
@@ -44,6 +47,9 @@ export function mountPhysicsUI(options: {
         <label>World reactions <select id="physics-worldReactions" aria-label="World reactions override"><option value="inherit">Inherited</option><option value="true">On</option><option value="false">Off</option></select></label>
         <label>Dynamic props <select id="physics-dynamicProps" aria-label="Dynamic props override"><option value="inherit">Inherited</option><option value="true">On</option><option value="false">Off</option></select></label>
         <label>Prop blocking <select id="physics-propBlocking" aria-label="Prop blocking override"><option value="inherit">Inherited</option><option value="true">On</option><option value="false">Off</option></select></label>
+        <label>Crowd contacts <select id="physics-crowdContacts" aria-label="Crowd contacts override"><option value="inherit">Inherited</option><option value="true">On</option><option value="false">Off</option></select></label>
+        <label>Ambient physics (adventure) <select id="physics-ambientPhysics" aria-label="Ambient physics override"><option value="inherit">Inherited</option><option value="true">On</option><option value="false">Off</option></select></label>
+        <label>Swept collision <select id="physics-sweptCollision" aria-label="Swept collision override"><option value="inherit">Inherited</option><option value="true">On</option><option value="false">Off</option></select></label>
         <label>Impulse multiplier <input id="physics-impulseStrength" aria-label="Impulse multiplier override" type="number" min="0" max="10" step="0.05" placeholder="Inherited"></label>
         <button class="secondary-button" id="physics-queue">Queue policy edit</button>
         <button class="secondary-button" id="physics-reset-scope">Reset this scope</button>
@@ -80,6 +86,16 @@ export function mountPhysicsUI(options: {
     <canvas id="physics-canvas" width="960" height="580" aria-label="Physical crate pile, wheel and collision wall"></canvas>`;
   document.querySelector("#lab-view .lab-grid")!.before(panel);
   const get = <T extends HTMLElement>(id: string) => panel.querySelector<T>(`#${id}`)!;
+  const scene = get<HTMLSelectElement>("physics-scene");
+  const selectedWorld = () =>
+    scene.value === "adventure" ? (options.adventure()?.world ?? null) : options.world();
+  const operation = () => (scene.value === "adventure" ? "actors" : "physics");
+  scene.addEventListener("change", () => {
+    policySignature = "";
+    profileIds = "";
+    shownIds = "";
+    draw();
+  });
   const canvas = get<HTMLCanvasElement>("physics-canvas"),
     ctx = canvas.getContext("2d")!;
   const selector = get<HTMLSelectElement>("physics-body"),
@@ -117,9 +133,9 @@ export function mountPhysicsUI(options: {
   const selectedScope = () => ({ scope: scope.value as PolicyScope, id: scopeId.value });
   const queue = (edits: PolicyEdit[]) =>
     options.execute({
-      op: "physics",
+      op: operation(),
       action: "configure",
-      expectedRevision: options.world()!.inspect().policies.nextRevision,
+      expectedRevision: selectedWorld()!.inspect().policies.nextRevision,
       edits,
     });
   const act = (id: string, action: () => void) =>
@@ -134,17 +150,16 @@ export function mountPhysicsUI(options: {
       }
     });
   act("physics-open", () => {
-    options.execute({ op: "physics", action: "reset" });
+    options.execute({ op: operation(), action: "reset" });
     lastSweep = "";
     policySignature = "";
   });
   act("physics-close", () => {
-    options.execute({ op: "physics", action: "close" });
+    options.execute({ op: operation(), action: "close" });
     lastSweep = "";
   });
   const impulse = (spin: boolean) => {
-    const pose = options
-      .world()
+    const pose = selectedWorld()
       ?.poses()
       .find((body) => body.id === selector.value);
     if (!pose) throw new Error("Select a dynamic body first");
@@ -152,7 +167,7 @@ export function mountPhysicsUI(options: {
     if (!Number.isFinite(x) || x < 1 || x > 1000)
       throw new Error("Impulse must be between 1 and 1000");
     options.execute({
-      op: "physics",
+      op: operation(),
       action: "impulse",
       id: pose.id,
       x,
@@ -163,7 +178,7 @@ export function mountPhysicsUI(options: {
   act("physics-push", () => impulse(false));
   act("physics-spin", () => impulse(true));
   act("physics-sweep", () => {
-    const result = options.execute({ op: "physics", action: "sweep" }) as {
+    const result = options.execute({ op: operation(), action: "sweep" }) as {
       hit: { id: string; fraction: number } | null;
     };
     lastSweep = result.hit
@@ -178,7 +193,14 @@ export function mountPhysicsUI(options: {
   act("physics-pause", () => options.pause(true));
   act("physics-queue", () => {
     const values: PolicyValues = {};
-    for (const key of ["worldReactions", "dynamicProps", "propBlocking"] as const) {
+    for (const key of [
+      "worldReactions",
+      "dynamicProps",
+      "propBlocking",
+      "crowdContacts",
+      "ambientPhysics",
+      "sweptCollision",
+    ] as const) {
       const value = get<HTMLSelectElement>(`physics-${key}`).value;
       if (value !== "inherit") values[key] = value === "true";
     }
@@ -206,15 +228,15 @@ export function mountPhysicsUI(options: {
     queue([
       {
         type: "master",
-        enabled: !options.world()!.inspect().policies.preview.masterWorldReactions,
+        enabled: !selectedWorld()!.inspect().policies.preview.masterWorldReactions,
       },
     ]),
   );
   act("physics-apply", () =>
     options.execute({
-      op: "physics",
+      op: operation(),
       action: "apply",
-      expectedRevision: options.world()!.inspect().policies.nextRevision,
+      expectedRevision: selectedWorld()!.inspect().policies.nextRevision,
     }),
   );
   act("physics-region-queue", () =>
@@ -229,7 +251,7 @@ export function mountPhysicsUI(options: {
   );
   act("physics-place", () =>
     options.execute({
-      op: "physics",
+      op: operation(),
       action: "place",
       id: selector.value,
       x: Number(get<HTMLInputElement>("physics-place-x").value),
@@ -238,7 +260,7 @@ export function mountPhysicsUI(options: {
   );
   act("physics-traveler", () =>
     options.execute({
-      op: "physics",
+      op: operation(),
       action: "spawn",
       body: {
         id: "traveler",
@@ -259,7 +281,7 @@ export function mountPhysicsUI(options: {
     ["stop", 0],
   ] as const)
     act(`physics-drive-${id}`, () =>
-      options.execute({ op: "physics", action: "drive", id: "traveler", x, y: 0 }),
+      options.execute({ op: operation(), action: "drive", id: "traveler", x, y: 0 }),
     );
   scope.addEventListener("change", () => {
     profileIds = "";
@@ -292,7 +314,14 @@ export function mountPhysicsUI(options: {
       const override = policy.preview.overrides.find(
         (p) => p.scope === scope.value && p.id === scopeId.value,
       )?.values;
-      for (const key of ["worldReactions", "dynamicProps", "propBlocking"] as const)
+      for (const key of [
+        "worldReactions",
+        "dynamicProps",
+        "propBlocking",
+        "crowdContacts",
+        "ambientPhysics",
+        "sweptCollision",
+      ] as const)
         get<HTMLSelectElement>(`physics-${key}`).value =
           override?.[key] === undefined ? "inherit" : String(override[key]);
       get<HTMLInputElement>("physics-impulseStrength").value =
@@ -309,7 +338,7 @@ export function mountPhysicsUI(options: {
     }
     const preset = get<HTMLSelectElement>("physics-preset").value as PresetName;
     get("physics-preset-preview").textContent =
-      `Preset preview: ${JSON.stringify(POLICY_PRESETS[preset])}. Applies the implemented prop controls at this scope. Editing individual values creates a custom override.`;
+      `Preset preview: ${JSON.stringify(POLICY_PRESETS[preset])}. Applies the implemented physics controls at this scope. Editing individual values creates a custom override.`;
     get("physics-policy-status").textContent =
       `Applied revision ${policy.state.revision} · ${policy.pending.length} queued transactions · next revision ${policy.nextRevision} · master ${policy.state.masterWorldReactions ? "on" : "OFF"}${policy.pending.length ? " · Preview changes await a boundary/apply." : ""}`;
     get<HTMLButtonElement>("physics-master").textContent = policy.preview.masterWorldReactions
@@ -318,7 +347,7 @@ export function mountPhysicsUI(options: {
   }
 
   function draw() {
-    const world = options.world(),
+    const world = selectedWorld(),
       solo = options.solo(),
       poses = world?.poses() ?? [];
     for (const button of panel.querySelectorAll<HTMLButtonElement>("button"))
@@ -327,7 +356,8 @@ export function mountPhysicsUI(options: {
     for (const control of panel.querySelectorAll<
       HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
     >("input,select,textarea")) {
-      if (["physics-overlay", "physics-regions-overlay"].includes(control.id)) continue;
+      if (["physics-overlay", "physics-regions-overlay", "physics-scene"].includes(control.id))
+        continue;
       control.disabled = !solo || !world;
     }
     policyControls(world);
@@ -340,6 +370,16 @@ export function mountPhysicsUI(options: {
         selector.value = poses.find((body) => body.motion === "dynamic")?.id ?? poses[0]?.id ?? "";
       shownIds = ids;
     }
+    for (const id of [
+      "physics-open",
+      "physics-close",
+      "physics-sweep",
+      "physics-traveler",
+      "physics-drive-left",
+      "physics-drive-right",
+      "physics-drive-stop",
+    ])
+      if (scene.value === "adventure") get<HTMLButtonElement>(id).disabled = true;
     const selected = poses.find((body) => body.id === selector.value);
     for (const id of ["physics-push", "physics-spin"])
       get<HTMLButtonElement>(id).disabled = !solo || !selected || selected.motion !== "dynamic";
@@ -347,10 +387,13 @@ export function mountPhysicsUI(options: {
       ? `${selected.id} · (${selected.x.toFixed(1)}, ${selected.y.toFixed(1)}) · ${selected.reactivationBlocked ? "Overlap unresolved: place this body in free space." : selected.frozen ? "FROZEN, motion discarded" : "active"} · regions: ${selected.policy.regions.join(", ") || "none"} · Effective: ${JSON.stringify(selected.policy.effective)} · Sources: ${JSON.stringify(selected.policy.provenance)} · Consequences: ${JSON.stringify(selected.consequences ?? {})}`
       : "Select a body to inspect its effective policy and provenance.";
     get<HTMLButtonElement>("physics-traveler").disabled =
-      !solo || !world || poses.some((body) => body.id === "traveler");
+      !solo ||
+      !world ||
+      scene.value === "adventure" ||
+      poses.some((body) => body.id === "traveler");
     for (const id of ["left", "right", "stop"])
       get<HTMLButtonElement>(`physics-drive-${id}`).disabled =
-        !solo || !poses.some((body) => body.id === "traveler");
+        !solo || scene.value === "adventure" || !poses.some((body) => body.id === "traveler");
     status.textContent =
       error ||
       (!solo
@@ -363,6 +406,10 @@ export function mountPhysicsUI(options: {
     ctx.save();
     ctx.translate(canvas.width / 2, canvas.height / 2);
     ctx.scale(1.65, 1.65);
+    if (scene.value === "adventure") {
+      const selected = poses.find((p) => p.id === selector.value);
+      if (selected) ctx.translate(-selected.x, -selected.y);
+    }
     ctx.strokeStyle = "#243d2f";
     ctx.lineWidth = 0.5;
     for (let n = -280; n <= 280; n += 20) {

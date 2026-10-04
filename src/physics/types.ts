@@ -22,6 +22,7 @@ export interface BodyRecipe {
   damping?: number;
   ccd?: boolean;
   role?: "prop" | "terrain" | "actor";
+  actorKind?: "player" | "monster" | "boss" | "npc" | "ambient" | "loot" | "sensor";
   areaId?: string;
   consequences?: { destroyed: boolean; claimed: boolean; durability?: number };
 }
@@ -35,6 +36,7 @@ export interface BodyPose extends BodyRecipe {
   sleeping: boolean;
   frozen: boolean;
   reactivationBlocked: boolean;
+  ccdEnabled: boolean;
   policy: ResolvedPolicy;
 }
 export interface BodyEntry {
@@ -46,6 +48,19 @@ export interface BodyEntry {
   frozen?: boolean;
   reactivationBlocked?: boolean;
   drive?: { x: number; y: number };
+  motor?: MotorState;
+}
+export interface MotorState {
+  intentX: number;
+  intentY: number;
+  x: number;
+  y: number;
+  externalX: number;
+  externalY: number;
+  acceleration: number;
+  recovery: number;
+  staggerUntil: number;
+  phaseActors: boolean;
 }
 export interface ContactEvent {
   tick: number;
@@ -54,7 +69,8 @@ export interface ContactEvent {
   started: boolean;
 }
 export interface PhysicsSnapshot {
-  version: 1 | 2;
+  version: 1 | 2 | 3;
+  scene?: "adventure";
   backend: typeof RAPIER_VERSION;
   units: typeof WORLD_UNITS_PER_METRE;
   tick: number;

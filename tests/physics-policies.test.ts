@@ -487,6 +487,9 @@ test("working presets, numeric zero and scope resets preserve the scene", () => 
       "dynamicProps",
       "propBlocking",
       "impulseStrength",
+      "crowdContacts",
+      "ambientPhysics",
+      "sweptCollision",
     ]);
   } finally {
     world.dispose();

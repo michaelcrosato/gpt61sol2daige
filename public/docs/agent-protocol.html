@@ -608,7 +608,105 @@ actor-to-prop blocking without migrating the adventure wayfarer. If wake
 overlap correction cannot find a valid pose, the inspector reports the
 frozen body and requests deliberate placement.</p>
 <pre class="bash"><code>node tools/physics.ts examples/physics-regions.jsonl # asserts crossing, repeated-cause suppression, specificity, master-off, paused apply, save continuation and replay
-node tools/agent.ts --count 0 &lt; examples/physics-regions.jsonl</code></pre></main>
+node tools/agent.ts --count 0 &lt; examples/physics-regions.jsonl</code></pre>
+<h2 id="m03-playable-adventure-physics">M03 playable adventure
+physics</h2>
+<p>Solo adventures use Rapier actors and occupied terrain automatically.
+In Agent lab choose <strong>Physics scene → Playable adventure</strong>
+to inspect and edit the real run. Select land/area/region, queue crowd
+contacts, ambient physics, prop blocking, prop dynamics, swept collision
+or the master switch, then step/run or apply while paused. The normal
+world renders solved actor/prop poses. Playground remains a separate
+scene. Shared physical controls stay unavailable online/connecting until
+M04; ordinary co-op remains supported.</p>
+<p><code>actors</code> actions use the same command/replay route:</p>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr>
+<th>Action</th>
+<th>Fields and behavior</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>inspect</code> (default)</td>
+<td>Backend, land ID, bounded first 100 bodies, total body count,
+policies/provenance, all optional props, occupied chunks and complete
+movement-owner counts. The body preview limit never limits physical
+participation.</td>
+</tr>
+<tr>
+<td><code>body</code></td>
+<td><code>id</code>: complete solved pose and effective policy for one
+stable ID</td>
+</tr>
+<tr>
+<td><code>configure</code></td>
+<td><code>expectedRevision</code>, <code>edits</code>: same atomic
+PolicyEdit queue; adventure area bindings cannot be removed while needed
+for entry/handovers</td>
+</tr>
+<tr>
+<td><code>apply</code></td>
+<td><code>expectedRevision</code>: deliberate paused boundary, including
+ambient ownership, without advancing game ticks</td>
+</tr>
+<tr>
+<td><code>policy</code></td>
+<td><code>areaId?</code>, <code>x?</code>, <code>y?</code>: effective
+values/provenance; default area follows coordinates</td>
+</tr>
+<tr>
+<td><code>impulse</code></td>
+<td><code>id,x?,y?,atX?,atY?</code>: same physical impulse units; props
+honor strength/freeze; character rotation stays locked</td>
+</tr>
+<tr>
+<td><code>place</code></td>
+<td><code>id,x,y</code>: relocate a prop and retain consequences; use
+normal <code>teleport</code> for the player</td>
+</tr>
+<tr>
+<td><code>spawn</code></td>
+<td><code>body</code>: prop BodyRecipe, explicit current
+<code>areaId</code>, unique ID starting <code>prop-</code>; no
+playground body cap applies to adventure</td>
+</tr>
+</tbody>
+</table>
+<p>Stable IDs: <code>player-&lt;player ID&gt;</code>,
+<code>enemy-&lt;enemy ID&gt;</code>,
+<code>ambient-&lt;slot&gt;-&lt;generation&gt;</code>,
+<code>crate-&lt;area&gt;-&lt;0..3&gt;</code>,
+<code>wheel-&lt;area&gt;</code>. Terrain keys include
+<code>terrain-land-&lt;run&gt;-&lt;land&gt;-&lt;tx&gt;-&lt;ty&gt;-water|decor</code>.
+Default scoped IDs include <code>town</code>, <code>wilderness</code>,
+<code>area-1</code>, <code>quiet-1</code>, <code>reactive-1</code>; read
+inspection for the current land. <code>crowdContacts</code>,
+<code>ambientPhysics</code>, <code>sweptCollision</code> are booleans
+added to the registered M02 fields. Master-off suppresses optional
+contacts/ambient/prop dynamics while retaining core movement, solid
+terrain and base combat. Core actor CCD stays on even when optional
+swept checks turn off.</p>
+<pre class="json"><code>{&quot;op&quot;:&quot;encounter&quot;,&quot;index&quot;:1}
+{&quot;op&quot;:&quot;actors&quot;,&quot;action&quot;:&quot;configure&quot;,&quot;expectedRevision&quot;:0,&quot;edits&quot;:[{&quot;type&quot;:&quot;override&quot;,&quot;scope&quot;:&quot;area&quot;,&quot;id&quot;:&quot;area-1&quot;,&quot;values&quot;:{&quot;crowdContacts&quot;:false,&quot;ambientPhysics&quot;:true}}]}
+{&quot;op&quot;:&quot;step&quot;,&quot;ticks&quot;:1}
+{&quot;op&quot;:&quot;actors&quot;,&quot;action&quot;:&quot;body&quot;,&quot;id&quot;:&quot;player-local&quot;}
+{&quot;op&quot;:&quot;actors&quot;,&quot;action&quot;:&quot;inspect&quot;}</code></pre>
+<p><code>save</code> includes the complete versioned
+<code>actorPhysics</code> member. Same-build replay and save
+continuation retain motor/external velocity, policy samples, ownership,
+navigation and mutations. Node/Chrome trigonometry may differ in
+insignificant digits; compare actual physical outcomes with stated
+tolerances across runtimes, and use exact replay in the originating
+runtime. <code>node tools/physics-actors.ts</code> produces the M03
+encounter receipt; <code>--population 65536</code> deliberately enables
+every selected creature and reports informational first-tick timing.
+This does not advertise later reaction systems.</p></main>
 <footer>Fern · A world engine built for agents · <a href="https://github.com/michaelcrosato/gpt61sol2daige">Source on GitHub</a></footer>
 </body>
 </html>

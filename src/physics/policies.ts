@@ -1,9 +1,12 @@
-// Authoritative M02 capabilities only. Later systems register controls when implemented.
+// Register controls only with their working simulation capability.
 export const POLICY_DEFAULTS = {
   worldReactions: true,
   dynamicProps: true,
   propBlocking: true,
   impulseStrength: 1,
+  crowdContacts: true,
+  ambientPhysics: false,
+  sweptCollision: true,
 };
 export type PolicyValues = Partial<typeof POLICY_DEFAULTS>;
 export type PolicyScope = "land" | "area" | "region";
@@ -69,10 +72,21 @@ export interface ResolvedPolicy {
   regions: string[];
 }
 export const POLICY_PRESETS = {
-  Quiet: { worldReactions: false, dynamicProps: false, propBlocking: false, impulseStrength: 1 },
+  Quiet: {
+    ...POLICY_DEFAULTS,
+    worldReactions: false,
+    dynamicProps: false,
+    propBlocking: false,
+    crowdContacts: false,
+  },
   Reactive: { ...POLICY_DEFAULTS },
   Wild: { ...POLICY_DEFAULTS, impulseStrength: 2.5 },
-  Sanctuary: { ...POLICY_DEFAULTS, propBlocking: false, impulseStrength: 0.35 },
+  Sanctuary: {
+    ...POLICY_DEFAULTS,
+    propBlocking: false,
+    crowdContacts: false,
+    impulseStrength: 0.35,
+  },
 };
 export type PresetName = keyof typeof POLICY_PRESETS;
 export const compareIds = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
@@ -98,7 +112,14 @@ function number(value: unknown, min: number, max: number) {
 export function validateValues(values: PolicyValues) {
   object(values);
   keys(values, Object.keys(POLICY_DEFAULTS));
-  for (const key of ["worldReactions", "dynamicProps", "propBlocking"] as const)
+  for (const key of [
+    "worldReactions",
+    "dynamicProps",
+    "propBlocking",
+    "crowdContacts",
+    "ambientPhysics",
+    "sweptCollision",
+  ] as const)
     if (key in values && typeof values[key] !== "boolean")
       throw new Error(`${key} must be boolean`);
   if ("impulseStrength" in values) number(values.impulseStrength, 0, 10);
@@ -413,7 +434,14 @@ export function resolvePolicy(
   for (const key of Object.keys(POLICY_DEFAULTS) as (keyof typeof POLICY_DEFAULTS)[])
     provenance[key] = "engine-default";
   const apply = (patch: PolicyValues, source: string) => {
-    for (const key of ["worldReactions", "dynamicProps", "propBlocking"] as const)
+    for (const key of [
+      "worldReactions",
+      "dynamicProps",
+      "propBlocking",
+      "crowdContacts",
+      "ambientPhysics",
+      "sweptCollision",
+    ] as const)
       if (patch[key] !== undefined) {
         values[key] = patch[key];
         provenance[key] = source;
@@ -444,6 +472,9 @@ export function resolvePolicy(
       ...values,
       dynamicProps: values.worldReactions && values.dynamicProps,
       propBlocking: values.worldReactions && values.propBlocking,
+      crowdContacts: values.worldReactions && values.crowdContacts,
+      ambientPhysics: values.worldReactions && values.ambientPhysics,
+      sweptCollision: values.worldReactions && values.sweptCollision,
     },
     provenance,
     landId: land.id,
