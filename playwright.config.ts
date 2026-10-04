@@ -27,7 +27,7 @@ export default defineConfig({
     : [
         {
           command:
-            "VITE_SIGNAL_HOST=127.0.0.1 VITE_SIGNAL_PORT=9018 VITE_SIGNAL_PATH=/fern VITE_SIGNAL_SECURE=false npm run dev -- --port 5187",
+            "VITE_SIGNAL_HOST=127.0.0.1 VITE_SIGNAL_PORT=9018 VITE_SIGNAL_PATH=/fern VITE_SIGNAL_SECURE=false VITE_ICE_SERVERS='[]' npm run dev -- --port 5187",
           port: 5187,
           reuseExistingServer: false,
         },

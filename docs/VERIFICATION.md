@@ -19,6 +19,8 @@ npm run bench:quality
 
 The browser suite starts isolated app/signaling processes on ports 5187 and 9018. `BASE_URL` targets an existing app, including production. No simulated WebRTC adapter is used. Chrome runs headlessly with background throttling disabled for multiple test tabs. The eight-client test places most clients in the lab to avoid conflating connection correctness with eight competing renderers on one workstation; one guest renders a 32,768-creature view and also switches to a 512-creature budget without changing the host population. Native fullscreen tests assert `document.fullscreenElement` and the canvas's actual viewport bounds. A separate denial test deliberately rejects the native API to verify the fallback.
 
+The local-signaling test configuration supplies an empty ICE server list so same-machine connections do not depend on external STUN/TURN availability. It still opens real WebRTC data channels between isolated contexts. Production testing uses the production site's public signaling and ICE configuration.
+
 ## Requirement-to-evidence map
 
 | Brief requirement | Implementation | Acceptance evidence |

@@ -45,6 +45,11 @@ to a 512-creature budget without changing the host population. Native
 fullscreen tests assert <code>document.fullscreenElement</code> and the
 canvas’s actual viewport bounds. A separate denial test deliberately
 rejects the native API to verify the fallback.</p>
+<p>The local-signaling test configuration supplies an empty ICE server
+list so same-machine connections do not depend on external STUN/TURN
+availability. It still opens real WebRTC data channels between isolated
+contexts. Production testing uses the production site’s public signaling
+and ICE configuration.</p>
 <h2 id="requirement-to-evidence-map">Requirement-to-evidence map</h2>
 <table>
 <colgroup>
