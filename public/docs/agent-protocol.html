@@ -385,7 +385,7 @@ rendering detail.</li>
 <code>npm run test:e2e</code> define the repository’s verification
 gates. Tests use local signaling by default; production tests must
 explicitly target the deployed URL.</p>
-<h2 id="physics-playground-m01">Physics playground (M01)</h2>
+<h2 id="physics-playground-m01m02">Physics playground (M01–M02)</h2>
 <p>In solo <strong>Agent lab</strong>, choose <strong>Open / reset
 playground</strong>, select a body and use <strong>Push right</strong>,
 <strong>Push off center</strong> or <strong>Launch swept body</strong>.
@@ -410,9 +410,9 @@ actions:</p>
 <tbody>
 <tr>
 <td><code>inspect</code> (default)</td>
-<td>Backend, unit scale, tick, bodies with solved poses/velocities and
-sleeping state, total contact starts and the last 64 contact
-transitions; <code>{active:false}</code> when closed</td>
+<td>Backend, unit scale, tick, bodies with solved poses/velocities,
+sleeping/frozen state, effective policy/provenance, contacts and policy
+document/queue/preview; <code>{active:false}</code> when closed</td>
 </tr>
 <tr>
 <td><code>reset</code></td>
@@ -426,7 +426,7 @@ previous world and queue</td>
 <tr>
 <td><code>spawn</code></td>
 <td><code>body</code>:
-<code>{id,motion:"dynamic"|"fixed",shape:{kind:"circle",radius}|{kind:"box",width,height},x,y,angle?,mass?,friction?,restitution?,damping?,ccd?}</code></td>
+<code>{id,motion:"dynamic"|"fixed",shape:{kind:"circle",radius}|{kind:"box",width,height},x,y,angle?,mass?,friction?,restitution?,damping?,ccd?,role?:"prop"|"terrain"|"actor",areaId?,consequences?:{destroyed,claimed,durability?}}</code></td>
 </tr>
 <tr>
 <td><code>impulse</code></td>
@@ -439,6 +439,37 @@ point together; linear impulse units are kg·Fern units/s</td>
 <td>Predict the nearest collider on the authored lane and launch the
 real CCD body; returns its ID, path and hit fraction; use
 <code>step</code> to observe contact</td>
+</tr>
+<tr>
+<td><code>configure</code></td>
+<td><code>expectedRevision</code>: current
+<code>policies.nextRevision</code>; <code>edits</code>: validated atomic
+<code>PolicyEdit[]</code>; queues a transaction and returns applied/next
+revisions</td>
+</tr>
+<tr>
+<td><code>apply</code></td>
+<td><code>expectedRevision</code>: final queued revision; deliberate
+paused commit without advancing ticks. Browser rejects while running;
+the next tick normally applies accepted edits</td>
+</tr>
+<tr>
+<td><code>policy</code></td>
+<td><code>areaId?</code> (default <code>playground</code>),
+<code>x?</code>, <code>y?</code> (default 0): inspect effective
+values/provenance and region entry membership at a point</td>
+</tr>
+<tr>
+<td><code>place</code></td>
+<td><code>id,x,y</code>: deliberate relocation of the same lab body
+(±10,000), preserving angle/consequences, clearing motion and applying
+current scope membership</td>
+</tr>
+<tr>
+<td><code>drive</code></td>
+<td><code>id,x?,y?</code>: lab contact actor intent in units/s, ±600
+(default 0). Actor role requires a dynamic body; essential terrain
+remains blocking</td>
 </tr>
 </tbody>
 </table>
@@ -467,7 +498,117 @@ restore, commands and replay follow that barrier. Dispose caller-owned
 snapshots identify Rapier 0.21.0 and reject incompatible versions; old
 version-1 saves without this member retain the ordinary adventure path.
 FPS/throughput telemetry is informational, with no FPS acceptance
-threshold.</p></main>
+threshold.</p>
+<p>M02’s policy document is version 1; the playground member is now
+version 2, with explicit M01 import. The outer save remains version 1
+and network wire remains 3. Shared controls stay solo-only until M04.
+Collider/region overlays are local device preferences, absent from saves
+and hashes.</p>
+<p>Each policy edit has <code>type</code> and these fields:</p>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr>
+<th><code>type</code></th>
+<th>Fields and semantics</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>master</code></td>
+<td><code>enabled</code>: session-wide absolute world-reactions
+switch</td>
+</tr>
+<tr>
+<td><code>margin</code></td>
+<td><code>value</code>: finite 0–16 boundary hysteresis (default 1)</td>
+</tr>
+<tr>
+<td><code>land</code></td>
+<td><code>profile:{id,values}</code>; upsert current profile layer</td>
+</tr>
+<tr>
+<td><code>area</code></td>
+<td><code>profile:{id,landId,values}</code>; upsert, parent land must
+exist</td>
+</tr>
+<tr>
+<td><code>region</code></td>
+<td><code>profile:{id,areaId,priority,shape,values}</code>; upsert
+bounds/profile, parent area must exist</td>
+</tr>
+<tr>
+<td><code>override</code></td>
+<td><code>scope:"land"|"area"|"region",id,values</code>: merge live
+override fields</td>
+</tr>
+<tr>
+<td><code>preset</code></td>
+<td><code>scope,id,preset:"Quiet"|"Reactive"|"Wild"|"Sanctuary"</code>:
+replace this scope’s override with working M02 values</td>
+</tr>
+<tr>
+<td><code>reset</code></td>
+<td><code>scope,id,to:"inherited"|"authored"</code>: remove the live
+override; authored also restores the original profile/region bounds.
+Custom profiles clear values and keep bounds</td>
+</tr>
+<tr>
+<td><code>remove</code></td>
+<td><code>scope,id</code>: remove a current profile and its override;
+remaining references and body area bindings must remain valid</td>
+</tr>
+</tbody>
+</table>
+<p>Only <code>worldReactions</code>, <code>dynamicProps</code>,
+<code>propBlocking</code> (booleans) and <code>impulseStrength</code>
+(finite 0–10) are registered; omitted fields inherit, unknown controls
+are rejected. Presets: Quiet disables optional reactions; Reactive uses
+defaults; Wild multiplies commanded prop impulses by 2.5; Sanctuary uses
+0.35 and disables prop blocking. Zero impulse strength suppresses
+commanded prop impulses without freezing contact dynamics.
+Numeric/boolean controls affect actual bodies, not graphics.</p>
+<p>Shapes: circle <code>{kind:"circle",x,y,radius}</code>, rectangle
+<code>{kind:"rectangle",x,y,width,height}</code> (top-left), polygon
+<code>{kind:"polygon",points:[{x,y},...]}</code> (3–64 simple, possibly
+concave vertices). Coordinates are ±10,000; positive circle radius is
+0.01–10,000 and rectangle dimensions 0.01–20,000. Priority is integer
+-1,000–1,000. Stable IDs follow body ID syntax. Final documents validate
+parent references, duplicate IDs and polygon geometry.
+Profile/transaction/queue limits are documented in <a
+href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/physics/POLICIES.md#m02-delivered-contract">policy
+semantics</a>.</p>
+<p>Resolution is defaults → land/area/region profiles → land/area/region
+live overrides, per field. Higher region priority then smaller stable ID
+wins overlaps. More-specific live overrides beat broader ones; broader
+live overrides beat authored region values. Master-off gates every
+optional capability regardless of feature-on. Inspect both
+<code>values</code> and <code>effective</code>, with per-value
+<code>provenance</code>. Tick-start center membership enters inside the
+margin and exits outside it; applied membership and position samples
+persist across saves.</p>
+<pre class="json"><code>{&quot;op&quot;:&quot;physics&quot;,&quot;action&quot;:&quot;configure&quot;,&quot;expectedRevision&quot;:0,&quot;edits&quot;:[{&quot;type&quot;:&quot;preset&quot;,&quot;scope&quot;:&quot;area&quot;,&quot;id&quot;:&quot;playground&quot;,&quot;preset&quot;:&quot;Quiet&quot;}]}
+{&quot;op&quot;:&quot;physics&quot;,&quot;action&quot;:&quot;inspect&quot;}
+{&quot;op&quot;:&quot;physics&quot;,&quot;action&quot;:&quot;apply&quot;,&quot;expectedRevision&quot;:1}
+{&quot;op&quot;:&quot;physics&quot;,&quot;action&quot;:&quot;configure&quot;,&quot;expectedRevision&quot;:1,&quot;edits&quot;:[{&quot;type&quot;:&quot;override&quot;,&quot;scope&quot;:&quot;region&quot;,&quot;id&quot;:&quot;quiet-garden&quot;,&quot;values&quot;:{&quot;worldReactions&quot;:true,&quot;dynamicProps&quot;:true}}]}
+{&quot;op&quot;:&quot;step&quot;,&quot;ticks&quot;:1}
+{&quot;op&quot;:&quot;physics&quot;,&quot;action&quot;:&quot;policy&quot;,&quot;x&quot;:-210,&quot;y&quot;:-70}</code></pre>
+<p>In Agent lab, select land/area/region and its profile, queue
+individual overrides or a previewed preset, then step/run or apply while
+paused. Reset controls affect only the selected scope. The inspector
+shows effective settings and sources; the region JSON editor can author
+all three shapes. Move a frozen prop back out with <strong>Place
+selected body</strong>; it keeps its pose angle and restarts with zero
+motion. <strong>Spawn contact traveler</strong>, <strong>Traveler
+left/right</strong> and <strong>Stop traveler</strong> demonstrate real
+actor-to-prop blocking without migrating the adventure wayfarer. If wake
+overlap correction cannot find a valid pose, the inspector reports the
+frozen body and requests deliberate placement.</p>
+<pre class="bash"><code>node tools/physics.ts examples/physics-regions.jsonl # asserts crossing, repeated-cause suppression, specificity, master-off, paused apply, save continuation and replay
+node tools/agent.ts --count 0 &lt; examples/physics-regions.jsonl</code></pre></main>
 <footer>Fern · A world engine built for agents · <a href="https://github.com/michaelcrosato/gpt61sol2daige">Source on GitHub</a></footer>
 </body>
 </html>

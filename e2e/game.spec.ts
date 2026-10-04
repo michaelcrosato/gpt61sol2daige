@@ -77,7 +77,7 @@ test("exploration, abilities, atlas, audio, lab commands, saving and determinist
   await page.getByRole("button", { name: "Run command", exact: true }).click();
   expect(await page.evaluate(() => window.fern.observe().population)).toBe(6000);
   await page.getByRole("button", { name: "Save trail", exact: true }).click();
-  await expect(page.getByRole("status")).toHaveText("Trail saved on this device.");
+  await expect(page.locator("#toast")).toHaveText("Trail saved on this device.");
   const saved = await page.evaluate(() => window.fern.observe().hash);
   await page.getByRole("button", { name: "Step 60 ticks", exact: true }).click();
   await page.getByRole("button", { name: "Load trail", exact: true }).click();
@@ -228,6 +228,9 @@ test("real WebRTC joins eight clients, syncs builds, combat and world, rejects n
       expect(denied).toMatch(/host|Leave the expedition/);
       expect(await participant.page.evaluate(() => window.fern.observe().playground)).toBeNull();
       await expect(participant.page.locator("#physics-open")).toBeDisabled();
+      await expect(participant.page.locator("#physics-scope")).toBeDisabled();
+      await expect(participant.page.locator("#physics-master")).toBeDisabled();
+      await expect(participant.page.locator("#physics-apply")).toBeDisabled();
     }
     const guest = participants[1],
       id = await guest.page.evaluate(() => window.fern.network.localId());

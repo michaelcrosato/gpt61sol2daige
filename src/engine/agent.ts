@@ -1,6 +1,7 @@
 import { ARCHETYPES, type AreaRecipe, areaRecipe, MECHANICS, THEMES } from "../game/content.ts";
 import { SKILLS } from "../game/skills.ts";
 import type { AdventureAction } from "../game/types.ts";
+import type { PolicyEdit } from "../physics/policies.ts";
 import { createPlayground } from "../physics/runtime.ts";
 import type { BodyRecipe } from "../physics/types.ts";
 import { ENGINE_VERSION, idleInput, MAX_NPCS, type SaveState, Simulation } from "./simulation.ts";
@@ -8,13 +9,25 @@ import { LANDMARKS, WORLD_LIMIT } from "./world.ts";
 
 export const COMMANDS = {
   physics: {
-    action: "inspect (default), reset (open/reset solo playground), close, spawn, impulse, sweep",
-    body: "spawn: BodyRecipe {id,motion:dynamic|fixed,shape:{kind:circle,radius}|{kind:box,width,height},x,y,angle?,mass?,friction?,restitution?,damping?,ccd?}",
+    action:
+      "inspect (default), reset, close, spawn, impulse, sweep, configure, apply, policy, place, drive",
+    body: "spawn: BodyRecipe {id,motion:dynamic|fixed,shape:{kind:circle,radius}|{kind:box,width,height},x,y,angle?,mass?,friction?,restitution?,damping?,ccd?,role?:prop|terrain|actor,areaId?,consequences?:{destroyed,claimed,durability?}}",
     id: "impulse: stable body ID",
     x: "impulse x in kg·Fern units/s; finite ±100000",
     y: "impulse y in kg·Fern units/s; finite ±100000",
     atX: "optional world-space application point; provide both atX and atY to spin",
     atY: "optional world-space application point",
+    expectedRevision:
+      "configure: policies.nextRevision; apply: expected final queued revision (browser must be paused)",
+    edits:
+      "configure: atomic PolicyEdit[]; master {enabled}, margin {value}, land/area/region {profile}, override {scope,id,values}, preset {scope,id,preset:Quiet|Reactive|Wild|Sanctuary}, reset {scope,id,to:inherited|authored}, remove {scope,id}",
+    profiles:
+      "land {id,values}; area {id,landId,values}; region {id,areaId,priority,shape,values}. shape: circle {x,y,radius}, rectangle {x,y,width,height} (top-left), polygon {points:[{x,y}]}",
+    values:
+      "worldReactions, dynamicProps, propBlocking: boolean; impulseStrength: finite 0..10. Omitted values inherit. More-specific debug overrides win; session master-off is absolute.",
+    areaId: "policy: inspect effective values/provenance at x,y in this area (default playground)",
+    placement:
+      "place: id,x,y relocates the existing lab body, clears motion and corrects wake overlaps; drive: id,x,y sets contact actor velocity (±600 units/s)",
     description:
       "Solo Rapier development selector; step/save/restore/replay include this scene. No adventure actors use it yet.",
   },
@@ -110,6 +123,14 @@ export class AgentRuntime {
       case "physics": {
         const action = command.action ?? "inspect";
         if (action === "inspect") return this.sim.playground?.inspect() ?? { active: false };
+        if (action === "policy") {
+          if (!this.sim.playground) throw new Error("Open the playground first");
+          return this.sim.playground.policyAt(
+            typeof command.areaId === "string" ? command.areaId : "playground",
+            num("x", 0),
+            num("y", 0),
+          );
+        }
         if (this.sim.players.size > 1) throw new Error("Physics playground is solo-only until M04");
         if (action === "reset" || action === "close") {
           const next = action === "reset" ? createPlayground() : null;
@@ -119,7 +140,17 @@ export class AgentRuntime {
           const world = this.sim.playground;
           if (!world) throw new Error("Open the physics playground with physics/reset first");
           if (action === "spawn") world.spawn(command.body as BodyRecipe);
-          else if (action === "impulse") {
+          else if (action === "configure")
+            result = world.configure({
+              expectedRevision: num("expectedRevision"),
+              edits: command.edits as PolicyEdit[],
+            });
+          else if (action === "apply") result = world.applyPolicies(num("expectedRevision"));
+          else if (action === "place" || action === "drive") {
+            if (typeof command.id !== "string") throw new Error("Physics body id is required");
+            if (action === "place") world.place(command.id, num("x"), num("y"));
+            else world.drive(command.id, num("x", 0), num("y", 0));
+          } else if (action === "impulse") {
             if (typeof command.id !== "string") throw new Error("Physics body id is required");
             world.impulse(
               command.id,

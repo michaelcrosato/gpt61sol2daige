@@ -1,0 +1,5159 @@
+{
+  "scene": "examples/physics-regions.jsonl",
+  "before": {
+    "backend": "Rapier2D 0.21.0",
+    "units": 16,
+    "tick": 68,
+    "contacts": 0,
+    "bodies": [
+      {
+        "id": "backstop",
+        "motion": "fixed",
+        "shape": {
+          "kind": "box",
+          "width": 440,
+          "height": 12
+        },
+        "x": 0,
+        "y": -158,
+        "angle": 0,
+        "vx": 0,
+        "vy": 0,
+        "angularVelocity": 0,
+        "sleeping": false,
+        "frozen": false,
+        "reactivationBlocked": false,
+        "policy": {
+          "values": {
+            "worldReactions": true,
+            "dynamicProps": true,
+            "propBlocking": true,
+            "impulseStrength": 1
+          },
+          "effective": {
+            "worldReactions": true,
+            "dynamicProps": true,
+            "propBlocking": true,
+            "impulseStrength": 1
+          },
+          "provenance": {
+            "worldReactions": "area:playground/override",
+            "dynamicProps": "area:playground/profile",
+            "propBlocking": "area:playground/profile",
+            "impulseStrength": "engine-default"
+          },
+          "landId": "lab-land",
+          "areaId": "playground",
+          "regions": []
+        }
+      },
+      {
+        "id": "crate-0",
+        "motion": "dynamic",
+        "shape": {
+          "kind": "box",
+          "width": 26,
+          "height": 26
+        },
+        "x": -50,
+        "y": -40,
+        "mass": 2,
+        "restitution": 0.25,
+        "angle": 0,
+        "vx": 0,
+        "vy": 0,
+        "angularVelocity": 0,
+        "sleeping": false,
+        "frozen": false,
+        "reactivationBlocked": false,
+        "policy": {
+          "values": {
+            "worldReactions": true,
+            "dynamicProps": true,
+            "propBlocking": true,
+            "impulseStrength": 1
+          },
+          "effective": {
+            "worldReactions": true,
+            "dynamicProps": true,
+            "propBlocking": true,
+            "impulseStrength": 1
+          },
+          "provenance": {
+            "worldReactions": "area:playground/override",
+            "dynamicProps": "area:playground/profile",
+            "propBlocking": "area:playground/profile",
+            "impulseStrength": "engine-default"
+          },
+          "landId": "lab-land",
+          "areaId": "playground",
+          "regions": []
+        }
+      },
+      {
+        "id": "crate-1",
+        "motion": "dynamic",
+        "shape": {
+          "kind": "box",
+          "width": 26,
+          "height": 26
+        },
+        "x": -21,
+        "y": -40,
+        "mass": 2,
+        "restitution": 0.25,
+        "angle": 0,
+        "vx": 0,
+        "vy": 0,
+        "angularVelocity": 0,
+        "sleeping": false,
+        "frozen": false,
+        "reactivationBlocked": false,
+        "policy": {
+          "values": {
+            "worldReactions": true,
+            "dynamicProps": true,
+            "propBlocking": true,
+            "impulseStrength": 1
+          },
+          "effective": {
+            "worldReactions": true,
+            "dynamicProps": true,
+            "propBlocking": true,
+            "impulseStrength": 1
+          },
+          "provenance": {
+            "worldReactions": "area:playground/override",
+            "dynamicProps": "area:playground/profile",
+            "propBlocking": "area:playground/profile",
+            "impulseStrength": "engine-default"
+          },
+          "landId": "lab-land",
+          "areaId": "playground",
+          "regions": []
+        }
+      },
+      {
+        "id": "crate-2",
+        "motion": "dynamic",
+        "shape": {
+          "kind": "box",
+          "width": 26,
+          "height": 26
+        },
+        "x": 8,
+        "y": -40,
+        "mass": 2,
+        "restitution": 0.25,
+        "angle": 0,
+        "vx": 0,
+        "vy": 0,
+        "angularVelocity": 0,
+        "sleeping": false,
+        "frozen": false,
+        "reactivationBlocked": false,
+        "policy": {
+          "values": {
+            "worldReactions": true,
+            "dynamicProps": true,
+            "propBlocking": true,
+            "impulseStrength": 1
+          },
+          "effective": {
+            "worldReactions": true,
+            "dynamicProps": true,
+            "propBlocking": true,
+            "impulseStrength": 1
+          },
+          "provenance": {
+            "worldReactions": "area:playground/override",
+            "dynamicProps": "area:playground/profile",
+            "propBlocking": "area:playground/profile",
+            "impulseStrength": "engine-default"
+          },
+          "landId": "lab-land",
+          "areaId": "playground",
+          "regions": []
+        }
+      },
+      {
+        "id": "crate-3",
+        "motion": "dynamic",
+        "shape": {
+          "kind": "box",
+          "width": 26,
+          "height": 26
+        },
+        "x": -50,
+        "y": -11,
+        "mass": 2,
+        "restitution": 0.25,
+        "angle": 0,
+        "vx": 0,
+        "vy": 0,
+        "angularVelocity": 0,
+        "sleeping": false,
+        "frozen": false,
+        "reactivationBlocked": false,
+        "policy": {
+          "values": {
+            "worldReactions": true,
+            "dynamicProps": true,
+            "propBlocking": true,
+            "impulseStrength": 1
+          },
+          "effective": {
+            "worldReactions": true,
+            "dynamicProps": true,
+            "propBlocking": true,
+            "impulseStrength": 1
+          },
+          "provenance": {
+            "worldReactions": "area:playground/override",
+            "dynamicProps": "area:playground/profile",
+            "propBlocking": "area:playground/profile",
+            "impulseStrength": "engine-default"
+          },
+          "landId": "lab-land",
+          "areaId": "playground",
+          "regions": []
+        }
+      },
+      {
+        "id": "crate-4",
+        "motion": "dynamic",
+        "shape": {
+          "kind": "box",
+          "width": 26,
+          "height": 26
+        },
+        "x": -21,
+        "y": -11,
+        "mass": 2,
+        "restitution": 0.25,
+        "angle": 0,
+        "vx": 0,
+        "vy": 0,
+        "angularVelocity": 0,
+        "sleeping": false,
+        "frozen": false,
+        "reactivationBlocked": false,
+        "policy": {
+          "values": {
+            "worldReactions": true,
+            "dynamicProps": true,
+            "propBlocking": true,
+            "impulseStrength": 1
+          },
+          "effective": {
+            "worldReactions": true,
+            "dynamicProps": true,
+            "propBlocking": true,
+            "impulseStrength": 1
+          },
+          "provenance": {
+            "worldReactions": "area:playground/override",
+            "dynamicProps": "area:playground/profile",
+            "propBlocking": "area:playground/profile",
+            "impulseStrength": "engine-default"
+          },
+          "landId": "lab-land",
+          "areaId": "playground",
+          "regions": []
+        }
+      },
+      {
+        "id": "crate-5",
+        "motion": "dynamic",
+        "shape": {
+          "kind": "box",
+          "width": 26,
+          "height": 26
+        },
+        "x": 8,
+        "y": -11,
+        "mass": 2,
+        "restitution": 0.25,
+        "angle": 0,
+        "vx": 0,
+        "vy": 0,
+        "angularVelocity": 0,
+        "sleeping": false,
+        "frozen": false,
+        "reactivationBlocked": false,
+        "policy": {
+          "values": {
+            "worldReactions": true,
+            "dynamicProps": true,
+            "propBlocking": true,
+            "impulseStrength": 1
+          },
+          "effective": {
+            "worldReactions": true,
+            "dynamicProps": true,
+            "propBlocking": true,
+            "impulseStrength": 1
+          },
+          "provenance": {
+            "worldReactions": "area:playground/override",
+            "dynamicProps": "area:playground/profile",
+            "propBlocking": "area:playground/profile",
+            "impulseStrength": "engine-default"
+          },
+          "landId": "lab-land",
+          "areaId": "playground",
+          "regions": []
+        }
+      },
+      {
+        "id": "crossing-crate",
+        "motion": "dynamic",
+        "shape": {
+          "kind": "box",
+          "width": 12,
+          "height": 12
+        },
+        "x": -129,
+        "y": -85,
+        "mass": 1,
+        "damping": 0,
+        "consequences": {
+          "destroyed": false,
+          "claimed": true,
+          "durability": 7
+        },
+        "angle": -2.288381338119507,
+        "vx": 0,
+        "vy": 0,
+        "angularVelocity": 0,
+        "sleeping": false,
+        "frozen": false,
+        "reactivationBlocked": false,
+        "policy": {
+          "values": {
+            "worldReactions": true,
+            "dynamicProps": true,
+            "propBlocking": true,
+            "impulseStrength": 2
+          },
+          "effective": {
+            "worldReactions": true,
+            "dynamicProps": true,
+            "propBlocking": true,
+            "impulseStrength": 2
+          },
+          "provenance": {
+            "worldReactions": "region:circle/override",
+            "dynamicProps": "region:circle/override",
+            "propBlocking": "area:playground/profile",
+            "impulseStrength": "region:polygon/profile"
+          },
+          "landId": "lab-land",
+          "areaId": "playground",
+          "regions": ["circle", "polygon"]
+        }
+      },
+      {
+        "id": "sweep",
+        "motion": "dynamic",
+        "shape": {
+          "kind": "circle",
+          "radius": 4
+        },
+        "x": -180,
+        "y": 110,
+        "mass": 0.5,
+        "restitution": 0,
+        "damping": 0,
+        "ccd": true,
+        "angle": 0,
+        "vx": 0,
+        "vy": 0,
+        "angularVelocity": 0,
+        "sleeping": false,
+        "frozen": false,
+        "reactivationBlocked": false,
+        "policy": {
+          "values": {
+            "worldReactions": true,
+            "dynamicProps": true,
+            "propBlocking": true,
+            "impulseStrength": 1
+          },
+          "effective": {
+            "worldReactions": true,
+            "dynamicProps": true,
+            "propBlocking": true,
+            "impulseStrength": 1
+          },
+          "provenance": {
+            "worldReactions": "area:playground/override",
+            "dynamicProps": "area:playground/profile",
+            "propBlocking": "area:playground/profile",
+            "impulseStrength": "engine-default"
+          },
+          "landId": "lab-land",
+          "areaId": "playground",
+          "regions": []
+        }
+      },
+      {
+        "id": "wall",
+        "motion": "fixed",
+        "shape": {
+          "kind": "box",
+          "width": 12,
+          "height": 300
+        },
+        "x": 128,
+        "y": 0,
+        "angle": 0,
+        "vx": 0,
+        "vy": 0,
+        "angularVelocity": 0,
+        "sleeping": false,
+        "frozen": false,
+        "reactivationBlocked": false,
+        "policy": {
+          "values": {
+            "worldReactions": true,
+            "dynamicProps": true,
+            "propBlocking": true,
+            "impulseStrength": 1
+          },
+          "effective": {
+            "worldReactions": true,
+            "dynamicProps": true,
+            "propBlocking": true,
+            "impulseStrength": 1
+          },
+          "provenance": {
+            "worldReactions": "area:playground/override",
+            "dynamicProps": "area:playground/profile",
+            "propBlocking": "area:playground/profile",
+            "impulseStrength": "engine-default"
+          },
+          "landId": "lab-land",
+          "areaId": "playground",
+          "regions": []
+        }
+      },
+      {
+        "id": "wheel",
+        "motion": "dynamic",
+        "shape": {
+          "kind": "circle",
+          "radius": 16
+        },
+        "x": -140,
+        "y": 45,
+        "mass": 1,
+        "angle": 0,
+        "vx": 0,
+        "vy": 0,
+        "angularVelocity": 0,
+        "sleeping": false,
+        "frozen": false,
+        "reactivationBlocked": false,
+        "policy": {
+          "values": {
+            "worldReactions": true,
+            "dynamicProps": true,
+            "propBlocking": true,
+            "impulseStrength": 1
+          },
+          "effective": {
+            "worldReactions": true,
+            "dynamicProps": true,
+            "propBlocking": true,
+            "impulseStrength": 1
+          },
+          "provenance": {
+            "worldReactions": "area:playground/override",
+            "dynamicProps": "area:playground/profile",
+            "propBlocking": "area:playground/profile",
+            "impulseStrength": "engine-default"
+          },
+          "landId": "lab-land",
+          "areaId": "playground",
+          "regions": []
+        }
+      }
+    ],
+    "events": [],
+    "policies": {
+      "state": {
+        "version": 1,
+        "revision": 3,
+        "masterWorldReactions": true,
+        "boundaryMargin": 1,
+        "authored": {
+          "lands": [
+            {
+              "id": "lab-land",
+              "values": {
+                "worldReactions": true
+              }
+            }
+          ],
+          "areas": [
+            {
+              "id": "playground",
+              "landId": "lab-land",
+              "values": {
+                "dynamicProps": true,
+                "propBlocking": true
+              }
+            }
+          ],
+          "regions": [
+            {
+              "id": "quiet-garden",
+              "areaId": "playground",
+              "priority": 10,
+              "shape": {
+                "kind": "rectangle",
+                "x": -260,
+                "y": -120,
+                "width": 90,
+                "height": 100
+              },
+              "values": {
+                "worldReactions": false
+              }
+            }
+          ]
+        },
+        "profiles": {
+          "lands": [
+            {
+              "id": "lab-land",
+              "values": {
+                "worldReactions": true
+              }
+            }
+          ],
+          "areas": [
+            {
+              "id": "playground",
+              "landId": "lab-land",
+              "values": {
+                "dynamicProps": true,
+                "propBlocking": true
+              }
+            }
+          ],
+          "regions": [
+            {
+              "id": "circle",
+              "areaId": "playground",
+              "priority": 30,
+              "shape": {
+                "kind": "circle",
+                "x": -125,
+                "y": -85,
+                "radius": 20
+              },
+              "values": {
+                "dynamicProps": false
+              }
+            },
+            {
+              "id": "polygon",
+              "areaId": "playground",
+              "priority": 40,
+              "shape": {
+                "kind": "polygon",
+                "points": [
+                  {
+                    "x": -150,
+                    "y": -105
+                  },
+                  {
+                    "x": -100,
+                    "y": -105
+                  },
+                  {
+                    "x": -100,
+                    "y": -60
+                  },
+                  {
+                    "x": -150,
+                    "y": -60
+                  }
+                ]
+              },
+              "values": {
+                "impulseStrength": 2
+              }
+            },
+            {
+              "id": "quiet-garden",
+              "areaId": "playground",
+              "priority": 10,
+              "shape": {
+                "kind": "rectangle",
+                "x": -260,
+                "y": -120,
+                "width": 90,
+                "height": 100
+              },
+              "values": {
+                "worldReactions": false
+              }
+            }
+          ]
+        },
+        "overrides": [
+          {
+            "scope": "land",
+            "id": "lab-land",
+            "values": {
+              "worldReactions": false
+            }
+          },
+          {
+            "scope": "area",
+            "id": "playground",
+            "values": {
+              "worldReactions": true
+            }
+          },
+          {
+            "scope": "region",
+            "id": "circle",
+            "values": {
+              "worldReactions": true,
+              "dynamicProps": true
+            }
+          }
+        ]
+      },
+      "pending": [],
+      "nextRevision": 3,
+      "preview": {
+        "version": 1,
+        "revision": 3,
+        "masterWorldReactions": true,
+        "boundaryMargin": 1,
+        "authored": {
+          "lands": [
+            {
+              "id": "lab-land",
+              "values": {
+                "worldReactions": true
+              }
+            }
+          ],
+          "areas": [
+            {
+              "id": "playground",
+              "landId": "lab-land",
+              "values": {
+                "dynamicProps": true,
+                "propBlocking": true
+              }
+            }
+          ],
+          "regions": [
+            {
+              "id": "quiet-garden",
+              "areaId": "playground",
+              "priority": 10,
+              "shape": {
+                "kind": "rectangle",
+                "x": -260,
+                "y": -120,
+                "width": 90,
+                "height": 100
+              },
+              "values": {
+                "worldReactions": false
+              }
+            }
+          ]
+        },
+        "profiles": {
+          "lands": [
+            {
+              "id": "lab-land",
+              "values": {
+                "worldReactions": true
+              }
+            }
+          ],
+          "areas": [
+            {
+              "id": "playground",
+              "landId": "lab-land",
+              "values": {
+                "dynamicProps": true,
+                "propBlocking": true
+              }
+            }
+          ],
+          "regions": [
+            {
+              "id": "circle",
+              "areaId": "playground",
+              "priority": 30,
+              "shape": {
+                "kind": "circle",
+                "x": -125,
+                "y": -85,
+                "radius": 20
+              },
+              "values": {
+                "dynamicProps": false
+              }
+            },
+            {
+              "id": "polygon",
+              "areaId": "playground",
+              "priority": 40,
+              "shape": {
+                "kind": "polygon",
+                "points": [
+                  {
+                    "x": -150,
+                    "y": -105
+                  },
+                  {
+                    "x": -100,
+                    "y": -105
+                  },
+                  {
+                    "x": -100,
+                    "y": -60
+                  },
+                  {
+                    "x": -150,
+                    "y": -60
+                  }
+                ]
+              },
+              "values": {
+                "impulseStrength": 2
+              }
+            },
+            {
+              "id": "quiet-garden",
+              "areaId": "playground",
+              "priority": 10,
+              "shape": {
+                "kind": "rectangle",
+                "x": -260,
+                "y": -120,
+                "width": 90,
+                "height": 100
+              },
+              "values": {
+                "worldReactions": false
+              }
+            }
+          ]
+        },
+        "overrides": [
+          {
+            "scope": "land",
+            "id": "lab-land",
+            "values": {
+              "worldReactions": false
+            }
+          },
+          {
+            "scope": "area",
+            "id": "playground",
+            "values": {
+              "worldReactions": true
+            }
+          },
+          {
+            "scope": "region",
+            "id": "circle",
+            "values": {
+              "worldReactions": true,
+              "dynamicProps": true
+            }
+          }
+        ]
+      },
+      "capabilities": ["worldReactions", "dynamicProps", "propBlocking", "impulseStrength"],
+      "presets": {
+        "Quiet": {
+          "worldReactions": false,
+          "dynamicProps": false,
+          "propBlocking": false,
+          "impulseStrength": 1
+        },
+        "Reactive": {
+          "worldReactions": true,
+          "dynamicProps": true,
+          "propBlocking": true,
+          "impulseStrength": 1
+        },
+        "Wild": {
+          "worldReactions": true,
+          "dynamicProps": true,
+          "propBlocking": true,
+          "impulseStrength": 2.5
+        },
+        "Sanctuary": {
+          "worldReactions": true,
+          "dynamicProps": true,
+          "propBlocking": false,
+          "impulseStrength": 0.35
+        }
+      }
+    }
+  },
+  "replayHash": "d0ca9dde",
+  "continuationHash": "1483a8eb",
+  "snapshotContinuation": "passed",
+  "policySamples": [
+    {
+      "backend": "Rapier2D 0.21.0",
+      "units": 16,
+      "tick": 30,
+      "contacts": 0,
+      "bodies": [
+        {
+          "id": "backstop",
+          "motion": "fixed",
+          "shape": {
+            "kind": "box",
+            "width": 440,
+            "height": 12
+          },
+          "x": 0,
+          "y": -158,
+          "angle": 0,
+          "vx": 0,
+          "vy": 0,
+          "angularVelocity": 0,
+          "sleeping": false,
+          "frozen": false,
+          "reactivationBlocked": false,
+          "policy": {
+            "values": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "effective": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "provenance": {
+              "worldReactions": "land:lab-land/profile",
+              "dynamicProps": "area:playground/profile",
+              "propBlocking": "area:playground/profile",
+              "impulseStrength": "engine-default"
+            },
+            "landId": "lab-land",
+            "areaId": "playground",
+            "regions": []
+          }
+        },
+        {
+          "id": "crate-0",
+          "motion": "dynamic",
+          "shape": {
+            "kind": "box",
+            "width": 26,
+            "height": 26
+          },
+          "x": -50,
+          "y": -40,
+          "mass": 2,
+          "restitution": 0.25,
+          "angle": 0,
+          "vx": 0,
+          "vy": 0,
+          "angularVelocity": 0,
+          "sleeping": false,
+          "frozen": false,
+          "reactivationBlocked": false,
+          "policy": {
+            "values": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "effective": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "provenance": {
+              "worldReactions": "land:lab-land/profile",
+              "dynamicProps": "area:playground/profile",
+              "propBlocking": "area:playground/profile",
+              "impulseStrength": "engine-default"
+            },
+            "landId": "lab-land",
+            "areaId": "playground",
+            "regions": []
+          }
+        },
+        {
+          "id": "crate-1",
+          "motion": "dynamic",
+          "shape": {
+            "kind": "box",
+            "width": 26,
+            "height": 26
+          },
+          "x": -21,
+          "y": -40,
+          "mass": 2,
+          "restitution": 0.25,
+          "angle": 0,
+          "vx": 0,
+          "vy": 0,
+          "angularVelocity": 0,
+          "sleeping": false,
+          "frozen": false,
+          "reactivationBlocked": false,
+          "policy": {
+            "values": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "effective": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "provenance": {
+              "worldReactions": "land:lab-land/profile",
+              "dynamicProps": "area:playground/profile",
+              "propBlocking": "area:playground/profile",
+              "impulseStrength": "engine-default"
+            },
+            "landId": "lab-land",
+            "areaId": "playground",
+            "regions": []
+          }
+        },
+        {
+          "id": "crate-2",
+          "motion": "dynamic",
+          "shape": {
+            "kind": "box",
+            "width": 26,
+            "height": 26
+          },
+          "x": 8,
+          "y": -40,
+          "mass": 2,
+          "restitution": 0.25,
+          "angle": 0,
+          "vx": 0,
+          "vy": 0,
+          "angularVelocity": 0,
+          "sleeping": false,
+          "frozen": false,
+          "reactivationBlocked": false,
+          "policy": {
+            "values": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "effective": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "provenance": {
+              "worldReactions": "land:lab-land/profile",
+              "dynamicProps": "area:playground/profile",
+              "propBlocking": "area:playground/profile",
+              "impulseStrength": "engine-default"
+            },
+            "landId": "lab-land",
+            "areaId": "playground",
+            "regions": []
+          }
+        },
+        {
+          "id": "crate-3",
+          "motion": "dynamic",
+          "shape": {
+            "kind": "box",
+            "width": 26,
+            "height": 26
+          },
+          "x": -50,
+          "y": -11,
+          "mass": 2,
+          "restitution": 0.25,
+          "angle": 0,
+          "vx": 0,
+          "vy": 0,
+          "angularVelocity": 0,
+          "sleeping": false,
+          "frozen": false,
+          "reactivationBlocked": false,
+          "policy": {
+            "values": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "effective": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "provenance": {
+              "worldReactions": "land:lab-land/profile",
+              "dynamicProps": "area:playground/profile",
+              "propBlocking": "area:playground/profile",
+              "impulseStrength": "engine-default"
+            },
+            "landId": "lab-land",
+            "areaId": "playground",
+            "regions": []
+          }
+        },
+        {
+          "id": "crate-4",
+          "motion": "dynamic",
+          "shape": {
+            "kind": "box",
+            "width": 26,
+            "height": 26
+          },
+          "x": -21,
+          "y": -11,
+          "mass": 2,
+          "restitution": 0.25,
+          "angle": 0,
+          "vx": 0,
+          "vy": 0,
+          "angularVelocity": 0,
+          "sleeping": false,
+          "frozen": false,
+          "reactivationBlocked": false,
+          "policy": {
+            "values": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "effective": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "provenance": {
+              "worldReactions": "land:lab-land/profile",
+              "dynamicProps": "area:playground/profile",
+              "propBlocking": "area:playground/profile",
+              "impulseStrength": "engine-default"
+            },
+            "landId": "lab-land",
+            "areaId": "playground",
+            "regions": []
+          }
+        },
+        {
+          "id": "crate-5",
+          "motion": "dynamic",
+          "shape": {
+            "kind": "box",
+            "width": 26,
+            "height": 26
+          },
+          "x": 8,
+          "y": -11,
+          "mass": 2,
+          "restitution": 0.25,
+          "angle": 0,
+          "vx": 0,
+          "vy": 0,
+          "angularVelocity": 0,
+          "sleeping": false,
+          "frozen": false,
+          "reactivationBlocked": false,
+          "policy": {
+            "values": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "effective": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "provenance": {
+              "worldReactions": "land:lab-land/profile",
+              "dynamicProps": "area:playground/profile",
+              "propBlocking": "area:playground/profile",
+              "impulseStrength": "engine-default"
+            },
+            "landId": "lab-land",
+            "areaId": "playground",
+            "regions": []
+          }
+        },
+        {
+          "id": "crossing-crate",
+          "motion": "dynamic",
+          "shape": {
+            "kind": "box",
+            "width": 12,
+            "height": 12
+          },
+          "x": -172,
+          "y": -85,
+          "mass": 1,
+          "damping": 0,
+          "consequences": {
+            "destroyed": false,
+            "claimed": true,
+            "durability": 7
+          },
+          "angle": -2.288381338119507,
+          "vx": 0,
+          "vy": 0,
+          "angularVelocity": 0,
+          "sleeping": false,
+          "frozen": true,
+          "reactivationBlocked": false,
+          "policy": {
+            "values": {
+              "worldReactions": false,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "effective": {
+              "worldReactions": false,
+              "dynamicProps": false,
+              "propBlocking": false,
+              "impulseStrength": 1
+            },
+            "provenance": {
+              "worldReactions": "region:quiet-garden/profile",
+              "dynamicProps": "area:playground/profile",
+              "propBlocking": "area:playground/profile",
+              "impulseStrength": "engine-default"
+            },
+            "landId": "lab-land",
+            "areaId": "playground",
+            "regions": ["quiet-garden"]
+          }
+        },
+        {
+          "id": "sweep",
+          "motion": "dynamic",
+          "shape": {
+            "kind": "circle",
+            "radius": 4
+          },
+          "x": -180,
+          "y": 110,
+          "mass": 0.5,
+          "restitution": 0,
+          "damping": 0,
+          "ccd": true,
+          "angle": 0,
+          "vx": 0,
+          "vy": 0,
+          "angularVelocity": 0,
+          "sleeping": false,
+          "frozen": false,
+          "reactivationBlocked": false,
+          "policy": {
+            "values": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "effective": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "provenance": {
+              "worldReactions": "land:lab-land/profile",
+              "dynamicProps": "area:playground/profile",
+              "propBlocking": "area:playground/profile",
+              "impulseStrength": "engine-default"
+            },
+            "landId": "lab-land",
+            "areaId": "playground",
+            "regions": []
+          }
+        },
+        {
+          "id": "wall",
+          "motion": "fixed",
+          "shape": {
+            "kind": "box",
+            "width": 12,
+            "height": 300
+          },
+          "x": 128,
+          "y": 0,
+          "angle": 0,
+          "vx": 0,
+          "vy": 0,
+          "angularVelocity": 0,
+          "sleeping": false,
+          "frozen": false,
+          "reactivationBlocked": false,
+          "policy": {
+            "values": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "effective": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "provenance": {
+              "worldReactions": "land:lab-land/profile",
+              "dynamicProps": "area:playground/profile",
+              "propBlocking": "area:playground/profile",
+              "impulseStrength": "engine-default"
+            },
+            "landId": "lab-land",
+            "areaId": "playground",
+            "regions": []
+          }
+        },
+        {
+          "id": "wheel",
+          "motion": "dynamic",
+          "shape": {
+            "kind": "circle",
+            "radius": 16
+          },
+          "x": -140,
+          "y": 45,
+          "mass": 1,
+          "angle": 0,
+          "vx": 0,
+          "vy": 0,
+          "angularVelocity": 0,
+          "sleeping": false,
+          "frozen": false,
+          "reactivationBlocked": false,
+          "policy": {
+            "values": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "effective": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "provenance": {
+              "worldReactions": "land:lab-land/profile",
+              "dynamicProps": "area:playground/profile",
+              "propBlocking": "area:playground/profile",
+              "impulseStrength": "engine-default"
+            },
+            "landId": "lab-land",
+            "areaId": "playground",
+            "regions": []
+          }
+        }
+      ],
+      "events": [],
+      "policies": {
+        "state": {
+          "version": 1,
+          "revision": 0,
+          "masterWorldReactions": true,
+          "boundaryMargin": 1,
+          "authored": {
+            "lands": [
+              {
+                "id": "lab-land",
+                "values": {
+                  "worldReactions": true
+                }
+              }
+            ],
+            "areas": [
+              {
+                "id": "playground",
+                "landId": "lab-land",
+                "values": {
+                  "dynamicProps": true,
+                  "propBlocking": true
+                }
+              }
+            ],
+            "regions": [
+              {
+                "id": "quiet-garden",
+                "areaId": "playground",
+                "priority": 10,
+                "shape": {
+                  "kind": "rectangle",
+                  "x": -260,
+                  "y": -120,
+                  "width": 90,
+                  "height": 100
+                },
+                "values": {
+                  "worldReactions": false
+                }
+              }
+            ]
+          },
+          "profiles": {
+            "lands": [
+              {
+                "id": "lab-land",
+                "values": {
+                  "worldReactions": true
+                }
+              }
+            ],
+            "areas": [
+              {
+                "id": "playground",
+                "landId": "lab-land",
+                "values": {
+                  "dynamicProps": true,
+                  "propBlocking": true
+                }
+              }
+            ],
+            "regions": [
+              {
+                "id": "quiet-garden",
+                "areaId": "playground",
+                "priority": 10,
+                "shape": {
+                  "kind": "rectangle",
+                  "x": -260,
+                  "y": -120,
+                  "width": 90,
+                  "height": 100
+                },
+                "values": {
+                  "worldReactions": false
+                }
+              }
+            ]
+          },
+          "overrides": []
+        },
+        "pending": [],
+        "nextRevision": 0,
+        "preview": {
+          "version": 1,
+          "revision": 0,
+          "masterWorldReactions": true,
+          "boundaryMargin": 1,
+          "authored": {
+            "lands": [
+              {
+                "id": "lab-land",
+                "values": {
+                  "worldReactions": true
+                }
+              }
+            ],
+            "areas": [
+              {
+                "id": "playground",
+                "landId": "lab-land",
+                "values": {
+                  "dynamicProps": true,
+                  "propBlocking": true
+                }
+              }
+            ],
+            "regions": [
+              {
+                "id": "quiet-garden",
+                "areaId": "playground",
+                "priority": 10,
+                "shape": {
+                  "kind": "rectangle",
+                  "x": -260,
+                  "y": -120,
+                  "width": 90,
+                  "height": 100
+                },
+                "values": {
+                  "worldReactions": false
+                }
+              }
+            ]
+          },
+          "profiles": {
+            "lands": [
+              {
+                "id": "lab-land",
+                "values": {
+                  "worldReactions": true
+                }
+              }
+            ],
+            "areas": [
+              {
+                "id": "playground",
+                "landId": "lab-land",
+                "values": {
+                  "dynamicProps": true,
+                  "propBlocking": true
+                }
+              }
+            ],
+            "regions": [
+              {
+                "id": "quiet-garden",
+                "areaId": "playground",
+                "priority": 10,
+                "shape": {
+                  "kind": "rectangle",
+                  "x": -260,
+                  "y": -120,
+                  "width": 90,
+                  "height": 100
+                },
+                "values": {
+                  "worldReactions": false
+                }
+              }
+            ]
+          },
+          "overrides": []
+        },
+        "capabilities": ["worldReactions", "dynamicProps", "propBlocking", "impulseStrength"],
+        "presets": {
+          "Quiet": {
+            "worldReactions": false,
+            "dynamicProps": false,
+            "propBlocking": false,
+            "impulseStrength": 1
+          },
+          "Reactive": {
+            "worldReactions": true,
+            "dynamicProps": true,
+            "propBlocking": true,
+            "impulseStrength": 1
+          },
+          "Wild": {
+            "worldReactions": true,
+            "dynamicProps": true,
+            "propBlocking": true,
+            "impulseStrength": 2.5
+          },
+          "Sanctuary": {
+            "worldReactions": true,
+            "dynamicProps": true,
+            "propBlocking": false,
+            "impulseStrength": 0.35
+          }
+        }
+      }
+    },
+    {
+      "backend": "Rapier2D 0.21.0",
+      "units": 16,
+      "tick": 60,
+      "contacts": 0,
+      "bodies": [
+        {
+          "id": "backstop",
+          "motion": "fixed",
+          "shape": {
+            "kind": "box",
+            "width": 440,
+            "height": 12
+          },
+          "x": 0,
+          "y": -158,
+          "angle": 0,
+          "vx": 0,
+          "vy": 0,
+          "angularVelocity": 0,
+          "sleeping": false,
+          "frozen": false,
+          "reactivationBlocked": false,
+          "policy": {
+            "values": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "effective": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "provenance": {
+              "worldReactions": "land:lab-land/profile",
+              "dynamicProps": "area:playground/profile",
+              "propBlocking": "area:playground/profile",
+              "impulseStrength": "engine-default"
+            },
+            "landId": "lab-land",
+            "areaId": "playground",
+            "regions": []
+          }
+        },
+        {
+          "id": "crate-0",
+          "motion": "dynamic",
+          "shape": {
+            "kind": "box",
+            "width": 26,
+            "height": 26
+          },
+          "x": -50,
+          "y": -40,
+          "mass": 2,
+          "restitution": 0.25,
+          "angle": 0,
+          "vx": 0,
+          "vy": 0,
+          "angularVelocity": 0,
+          "sleeping": true,
+          "frozen": false,
+          "reactivationBlocked": false,
+          "policy": {
+            "values": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "effective": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "provenance": {
+              "worldReactions": "land:lab-land/profile",
+              "dynamicProps": "area:playground/profile",
+              "propBlocking": "area:playground/profile",
+              "impulseStrength": "engine-default"
+            },
+            "landId": "lab-land",
+            "areaId": "playground",
+            "regions": []
+          }
+        },
+        {
+          "id": "crate-1",
+          "motion": "dynamic",
+          "shape": {
+            "kind": "box",
+            "width": 26,
+            "height": 26
+          },
+          "x": -21,
+          "y": -40,
+          "mass": 2,
+          "restitution": 0.25,
+          "angle": 0,
+          "vx": 0,
+          "vy": 0,
+          "angularVelocity": 0,
+          "sleeping": true,
+          "frozen": false,
+          "reactivationBlocked": false,
+          "policy": {
+            "values": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "effective": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "provenance": {
+              "worldReactions": "land:lab-land/profile",
+              "dynamicProps": "area:playground/profile",
+              "propBlocking": "area:playground/profile",
+              "impulseStrength": "engine-default"
+            },
+            "landId": "lab-land",
+            "areaId": "playground",
+            "regions": []
+          }
+        },
+        {
+          "id": "crate-2",
+          "motion": "dynamic",
+          "shape": {
+            "kind": "box",
+            "width": 26,
+            "height": 26
+          },
+          "x": 8,
+          "y": -40,
+          "mass": 2,
+          "restitution": 0.25,
+          "angle": 0,
+          "vx": 0,
+          "vy": 0,
+          "angularVelocity": 0,
+          "sleeping": true,
+          "frozen": false,
+          "reactivationBlocked": false,
+          "policy": {
+            "values": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "effective": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "provenance": {
+              "worldReactions": "land:lab-land/profile",
+              "dynamicProps": "area:playground/profile",
+              "propBlocking": "area:playground/profile",
+              "impulseStrength": "engine-default"
+            },
+            "landId": "lab-land",
+            "areaId": "playground",
+            "regions": []
+          }
+        },
+        {
+          "id": "crate-3",
+          "motion": "dynamic",
+          "shape": {
+            "kind": "box",
+            "width": 26,
+            "height": 26
+          },
+          "x": -50,
+          "y": -11,
+          "mass": 2,
+          "restitution": 0.25,
+          "angle": 0,
+          "vx": 0,
+          "vy": 0,
+          "angularVelocity": 0,
+          "sleeping": true,
+          "frozen": false,
+          "reactivationBlocked": false,
+          "policy": {
+            "values": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "effective": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "provenance": {
+              "worldReactions": "land:lab-land/profile",
+              "dynamicProps": "area:playground/profile",
+              "propBlocking": "area:playground/profile",
+              "impulseStrength": "engine-default"
+            },
+            "landId": "lab-land",
+            "areaId": "playground",
+            "regions": []
+          }
+        },
+        {
+          "id": "crate-4",
+          "motion": "dynamic",
+          "shape": {
+            "kind": "box",
+            "width": 26,
+            "height": 26
+          },
+          "x": -21,
+          "y": -11,
+          "mass": 2,
+          "restitution": 0.25,
+          "angle": 0,
+          "vx": 0,
+          "vy": 0,
+          "angularVelocity": 0,
+          "sleeping": true,
+          "frozen": false,
+          "reactivationBlocked": false,
+          "policy": {
+            "values": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "effective": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "provenance": {
+              "worldReactions": "land:lab-land/profile",
+              "dynamicProps": "area:playground/profile",
+              "propBlocking": "area:playground/profile",
+              "impulseStrength": "engine-default"
+            },
+            "landId": "lab-land",
+            "areaId": "playground",
+            "regions": []
+          }
+        },
+        {
+          "id": "crate-5",
+          "motion": "dynamic",
+          "shape": {
+            "kind": "box",
+            "width": 26,
+            "height": 26
+          },
+          "x": 8,
+          "y": -11,
+          "mass": 2,
+          "restitution": 0.25,
+          "angle": 0,
+          "vx": 0,
+          "vy": 0,
+          "angularVelocity": 0,
+          "sleeping": true,
+          "frozen": false,
+          "reactivationBlocked": false,
+          "policy": {
+            "values": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "effective": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "provenance": {
+              "worldReactions": "land:lab-land/profile",
+              "dynamicProps": "area:playground/profile",
+              "propBlocking": "area:playground/profile",
+              "impulseStrength": "engine-default"
+            },
+            "landId": "lab-land",
+            "areaId": "playground",
+            "regions": []
+          }
+        },
+        {
+          "id": "crossing-crate",
+          "motion": "dynamic",
+          "shape": {
+            "kind": "box",
+            "width": 12,
+            "height": 12
+          },
+          "x": -172,
+          "y": -85,
+          "mass": 1,
+          "damping": 0,
+          "consequences": {
+            "destroyed": false,
+            "claimed": true,
+            "durability": 7
+          },
+          "angle": -2.288381338119507,
+          "vx": 0,
+          "vy": 0,
+          "angularVelocity": 0,
+          "sleeping": false,
+          "frozen": true,
+          "reactivationBlocked": false,
+          "policy": {
+            "values": {
+              "worldReactions": false,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "effective": {
+              "worldReactions": false,
+              "dynamicProps": false,
+              "propBlocking": false,
+              "impulseStrength": 1
+            },
+            "provenance": {
+              "worldReactions": "region:quiet-garden/profile",
+              "dynamicProps": "area:playground/profile",
+              "propBlocking": "area:playground/profile",
+              "impulseStrength": "engine-default"
+            },
+            "landId": "lab-land",
+            "areaId": "playground",
+            "regions": ["quiet-garden"]
+          }
+        },
+        {
+          "id": "sweep",
+          "motion": "dynamic",
+          "shape": {
+            "kind": "circle",
+            "radius": 4
+          },
+          "x": -180,
+          "y": 110,
+          "mass": 0.5,
+          "restitution": 0,
+          "damping": 0,
+          "ccd": true,
+          "angle": 0,
+          "vx": 0,
+          "vy": 0,
+          "angularVelocity": 0,
+          "sleeping": true,
+          "frozen": false,
+          "reactivationBlocked": false,
+          "policy": {
+            "values": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "effective": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "provenance": {
+              "worldReactions": "land:lab-land/profile",
+              "dynamicProps": "area:playground/profile",
+              "propBlocking": "area:playground/profile",
+              "impulseStrength": "engine-default"
+            },
+            "landId": "lab-land",
+            "areaId": "playground",
+            "regions": []
+          }
+        },
+        {
+          "id": "wall",
+          "motion": "fixed",
+          "shape": {
+            "kind": "box",
+            "width": 12,
+            "height": 300
+          },
+          "x": 128,
+          "y": 0,
+          "angle": 0,
+          "vx": 0,
+          "vy": 0,
+          "angularVelocity": 0,
+          "sleeping": false,
+          "frozen": false,
+          "reactivationBlocked": false,
+          "policy": {
+            "values": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "effective": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "provenance": {
+              "worldReactions": "land:lab-land/profile",
+              "dynamicProps": "area:playground/profile",
+              "propBlocking": "area:playground/profile",
+              "impulseStrength": "engine-default"
+            },
+            "landId": "lab-land",
+            "areaId": "playground",
+            "regions": []
+          }
+        },
+        {
+          "id": "wheel",
+          "motion": "dynamic",
+          "shape": {
+            "kind": "circle",
+            "radius": 16
+          },
+          "x": -140,
+          "y": 45,
+          "mass": 1,
+          "angle": 0,
+          "vx": 0,
+          "vy": 0,
+          "angularVelocity": 0,
+          "sleeping": true,
+          "frozen": false,
+          "reactivationBlocked": false,
+          "policy": {
+            "values": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "effective": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "provenance": {
+              "worldReactions": "land:lab-land/profile",
+              "dynamicProps": "area:playground/profile",
+              "propBlocking": "area:playground/profile",
+              "impulseStrength": "engine-default"
+            },
+            "landId": "lab-land",
+            "areaId": "playground",
+            "regions": []
+          }
+        }
+      ],
+      "events": [],
+      "policies": {
+        "state": {
+          "version": 1,
+          "revision": 0,
+          "masterWorldReactions": true,
+          "boundaryMargin": 1,
+          "authored": {
+            "lands": [
+              {
+                "id": "lab-land",
+                "values": {
+                  "worldReactions": true
+                }
+              }
+            ],
+            "areas": [
+              {
+                "id": "playground",
+                "landId": "lab-land",
+                "values": {
+                  "dynamicProps": true,
+                  "propBlocking": true
+                }
+              }
+            ],
+            "regions": [
+              {
+                "id": "quiet-garden",
+                "areaId": "playground",
+                "priority": 10,
+                "shape": {
+                  "kind": "rectangle",
+                  "x": -260,
+                  "y": -120,
+                  "width": 90,
+                  "height": 100
+                },
+                "values": {
+                  "worldReactions": false
+                }
+              }
+            ]
+          },
+          "profiles": {
+            "lands": [
+              {
+                "id": "lab-land",
+                "values": {
+                  "worldReactions": true
+                }
+              }
+            ],
+            "areas": [
+              {
+                "id": "playground",
+                "landId": "lab-land",
+                "values": {
+                  "dynamicProps": true,
+                  "propBlocking": true
+                }
+              }
+            ],
+            "regions": [
+              {
+                "id": "quiet-garden",
+                "areaId": "playground",
+                "priority": 10,
+                "shape": {
+                  "kind": "rectangle",
+                  "x": -260,
+                  "y": -120,
+                  "width": 90,
+                  "height": 100
+                },
+                "values": {
+                  "worldReactions": false
+                }
+              }
+            ]
+          },
+          "overrides": []
+        },
+        "pending": [],
+        "nextRevision": 0,
+        "preview": {
+          "version": 1,
+          "revision": 0,
+          "masterWorldReactions": true,
+          "boundaryMargin": 1,
+          "authored": {
+            "lands": [
+              {
+                "id": "lab-land",
+                "values": {
+                  "worldReactions": true
+                }
+              }
+            ],
+            "areas": [
+              {
+                "id": "playground",
+                "landId": "lab-land",
+                "values": {
+                  "dynamicProps": true,
+                  "propBlocking": true
+                }
+              }
+            ],
+            "regions": [
+              {
+                "id": "quiet-garden",
+                "areaId": "playground",
+                "priority": 10,
+                "shape": {
+                  "kind": "rectangle",
+                  "x": -260,
+                  "y": -120,
+                  "width": 90,
+                  "height": 100
+                },
+                "values": {
+                  "worldReactions": false
+                }
+              }
+            ]
+          },
+          "profiles": {
+            "lands": [
+              {
+                "id": "lab-land",
+                "values": {
+                  "worldReactions": true
+                }
+              }
+            ],
+            "areas": [
+              {
+                "id": "playground",
+                "landId": "lab-land",
+                "values": {
+                  "dynamicProps": true,
+                  "propBlocking": true
+                }
+              }
+            ],
+            "regions": [
+              {
+                "id": "quiet-garden",
+                "areaId": "playground",
+                "priority": 10,
+                "shape": {
+                  "kind": "rectangle",
+                  "x": -260,
+                  "y": -120,
+                  "width": 90,
+                  "height": 100
+                },
+                "values": {
+                  "worldReactions": false
+                }
+              }
+            ]
+          },
+          "overrides": []
+        },
+        "capabilities": ["worldReactions", "dynamicProps", "propBlocking", "impulseStrength"],
+        "presets": {
+          "Quiet": {
+            "worldReactions": false,
+            "dynamicProps": false,
+            "propBlocking": false,
+            "impulseStrength": 1
+          },
+          "Reactive": {
+            "worldReactions": true,
+            "dynamicProps": true,
+            "propBlocking": true,
+            "impulseStrength": 1
+          },
+          "Wild": {
+            "worldReactions": true,
+            "dynamicProps": true,
+            "propBlocking": true,
+            "impulseStrength": 2.5
+          },
+          "Sanctuary": {
+            "worldReactions": true,
+            "dynamicProps": true,
+            "propBlocking": false,
+            "impulseStrength": 0.35
+          }
+        }
+      }
+    },
+    {
+      "backend": "Rapier2D 0.21.0",
+      "units": 16,
+      "tick": 60,
+      "contacts": 0,
+      "bodies": [
+        {
+          "id": "backstop",
+          "motion": "fixed",
+          "shape": {
+            "kind": "box",
+            "width": 440,
+            "height": 12
+          },
+          "x": 0,
+          "y": -158,
+          "angle": 0,
+          "vx": 0,
+          "vy": 0,
+          "angularVelocity": 0,
+          "sleeping": false,
+          "frozen": false,
+          "reactivationBlocked": false,
+          "policy": {
+            "values": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "effective": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "provenance": {
+              "worldReactions": "land:lab-land/profile",
+              "dynamicProps": "area:playground/profile",
+              "propBlocking": "area:playground/profile",
+              "impulseStrength": "engine-default"
+            },
+            "landId": "lab-land",
+            "areaId": "playground",
+            "regions": []
+          }
+        },
+        {
+          "id": "crate-0",
+          "motion": "dynamic",
+          "shape": {
+            "kind": "box",
+            "width": 26,
+            "height": 26
+          },
+          "x": -50,
+          "y": -40,
+          "mass": 2,
+          "restitution": 0.25,
+          "angle": 0,
+          "vx": 0,
+          "vy": 0,
+          "angularVelocity": 0,
+          "sleeping": true,
+          "frozen": false,
+          "reactivationBlocked": false,
+          "policy": {
+            "values": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "effective": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "provenance": {
+              "worldReactions": "land:lab-land/profile",
+              "dynamicProps": "area:playground/profile",
+              "propBlocking": "area:playground/profile",
+              "impulseStrength": "engine-default"
+            },
+            "landId": "lab-land",
+            "areaId": "playground",
+            "regions": []
+          }
+        },
+        {
+          "id": "crate-1",
+          "motion": "dynamic",
+          "shape": {
+            "kind": "box",
+            "width": 26,
+            "height": 26
+          },
+          "x": -21,
+          "y": -40,
+          "mass": 2,
+          "restitution": 0.25,
+          "angle": 0,
+          "vx": 0,
+          "vy": 0,
+          "angularVelocity": 0,
+          "sleeping": true,
+          "frozen": false,
+          "reactivationBlocked": false,
+          "policy": {
+            "values": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "effective": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "provenance": {
+              "worldReactions": "land:lab-land/profile",
+              "dynamicProps": "area:playground/profile",
+              "propBlocking": "area:playground/profile",
+              "impulseStrength": "engine-default"
+            },
+            "landId": "lab-land",
+            "areaId": "playground",
+            "regions": []
+          }
+        },
+        {
+          "id": "crate-2",
+          "motion": "dynamic",
+          "shape": {
+            "kind": "box",
+            "width": 26,
+            "height": 26
+          },
+          "x": 8,
+          "y": -40,
+          "mass": 2,
+          "restitution": 0.25,
+          "angle": 0,
+          "vx": 0,
+          "vy": 0,
+          "angularVelocity": 0,
+          "sleeping": true,
+          "frozen": false,
+          "reactivationBlocked": false,
+          "policy": {
+            "values": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "effective": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "provenance": {
+              "worldReactions": "land:lab-land/profile",
+              "dynamicProps": "area:playground/profile",
+              "propBlocking": "area:playground/profile",
+              "impulseStrength": "engine-default"
+            },
+            "landId": "lab-land",
+            "areaId": "playground",
+            "regions": []
+          }
+        },
+        {
+          "id": "crate-3",
+          "motion": "dynamic",
+          "shape": {
+            "kind": "box",
+            "width": 26,
+            "height": 26
+          },
+          "x": -50,
+          "y": -11,
+          "mass": 2,
+          "restitution": 0.25,
+          "angle": 0,
+          "vx": 0,
+          "vy": 0,
+          "angularVelocity": 0,
+          "sleeping": true,
+          "frozen": false,
+          "reactivationBlocked": false,
+          "policy": {
+            "values": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "effective": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "provenance": {
+              "worldReactions": "land:lab-land/profile",
+              "dynamicProps": "area:playground/profile",
+              "propBlocking": "area:playground/profile",
+              "impulseStrength": "engine-default"
+            },
+            "landId": "lab-land",
+            "areaId": "playground",
+            "regions": []
+          }
+        },
+        {
+          "id": "crate-4",
+          "motion": "dynamic",
+          "shape": {
+            "kind": "box",
+            "width": 26,
+            "height": 26
+          },
+          "x": -21,
+          "y": -11,
+          "mass": 2,
+          "restitution": 0.25,
+          "angle": 0,
+          "vx": 0,
+          "vy": 0,
+          "angularVelocity": 0,
+          "sleeping": true,
+          "frozen": false,
+          "reactivationBlocked": false,
+          "policy": {
+            "values": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "effective": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "provenance": {
+              "worldReactions": "land:lab-land/profile",
+              "dynamicProps": "area:playground/profile",
+              "propBlocking": "area:playground/profile",
+              "impulseStrength": "engine-default"
+            },
+            "landId": "lab-land",
+            "areaId": "playground",
+            "regions": []
+          }
+        },
+        {
+          "id": "crate-5",
+          "motion": "dynamic",
+          "shape": {
+            "kind": "box",
+            "width": 26,
+            "height": 26
+          },
+          "x": 8,
+          "y": -11,
+          "mass": 2,
+          "restitution": 0.25,
+          "angle": 0,
+          "vx": 0,
+          "vy": 0,
+          "angularVelocity": 0,
+          "sleeping": true,
+          "frozen": false,
+          "reactivationBlocked": false,
+          "policy": {
+            "values": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "effective": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "provenance": {
+              "worldReactions": "land:lab-land/profile",
+              "dynamicProps": "area:playground/profile",
+              "propBlocking": "area:playground/profile",
+              "impulseStrength": "engine-default"
+            },
+            "landId": "lab-land",
+            "areaId": "playground",
+            "regions": []
+          }
+        },
+        {
+          "id": "crossing-crate",
+          "motion": "dynamic",
+          "shape": {
+            "kind": "box",
+            "width": 12,
+            "height": 12
+          },
+          "x": -145,
+          "y": -85,
+          "mass": 1,
+          "damping": 0,
+          "consequences": {
+            "destroyed": false,
+            "claimed": true,
+            "durability": 7
+          },
+          "angle": -2.288381338119507,
+          "vx": 0,
+          "vy": 0,
+          "angularVelocity": 0,
+          "sleeping": false,
+          "frozen": false,
+          "reactivationBlocked": false,
+          "policy": {
+            "values": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "effective": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "provenance": {
+              "worldReactions": "land:lab-land/profile",
+              "dynamicProps": "area:playground/profile",
+              "propBlocking": "area:playground/profile",
+              "impulseStrength": "engine-default"
+            },
+            "landId": "lab-land",
+            "areaId": "playground",
+            "regions": []
+          }
+        },
+        {
+          "id": "sweep",
+          "motion": "dynamic",
+          "shape": {
+            "kind": "circle",
+            "radius": 4
+          },
+          "x": -180,
+          "y": 110,
+          "mass": 0.5,
+          "restitution": 0,
+          "damping": 0,
+          "ccd": true,
+          "angle": 0,
+          "vx": 0,
+          "vy": 0,
+          "angularVelocity": 0,
+          "sleeping": true,
+          "frozen": false,
+          "reactivationBlocked": false,
+          "policy": {
+            "values": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "effective": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "provenance": {
+              "worldReactions": "land:lab-land/profile",
+              "dynamicProps": "area:playground/profile",
+              "propBlocking": "area:playground/profile",
+              "impulseStrength": "engine-default"
+            },
+            "landId": "lab-land",
+            "areaId": "playground",
+            "regions": []
+          }
+        },
+        {
+          "id": "wall",
+          "motion": "fixed",
+          "shape": {
+            "kind": "box",
+            "width": 12,
+            "height": 300
+          },
+          "x": 128,
+          "y": 0,
+          "angle": 0,
+          "vx": 0,
+          "vy": 0,
+          "angularVelocity": 0,
+          "sleeping": false,
+          "frozen": false,
+          "reactivationBlocked": false,
+          "policy": {
+            "values": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "effective": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "provenance": {
+              "worldReactions": "land:lab-land/profile",
+              "dynamicProps": "area:playground/profile",
+              "propBlocking": "area:playground/profile",
+              "impulseStrength": "engine-default"
+            },
+            "landId": "lab-land",
+            "areaId": "playground",
+            "regions": []
+          }
+        },
+        {
+          "id": "wheel",
+          "motion": "dynamic",
+          "shape": {
+            "kind": "circle",
+            "radius": 16
+          },
+          "x": -140,
+          "y": 45,
+          "mass": 1,
+          "angle": 0,
+          "vx": 0,
+          "vy": 0,
+          "angularVelocity": 0,
+          "sleeping": true,
+          "frozen": false,
+          "reactivationBlocked": false,
+          "policy": {
+            "values": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "effective": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "provenance": {
+              "worldReactions": "land:lab-land/profile",
+              "dynamicProps": "area:playground/profile",
+              "propBlocking": "area:playground/profile",
+              "impulseStrength": "engine-default"
+            },
+            "landId": "lab-land",
+            "areaId": "playground",
+            "regions": []
+          }
+        }
+      ],
+      "events": [],
+      "policies": {
+        "state": {
+          "version": 1,
+          "revision": 0,
+          "masterWorldReactions": true,
+          "boundaryMargin": 1,
+          "authored": {
+            "lands": [
+              {
+                "id": "lab-land",
+                "values": {
+                  "worldReactions": true
+                }
+              }
+            ],
+            "areas": [
+              {
+                "id": "playground",
+                "landId": "lab-land",
+                "values": {
+                  "dynamicProps": true,
+                  "propBlocking": true
+                }
+              }
+            ],
+            "regions": [
+              {
+                "id": "quiet-garden",
+                "areaId": "playground",
+                "priority": 10,
+                "shape": {
+                  "kind": "rectangle",
+                  "x": -260,
+                  "y": -120,
+                  "width": 90,
+                  "height": 100
+                },
+                "values": {
+                  "worldReactions": false
+                }
+              }
+            ]
+          },
+          "profiles": {
+            "lands": [
+              {
+                "id": "lab-land",
+                "values": {
+                  "worldReactions": true
+                }
+              }
+            ],
+            "areas": [
+              {
+                "id": "playground",
+                "landId": "lab-land",
+                "values": {
+                  "dynamicProps": true,
+                  "propBlocking": true
+                }
+              }
+            ],
+            "regions": [
+              {
+                "id": "quiet-garden",
+                "areaId": "playground",
+                "priority": 10,
+                "shape": {
+                  "kind": "rectangle",
+                  "x": -260,
+                  "y": -120,
+                  "width": 90,
+                  "height": 100
+                },
+                "values": {
+                  "worldReactions": false
+                }
+              }
+            ]
+          },
+          "overrides": []
+        },
+        "pending": [],
+        "nextRevision": 0,
+        "preview": {
+          "version": 1,
+          "revision": 0,
+          "masterWorldReactions": true,
+          "boundaryMargin": 1,
+          "authored": {
+            "lands": [
+              {
+                "id": "lab-land",
+                "values": {
+                  "worldReactions": true
+                }
+              }
+            ],
+            "areas": [
+              {
+                "id": "playground",
+                "landId": "lab-land",
+                "values": {
+                  "dynamicProps": true,
+                  "propBlocking": true
+                }
+              }
+            ],
+            "regions": [
+              {
+                "id": "quiet-garden",
+                "areaId": "playground",
+                "priority": 10,
+                "shape": {
+                  "kind": "rectangle",
+                  "x": -260,
+                  "y": -120,
+                  "width": 90,
+                  "height": 100
+                },
+                "values": {
+                  "worldReactions": false
+                }
+              }
+            ]
+          },
+          "profiles": {
+            "lands": [
+              {
+                "id": "lab-land",
+                "values": {
+                  "worldReactions": true
+                }
+              }
+            ],
+            "areas": [
+              {
+                "id": "playground",
+                "landId": "lab-land",
+                "values": {
+                  "dynamicProps": true,
+                  "propBlocking": true
+                }
+              }
+            ],
+            "regions": [
+              {
+                "id": "quiet-garden",
+                "areaId": "playground",
+                "priority": 10,
+                "shape": {
+                  "kind": "rectangle",
+                  "x": -260,
+                  "y": -120,
+                  "width": 90,
+                  "height": 100
+                },
+                "values": {
+                  "worldReactions": false
+                }
+              }
+            ]
+          },
+          "overrides": []
+        },
+        "capabilities": ["worldReactions", "dynamicProps", "propBlocking", "impulseStrength"],
+        "presets": {
+          "Quiet": {
+            "worldReactions": false,
+            "dynamicProps": false,
+            "propBlocking": false,
+            "impulseStrength": 1
+          },
+          "Reactive": {
+            "worldReactions": true,
+            "dynamicProps": true,
+            "propBlocking": true,
+            "impulseStrength": 1
+          },
+          "Wild": {
+            "worldReactions": true,
+            "dynamicProps": true,
+            "propBlocking": true,
+            "impulseStrength": 2.5
+          },
+          "Sanctuary": {
+            "worldReactions": true,
+            "dynamicProps": true,
+            "propBlocking": false,
+            "impulseStrength": 0.35
+          }
+        }
+      }
+    },
+    {
+      "backend": "Rapier2D 0.21.0",
+      "units": 16,
+      "tick": 68,
+      "contacts": 0,
+      "bodies": [
+        {
+          "id": "backstop",
+          "motion": "fixed",
+          "shape": {
+            "kind": "box",
+            "width": 440,
+            "height": 12
+          },
+          "x": 0,
+          "y": -158,
+          "angle": 0,
+          "vx": 0,
+          "vy": 0,
+          "angularVelocity": 0,
+          "sleeping": false,
+          "frozen": false,
+          "reactivationBlocked": false,
+          "policy": {
+            "values": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "effective": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "provenance": {
+              "worldReactions": "area:playground/override",
+              "dynamicProps": "area:playground/profile",
+              "propBlocking": "area:playground/profile",
+              "impulseStrength": "engine-default"
+            },
+            "landId": "lab-land",
+            "areaId": "playground",
+            "regions": []
+          }
+        },
+        {
+          "id": "crate-0",
+          "motion": "dynamic",
+          "shape": {
+            "kind": "box",
+            "width": 26,
+            "height": 26
+          },
+          "x": -50,
+          "y": -40,
+          "mass": 2,
+          "restitution": 0.25,
+          "angle": 0,
+          "vx": 0,
+          "vy": 0,
+          "angularVelocity": 0,
+          "sleeping": true,
+          "frozen": false,
+          "reactivationBlocked": false,
+          "policy": {
+            "values": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "effective": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "provenance": {
+              "worldReactions": "area:playground/override",
+              "dynamicProps": "area:playground/profile",
+              "propBlocking": "area:playground/profile",
+              "impulseStrength": "engine-default"
+            },
+            "landId": "lab-land",
+            "areaId": "playground",
+            "regions": []
+          }
+        },
+        {
+          "id": "crate-1",
+          "motion": "dynamic",
+          "shape": {
+            "kind": "box",
+            "width": 26,
+            "height": 26
+          },
+          "x": -21,
+          "y": -40,
+          "mass": 2,
+          "restitution": 0.25,
+          "angle": 0,
+          "vx": 0,
+          "vy": 0,
+          "angularVelocity": 0,
+          "sleeping": true,
+          "frozen": false,
+          "reactivationBlocked": false,
+          "policy": {
+            "values": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "effective": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "provenance": {
+              "worldReactions": "area:playground/override",
+              "dynamicProps": "area:playground/profile",
+              "propBlocking": "area:playground/profile",
+              "impulseStrength": "engine-default"
+            },
+            "landId": "lab-land",
+            "areaId": "playground",
+            "regions": []
+          }
+        },
+        {
+          "id": "crate-2",
+          "motion": "dynamic",
+          "shape": {
+            "kind": "box",
+            "width": 26,
+            "height": 26
+          },
+          "x": 8,
+          "y": -40,
+          "mass": 2,
+          "restitution": 0.25,
+          "angle": 0,
+          "vx": 0,
+          "vy": 0,
+          "angularVelocity": 0,
+          "sleeping": true,
+          "frozen": false,
+          "reactivationBlocked": false,
+          "policy": {
+            "values": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "effective": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "provenance": {
+              "worldReactions": "area:playground/override",
+              "dynamicProps": "area:playground/profile",
+              "propBlocking": "area:playground/profile",
+              "impulseStrength": "engine-default"
+            },
+            "landId": "lab-land",
+            "areaId": "playground",
+            "regions": []
+          }
+        },
+        {
+          "id": "crate-3",
+          "motion": "dynamic",
+          "shape": {
+            "kind": "box",
+            "width": 26,
+            "height": 26
+          },
+          "x": -50,
+          "y": -11,
+          "mass": 2,
+          "restitution": 0.25,
+          "angle": 0,
+          "vx": 0,
+          "vy": 0,
+          "angularVelocity": 0,
+          "sleeping": true,
+          "frozen": false,
+          "reactivationBlocked": false,
+          "policy": {
+            "values": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "effective": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "provenance": {
+              "worldReactions": "area:playground/override",
+              "dynamicProps": "area:playground/profile",
+              "propBlocking": "area:playground/profile",
+              "impulseStrength": "engine-default"
+            },
+            "landId": "lab-land",
+            "areaId": "playground",
+            "regions": []
+          }
+        },
+        {
+          "id": "crate-4",
+          "motion": "dynamic",
+          "shape": {
+            "kind": "box",
+            "width": 26,
+            "height": 26
+          },
+          "x": -21,
+          "y": -11,
+          "mass": 2,
+          "restitution": 0.25,
+          "angle": 0,
+          "vx": 0,
+          "vy": 0,
+          "angularVelocity": 0,
+          "sleeping": true,
+          "frozen": false,
+          "reactivationBlocked": false,
+          "policy": {
+            "values": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "effective": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "provenance": {
+              "worldReactions": "area:playground/override",
+              "dynamicProps": "area:playground/profile",
+              "propBlocking": "area:playground/profile",
+              "impulseStrength": "engine-default"
+            },
+            "landId": "lab-land",
+            "areaId": "playground",
+            "regions": []
+          }
+        },
+        {
+          "id": "crate-5",
+          "motion": "dynamic",
+          "shape": {
+            "kind": "box",
+            "width": 26,
+            "height": 26
+          },
+          "x": 8,
+          "y": -11,
+          "mass": 2,
+          "restitution": 0.25,
+          "angle": 0,
+          "vx": 0,
+          "vy": 0,
+          "angularVelocity": 0,
+          "sleeping": true,
+          "frozen": false,
+          "reactivationBlocked": false,
+          "policy": {
+            "values": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "effective": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "provenance": {
+              "worldReactions": "area:playground/override",
+              "dynamicProps": "area:playground/profile",
+              "propBlocking": "area:playground/profile",
+              "impulseStrength": "engine-default"
+            },
+            "landId": "lab-land",
+            "areaId": "playground",
+            "regions": []
+          }
+        },
+        {
+          "id": "crossing-crate",
+          "motion": "dynamic",
+          "shape": {
+            "kind": "box",
+            "width": 12,
+            "height": 12
+          },
+          "x": -129,
+          "y": -85,
+          "mass": 1,
+          "damping": 0,
+          "consequences": {
+            "destroyed": false,
+            "claimed": true,
+            "durability": 7
+          },
+          "angle": -2.288381338119507,
+          "vx": 120,
+          "vy": 0,
+          "angularVelocity": 0,
+          "sleeping": false,
+          "frozen": false,
+          "reactivationBlocked": false,
+          "policy": {
+            "values": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "effective": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "provenance": {
+              "worldReactions": "area:playground/override",
+              "dynamicProps": "area:playground/profile",
+              "propBlocking": "area:playground/profile",
+              "impulseStrength": "engine-default"
+            },
+            "landId": "lab-land",
+            "areaId": "playground",
+            "regions": []
+          }
+        },
+        {
+          "id": "sweep",
+          "motion": "dynamic",
+          "shape": {
+            "kind": "circle",
+            "radius": 4
+          },
+          "x": -180,
+          "y": 110,
+          "mass": 0.5,
+          "restitution": 0,
+          "damping": 0,
+          "ccd": true,
+          "angle": 0,
+          "vx": 0,
+          "vy": 0,
+          "angularVelocity": 0,
+          "sleeping": true,
+          "frozen": false,
+          "reactivationBlocked": false,
+          "policy": {
+            "values": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "effective": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "provenance": {
+              "worldReactions": "area:playground/override",
+              "dynamicProps": "area:playground/profile",
+              "propBlocking": "area:playground/profile",
+              "impulseStrength": "engine-default"
+            },
+            "landId": "lab-land",
+            "areaId": "playground",
+            "regions": []
+          }
+        },
+        {
+          "id": "wall",
+          "motion": "fixed",
+          "shape": {
+            "kind": "box",
+            "width": 12,
+            "height": 300
+          },
+          "x": 128,
+          "y": 0,
+          "angle": 0,
+          "vx": 0,
+          "vy": 0,
+          "angularVelocity": 0,
+          "sleeping": false,
+          "frozen": false,
+          "reactivationBlocked": false,
+          "policy": {
+            "values": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "effective": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "provenance": {
+              "worldReactions": "area:playground/override",
+              "dynamicProps": "area:playground/profile",
+              "propBlocking": "area:playground/profile",
+              "impulseStrength": "engine-default"
+            },
+            "landId": "lab-land",
+            "areaId": "playground",
+            "regions": []
+          }
+        },
+        {
+          "id": "wheel",
+          "motion": "dynamic",
+          "shape": {
+            "kind": "circle",
+            "radius": 16
+          },
+          "x": -140,
+          "y": 45,
+          "mass": 1,
+          "angle": 0,
+          "vx": 0,
+          "vy": 0,
+          "angularVelocity": 0,
+          "sleeping": true,
+          "frozen": false,
+          "reactivationBlocked": false,
+          "policy": {
+            "values": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "effective": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "provenance": {
+              "worldReactions": "area:playground/override",
+              "dynamicProps": "area:playground/profile",
+              "propBlocking": "area:playground/profile",
+              "impulseStrength": "engine-default"
+            },
+            "landId": "lab-land",
+            "areaId": "playground",
+            "regions": []
+          }
+        }
+      ],
+      "events": [],
+      "policies": {
+        "state": {
+          "version": 1,
+          "revision": 1,
+          "masterWorldReactions": true,
+          "boundaryMargin": 1,
+          "authored": {
+            "lands": [
+              {
+                "id": "lab-land",
+                "values": {
+                  "worldReactions": true
+                }
+              }
+            ],
+            "areas": [
+              {
+                "id": "playground",
+                "landId": "lab-land",
+                "values": {
+                  "dynamicProps": true,
+                  "propBlocking": true
+                }
+              }
+            ],
+            "regions": [
+              {
+                "id": "quiet-garden",
+                "areaId": "playground",
+                "priority": 10,
+                "shape": {
+                  "kind": "rectangle",
+                  "x": -260,
+                  "y": -120,
+                  "width": 90,
+                  "height": 100
+                },
+                "values": {
+                  "worldReactions": false
+                }
+              }
+            ]
+          },
+          "profiles": {
+            "lands": [
+              {
+                "id": "lab-land",
+                "values": {
+                  "worldReactions": true
+                }
+              }
+            ],
+            "areas": [
+              {
+                "id": "playground",
+                "landId": "lab-land",
+                "values": {
+                  "dynamicProps": true,
+                  "propBlocking": true
+                }
+              }
+            ],
+            "regions": [
+              {
+                "id": "quiet-garden",
+                "areaId": "playground",
+                "priority": 10,
+                "shape": {
+                  "kind": "rectangle",
+                  "x": -260,
+                  "y": -120,
+                  "width": 90,
+                  "height": 100
+                },
+                "values": {
+                  "worldReactions": false
+                }
+              }
+            ]
+          },
+          "overrides": [
+            {
+              "scope": "land",
+              "id": "lab-land",
+              "values": {
+                "worldReactions": false
+              }
+            },
+            {
+              "scope": "area",
+              "id": "playground",
+              "values": {
+                "worldReactions": true
+              }
+            }
+          ]
+        },
+        "pending": [],
+        "nextRevision": 1,
+        "preview": {
+          "version": 1,
+          "revision": 1,
+          "masterWorldReactions": true,
+          "boundaryMargin": 1,
+          "authored": {
+            "lands": [
+              {
+                "id": "lab-land",
+                "values": {
+                  "worldReactions": true
+                }
+              }
+            ],
+            "areas": [
+              {
+                "id": "playground",
+                "landId": "lab-land",
+                "values": {
+                  "dynamicProps": true,
+                  "propBlocking": true
+                }
+              }
+            ],
+            "regions": [
+              {
+                "id": "quiet-garden",
+                "areaId": "playground",
+                "priority": 10,
+                "shape": {
+                  "kind": "rectangle",
+                  "x": -260,
+                  "y": -120,
+                  "width": 90,
+                  "height": 100
+                },
+                "values": {
+                  "worldReactions": false
+                }
+              }
+            ]
+          },
+          "profiles": {
+            "lands": [
+              {
+                "id": "lab-land",
+                "values": {
+                  "worldReactions": true
+                }
+              }
+            ],
+            "areas": [
+              {
+                "id": "playground",
+                "landId": "lab-land",
+                "values": {
+                  "dynamicProps": true,
+                  "propBlocking": true
+                }
+              }
+            ],
+            "regions": [
+              {
+                "id": "quiet-garden",
+                "areaId": "playground",
+                "priority": 10,
+                "shape": {
+                  "kind": "rectangle",
+                  "x": -260,
+                  "y": -120,
+                  "width": 90,
+                  "height": 100
+                },
+                "values": {
+                  "worldReactions": false
+                }
+              }
+            ]
+          },
+          "overrides": [
+            {
+              "scope": "land",
+              "id": "lab-land",
+              "values": {
+                "worldReactions": false
+              }
+            },
+            {
+              "scope": "area",
+              "id": "playground",
+              "values": {
+                "worldReactions": true
+              }
+            }
+          ]
+        },
+        "capabilities": ["worldReactions", "dynamicProps", "propBlocking", "impulseStrength"],
+        "presets": {
+          "Quiet": {
+            "worldReactions": false,
+            "dynamicProps": false,
+            "propBlocking": false,
+            "impulseStrength": 1
+          },
+          "Reactive": {
+            "worldReactions": true,
+            "dynamicProps": true,
+            "propBlocking": true,
+            "impulseStrength": 1
+          },
+          "Wild": {
+            "worldReactions": true,
+            "dynamicProps": true,
+            "propBlocking": true,
+            "impulseStrength": 2.5
+          },
+          "Sanctuary": {
+            "worldReactions": true,
+            "dynamicProps": true,
+            "propBlocking": false,
+            "impulseStrength": 0.35
+          }
+        }
+      }
+    },
+    {
+      "backend": "Rapier2D 0.21.0",
+      "units": 16,
+      "tick": 68,
+      "contacts": 0,
+      "bodies": [
+        {
+          "id": "backstop",
+          "motion": "fixed",
+          "shape": {
+            "kind": "box",
+            "width": 440,
+            "height": 12
+          },
+          "x": 0,
+          "y": -158,
+          "angle": 0,
+          "vx": 0,
+          "vy": 0,
+          "angularVelocity": 0,
+          "sleeping": false,
+          "frozen": false,
+          "reactivationBlocked": false,
+          "policy": {
+            "values": {
+              "worldReactions": false,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "effective": {
+              "worldReactions": false,
+              "dynamicProps": false,
+              "propBlocking": false,
+              "impulseStrength": 1
+            },
+            "provenance": {
+              "worldReactions": "session-master-off",
+              "dynamicProps": "area:playground/profile",
+              "propBlocking": "area:playground/profile",
+              "impulseStrength": "engine-default"
+            },
+            "landId": "lab-land",
+            "areaId": "playground",
+            "regions": []
+          }
+        },
+        {
+          "id": "crate-0",
+          "motion": "dynamic",
+          "shape": {
+            "kind": "box",
+            "width": 26,
+            "height": 26
+          },
+          "x": -50,
+          "y": -40,
+          "mass": 2,
+          "restitution": 0.25,
+          "angle": 0,
+          "vx": 0,
+          "vy": 0,
+          "angularVelocity": 0,
+          "sleeping": true,
+          "frozen": true,
+          "reactivationBlocked": false,
+          "policy": {
+            "values": {
+              "worldReactions": false,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "effective": {
+              "worldReactions": false,
+              "dynamicProps": false,
+              "propBlocking": false,
+              "impulseStrength": 1
+            },
+            "provenance": {
+              "worldReactions": "session-master-off",
+              "dynamicProps": "area:playground/profile",
+              "propBlocking": "area:playground/profile",
+              "impulseStrength": "engine-default"
+            },
+            "landId": "lab-land",
+            "areaId": "playground",
+            "regions": []
+          }
+        },
+        {
+          "id": "crate-1",
+          "motion": "dynamic",
+          "shape": {
+            "kind": "box",
+            "width": 26,
+            "height": 26
+          },
+          "x": -21,
+          "y": -40,
+          "mass": 2,
+          "restitution": 0.25,
+          "angle": 0,
+          "vx": 0,
+          "vy": 0,
+          "angularVelocity": 0,
+          "sleeping": true,
+          "frozen": true,
+          "reactivationBlocked": false,
+          "policy": {
+            "values": {
+              "worldReactions": false,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "effective": {
+              "worldReactions": false,
+              "dynamicProps": false,
+              "propBlocking": false,
+              "impulseStrength": 1
+            },
+            "provenance": {
+              "worldReactions": "session-master-off",
+              "dynamicProps": "area:playground/profile",
+              "propBlocking": "area:playground/profile",
+              "impulseStrength": "engine-default"
+            },
+            "landId": "lab-land",
+            "areaId": "playground",
+            "regions": []
+          }
+        },
+        {
+          "id": "crate-2",
+          "motion": "dynamic",
+          "shape": {
+            "kind": "box",
+            "width": 26,
+            "height": 26
+          },
+          "x": 8,
+          "y": -40,
+          "mass": 2,
+          "restitution": 0.25,
+          "angle": 0,
+          "vx": 0,
+          "vy": 0,
+          "angularVelocity": 0,
+          "sleeping": true,
+          "frozen": true,
+          "reactivationBlocked": false,
+          "policy": {
+            "values": {
+              "worldReactions": false,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "effective": {
+              "worldReactions": false,
+              "dynamicProps": false,
+              "propBlocking": false,
+              "impulseStrength": 1
+            },
+            "provenance": {
+              "worldReactions": "session-master-off",
+              "dynamicProps": "area:playground/profile",
+              "propBlocking": "area:playground/profile",
+              "impulseStrength": "engine-default"
+            },
+            "landId": "lab-land",
+            "areaId": "playground",
+            "regions": []
+          }
+        },
+        {
+          "id": "crate-3",
+          "motion": "dynamic",
+          "shape": {
+            "kind": "box",
+            "width": 26,
+            "height": 26
+          },
+          "x": -50,
+          "y": -11,
+          "mass": 2,
+          "restitution": 0.25,
+          "angle": 0,
+          "vx": 0,
+          "vy": 0,
+          "angularVelocity": 0,
+          "sleeping": true,
+          "frozen": true,
+          "reactivationBlocked": false,
+          "policy": {
+            "values": {
+              "worldReactions": false,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "effective": {
+              "worldReactions": false,
+              "dynamicProps": false,
+              "propBlocking": false,
+              "impulseStrength": 1
+            },
+            "provenance": {
+              "worldReactions": "session-master-off",
+              "dynamicProps": "area:playground/profile",
+              "propBlocking": "area:playground/profile",
+              "impulseStrength": "engine-default"
+            },
+            "landId": "lab-land",
+            "areaId": "playground",
+            "regions": []
+          }
+        },
+        {
+          "id": "crate-4",
+          "motion": "dynamic",
+          "shape": {
+            "kind": "box",
+            "width": 26,
+            "height": 26
+          },
+          "x": -21,
+          "y": -11,
+          "mass": 2,
+          "restitution": 0.25,
+          "angle": 0,
+          "vx": 0,
+          "vy": 0,
+          "angularVelocity": 0,
+          "sleeping": true,
+          "frozen": true,
+          "reactivationBlocked": false,
+          "policy": {
+            "values": {
+              "worldReactions": false,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "effective": {
+              "worldReactions": false,
+              "dynamicProps": false,
+              "propBlocking": false,
+              "impulseStrength": 1
+            },
+            "provenance": {
+              "worldReactions": "session-master-off",
+              "dynamicProps": "area:playground/profile",
+              "propBlocking": "area:playground/profile",
+              "impulseStrength": "engine-default"
+            },
+            "landId": "lab-land",
+            "areaId": "playground",
+            "regions": []
+          }
+        },
+        {
+          "id": "crate-5",
+          "motion": "dynamic",
+          "shape": {
+            "kind": "box",
+            "width": 26,
+            "height": 26
+          },
+          "x": 8,
+          "y": -11,
+          "mass": 2,
+          "restitution": 0.25,
+          "angle": 0,
+          "vx": 0,
+          "vy": 0,
+          "angularVelocity": 0,
+          "sleeping": true,
+          "frozen": true,
+          "reactivationBlocked": false,
+          "policy": {
+            "values": {
+              "worldReactions": false,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "effective": {
+              "worldReactions": false,
+              "dynamicProps": false,
+              "propBlocking": false,
+              "impulseStrength": 1
+            },
+            "provenance": {
+              "worldReactions": "session-master-off",
+              "dynamicProps": "area:playground/profile",
+              "propBlocking": "area:playground/profile",
+              "impulseStrength": "engine-default"
+            },
+            "landId": "lab-land",
+            "areaId": "playground",
+            "regions": []
+          }
+        },
+        {
+          "id": "crossing-crate",
+          "motion": "dynamic",
+          "shape": {
+            "kind": "box",
+            "width": 12,
+            "height": 12
+          },
+          "x": -129,
+          "y": -85,
+          "mass": 1,
+          "damping": 0,
+          "consequences": {
+            "destroyed": false,
+            "claimed": true,
+            "durability": 7
+          },
+          "angle": -2.288381338119507,
+          "vx": 0,
+          "vy": 0,
+          "angularVelocity": 0,
+          "sleeping": false,
+          "frozen": true,
+          "reactivationBlocked": false,
+          "policy": {
+            "values": {
+              "worldReactions": false,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 2
+            },
+            "effective": {
+              "worldReactions": false,
+              "dynamicProps": false,
+              "propBlocking": false,
+              "impulseStrength": 2
+            },
+            "provenance": {
+              "worldReactions": "session-master-off",
+              "dynamicProps": "region:circle/override",
+              "propBlocking": "area:playground/profile",
+              "impulseStrength": "region:polygon/profile"
+            },
+            "landId": "lab-land",
+            "areaId": "playground",
+            "regions": ["circle", "polygon"]
+          }
+        },
+        {
+          "id": "sweep",
+          "motion": "dynamic",
+          "shape": {
+            "kind": "circle",
+            "radius": 4
+          },
+          "x": -180,
+          "y": 110,
+          "mass": 0.5,
+          "restitution": 0,
+          "damping": 0,
+          "ccd": true,
+          "angle": 0,
+          "vx": 0,
+          "vy": 0,
+          "angularVelocity": 0,
+          "sleeping": true,
+          "frozen": true,
+          "reactivationBlocked": false,
+          "policy": {
+            "values": {
+              "worldReactions": false,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "effective": {
+              "worldReactions": false,
+              "dynamicProps": false,
+              "propBlocking": false,
+              "impulseStrength": 1
+            },
+            "provenance": {
+              "worldReactions": "session-master-off",
+              "dynamicProps": "area:playground/profile",
+              "propBlocking": "area:playground/profile",
+              "impulseStrength": "engine-default"
+            },
+            "landId": "lab-land",
+            "areaId": "playground",
+            "regions": []
+          }
+        },
+        {
+          "id": "wall",
+          "motion": "fixed",
+          "shape": {
+            "kind": "box",
+            "width": 12,
+            "height": 300
+          },
+          "x": 128,
+          "y": 0,
+          "angle": 0,
+          "vx": 0,
+          "vy": 0,
+          "angularVelocity": 0,
+          "sleeping": false,
+          "frozen": false,
+          "reactivationBlocked": false,
+          "policy": {
+            "values": {
+              "worldReactions": false,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "effective": {
+              "worldReactions": false,
+              "dynamicProps": false,
+              "propBlocking": false,
+              "impulseStrength": 1
+            },
+            "provenance": {
+              "worldReactions": "session-master-off",
+              "dynamicProps": "area:playground/profile",
+              "propBlocking": "area:playground/profile",
+              "impulseStrength": "engine-default"
+            },
+            "landId": "lab-land",
+            "areaId": "playground",
+            "regions": []
+          }
+        },
+        {
+          "id": "wheel",
+          "motion": "dynamic",
+          "shape": {
+            "kind": "circle",
+            "radius": 16
+          },
+          "x": -140,
+          "y": 45,
+          "mass": 1,
+          "angle": 0,
+          "vx": 0,
+          "vy": 0,
+          "angularVelocity": 0,
+          "sleeping": true,
+          "frozen": true,
+          "reactivationBlocked": false,
+          "policy": {
+            "values": {
+              "worldReactions": false,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "effective": {
+              "worldReactions": false,
+              "dynamicProps": false,
+              "propBlocking": false,
+              "impulseStrength": 1
+            },
+            "provenance": {
+              "worldReactions": "session-master-off",
+              "dynamicProps": "area:playground/profile",
+              "propBlocking": "area:playground/profile",
+              "impulseStrength": "engine-default"
+            },
+            "landId": "lab-land",
+            "areaId": "playground",
+            "regions": []
+          }
+        }
+      ],
+      "events": [],
+      "policies": {
+        "state": {
+          "version": 1,
+          "revision": 2,
+          "masterWorldReactions": false,
+          "boundaryMargin": 1,
+          "authored": {
+            "lands": [
+              {
+                "id": "lab-land",
+                "values": {
+                  "worldReactions": true
+                }
+              }
+            ],
+            "areas": [
+              {
+                "id": "playground",
+                "landId": "lab-land",
+                "values": {
+                  "dynamicProps": true,
+                  "propBlocking": true
+                }
+              }
+            ],
+            "regions": [
+              {
+                "id": "quiet-garden",
+                "areaId": "playground",
+                "priority": 10,
+                "shape": {
+                  "kind": "rectangle",
+                  "x": -260,
+                  "y": -120,
+                  "width": 90,
+                  "height": 100
+                },
+                "values": {
+                  "worldReactions": false
+                }
+              }
+            ]
+          },
+          "profiles": {
+            "lands": [
+              {
+                "id": "lab-land",
+                "values": {
+                  "worldReactions": true
+                }
+              }
+            ],
+            "areas": [
+              {
+                "id": "playground",
+                "landId": "lab-land",
+                "values": {
+                  "dynamicProps": true,
+                  "propBlocking": true
+                }
+              }
+            ],
+            "regions": [
+              {
+                "id": "circle",
+                "areaId": "playground",
+                "priority": 30,
+                "shape": {
+                  "kind": "circle",
+                  "x": -125,
+                  "y": -85,
+                  "radius": 20
+                },
+                "values": {
+                  "dynamicProps": false
+                }
+              },
+              {
+                "id": "polygon",
+                "areaId": "playground",
+                "priority": 40,
+                "shape": {
+                  "kind": "polygon",
+                  "points": [
+                    {
+                      "x": -150,
+                      "y": -105
+                    },
+                    {
+                      "x": -100,
+                      "y": -105
+                    },
+                    {
+                      "x": -100,
+                      "y": -60
+                    },
+                    {
+                      "x": -150,
+                      "y": -60
+                    }
+                  ]
+                },
+                "values": {
+                  "impulseStrength": 2
+                }
+              },
+              {
+                "id": "quiet-garden",
+                "areaId": "playground",
+                "priority": 10,
+                "shape": {
+                  "kind": "rectangle",
+                  "x": -260,
+                  "y": -120,
+                  "width": 90,
+                  "height": 100
+                },
+                "values": {
+                  "worldReactions": false
+                }
+              }
+            ]
+          },
+          "overrides": [
+            {
+              "scope": "land",
+              "id": "lab-land",
+              "values": {
+                "worldReactions": false
+              }
+            },
+            {
+              "scope": "area",
+              "id": "playground",
+              "values": {
+                "worldReactions": true
+              }
+            },
+            {
+              "scope": "region",
+              "id": "circle",
+              "values": {
+                "worldReactions": true,
+                "dynamicProps": true
+              }
+            }
+          ]
+        },
+        "pending": [],
+        "nextRevision": 2,
+        "preview": {
+          "version": 1,
+          "revision": 2,
+          "masterWorldReactions": false,
+          "boundaryMargin": 1,
+          "authored": {
+            "lands": [
+              {
+                "id": "lab-land",
+                "values": {
+                  "worldReactions": true
+                }
+              }
+            ],
+            "areas": [
+              {
+                "id": "playground",
+                "landId": "lab-land",
+                "values": {
+                  "dynamicProps": true,
+                  "propBlocking": true
+                }
+              }
+            ],
+            "regions": [
+              {
+                "id": "quiet-garden",
+                "areaId": "playground",
+                "priority": 10,
+                "shape": {
+                  "kind": "rectangle",
+                  "x": -260,
+                  "y": -120,
+                  "width": 90,
+                  "height": 100
+                },
+                "values": {
+                  "worldReactions": false
+                }
+              }
+            ]
+          },
+          "profiles": {
+            "lands": [
+              {
+                "id": "lab-land",
+                "values": {
+                  "worldReactions": true
+                }
+              }
+            ],
+            "areas": [
+              {
+                "id": "playground",
+                "landId": "lab-land",
+                "values": {
+                  "dynamicProps": true,
+                  "propBlocking": true
+                }
+              }
+            ],
+            "regions": [
+              {
+                "id": "circle",
+                "areaId": "playground",
+                "priority": 30,
+                "shape": {
+                  "kind": "circle",
+                  "x": -125,
+                  "y": -85,
+                  "radius": 20
+                },
+                "values": {
+                  "dynamicProps": false
+                }
+              },
+              {
+                "id": "polygon",
+                "areaId": "playground",
+                "priority": 40,
+                "shape": {
+                  "kind": "polygon",
+                  "points": [
+                    {
+                      "x": -150,
+                      "y": -105
+                    },
+                    {
+                      "x": -100,
+                      "y": -105
+                    },
+                    {
+                      "x": -100,
+                      "y": -60
+                    },
+                    {
+                      "x": -150,
+                      "y": -60
+                    }
+                  ]
+                },
+                "values": {
+                  "impulseStrength": 2
+                }
+              },
+              {
+                "id": "quiet-garden",
+                "areaId": "playground",
+                "priority": 10,
+                "shape": {
+                  "kind": "rectangle",
+                  "x": -260,
+                  "y": -120,
+                  "width": 90,
+                  "height": 100
+                },
+                "values": {
+                  "worldReactions": false
+                }
+              }
+            ]
+          },
+          "overrides": [
+            {
+              "scope": "land",
+              "id": "lab-land",
+              "values": {
+                "worldReactions": false
+              }
+            },
+            {
+              "scope": "area",
+              "id": "playground",
+              "values": {
+                "worldReactions": true
+              }
+            },
+            {
+              "scope": "region",
+              "id": "circle",
+              "values": {
+                "worldReactions": true,
+                "dynamicProps": true
+              }
+            }
+          ]
+        },
+        "capabilities": ["worldReactions", "dynamicProps", "propBlocking", "impulseStrength"],
+        "presets": {
+          "Quiet": {
+            "worldReactions": false,
+            "dynamicProps": false,
+            "propBlocking": false,
+            "impulseStrength": 1
+          },
+          "Reactive": {
+            "worldReactions": true,
+            "dynamicProps": true,
+            "propBlocking": true,
+            "impulseStrength": 1
+          },
+          "Wild": {
+            "worldReactions": true,
+            "dynamicProps": true,
+            "propBlocking": true,
+            "impulseStrength": 2.5
+          },
+          "Sanctuary": {
+            "worldReactions": true,
+            "dynamicProps": true,
+            "propBlocking": false,
+            "impulseStrength": 0.35
+          }
+        }
+      }
+    },
+    {
+      "backend": "Rapier2D 0.21.0",
+      "units": 16,
+      "tick": 68,
+      "contacts": 0,
+      "bodies": [
+        {
+          "id": "backstop",
+          "motion": "fixed",
+          "shape": {
+            "kind": "box",
+            "width": 440,
+            "height": 12
+          },
+          "x": 0,
+          "y": -158,
+          "angle": 0,
+          "vx": 0,
+          "vy": 0,
+          "angularVelocity": 0,
+          "sleeping": false,
+          "frozen": false,
+          "reactivationBlocked": false,
+          "policy": {
+            "values": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "effective": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "provenance": {
+              "worldReactions": "area:playground/override",
+              "dynamicProps": "area:playground/profile",
+              "propBlocking": "area:playground/profile",
+              "impulseStrength": "engine-default"
+            },
+            "landId": "lab-land",
+            "areaId": "playground",
+            "regions": []
+          }
+        },
+        {
+          "id": "crate-0",
+          "motion": "dynamic",
+          "shape": {
+            "kind": "box",
+            "width": 26,
+            "height": 26
+          },
+          "x": -50,
+          "y": -40,
+          "mass": 2,
+          "restitution": 0.25,
+          "angle": 0,
+          "vx": 0,
+          "vy": 0,
+          "angularVelocity": 0,
+          "sleeping": false,
+          "frozen": false,
+          "reactivationBlocked": false,
+          "policy": {
+            "values": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "effective": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "provenance": {
+              "worldReactions": "area:playground/override",
+              "dynamicProps": "area:playground/profile",
+              "propBlocking": "area:playground/profile",
+              "impulseStrength": "engine-default"
+            },
+            "landId": "lab-land",
+            "areaId": "playground",
+            "regions": []
+          }
+        },
+        {
+          "id": "crate-1",
+          "motion": "dynamic",
+          "shape": {
+            "kind": "box",
+            "width": 26,
+            "height": 26
+          },
+          "x": -21,
+          "y": -40,
+          "mass": 2,
+          "restitution": 0.25,
+          "angle": 0,
+          "vx": 0,
+          "vy": 0,
+          "angularVelocity": 0,
+          "sleeping": false,
+          "frozen": false,
+          "reactivationBlocked": false,
+          "policy": {
+            "values": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "effective": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "provenance": {
+              "worldReactions": "area:playground/override",
+              "dynamicProps": "area:playground/profile",
+              "propBlocking": "area:playground/profile",
+              "impulseStrength": "engine-default"
+            },
+            "landId": "lab-land",
+            "areaId": "playground",
+            "regions": []
+          }
+        },
+        {
+          "id": "crate-2",
+          "motion": "dynamic",
+          "shape": {
+            "kind": "box",
+            "width": 26,
+            "height": 26
+          },
+          "x": 8,
+          "y": -40,
+          "mass": 2,
+          "restitution": 0.25,
+          "angle": 0,
+          "vx": 0,
+          "vy": 0,
+          "angularVelocity": 0,
+          "sleeping": false,
+          "frozen": false,
+          "reactivationBlocked": false,
+          "policy": {
+            "values": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "effective": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "provenance": {
+              "worldReactions": "area:playground/override",
+              "dynamicProps": "area:playground/profile",
+              "propBlocking": "area:playground/profile",
+              "impulseStrength": "engine-default"
+            },
+            "landId": "lab-land",
+            "areaId": "playground",
+            "regions": []
+          }
+        },
+        {
+          "id": "crate-3",
+          "motion": "dynamic",
+          "shape": {
+            "kind": "box",
+            "width": 26,
+            "height": 26
+          },
+          "x": -50,
+          "y": -11,
+          "mass": 2,
+          "restitution": 0.25,
+          "angle": 0,
+          "vx": 0,
+          "vy": 0,
+          "angularVelocity": 0,
+          "sleeping": false,
+          "frozen": false,
+          "reactivationBlocked": false,
+          "policy": {
+            "values": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "effective": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "provenance": {
+              "worldReactions": "area:playground/override",
+              "dynamicProps": "area:playground/profile",
+              "propBlocking": "area:playground/profile",
+              "impulseStrength": "engine-default"
+            },
+            "landId": "lab-land",
+            "areaId": "playground",
+            "regions": []
+          }
+        },
+        {
+          "id": "crate-4",
+          "motion": "dynamic",
+          "shape": {
+            "kind": "box",
+            "width": 26,
+            "height": 26
+          },
+          "x": -21,
+          "y": -11,
+          "mass": 2,
+          "restitution": 0.25,
+          "angle": 0,
+          "vx": 0,
+          "vy": 0,
+          "angularVelocity": 0,
+          "sleeping": false,
+          "frozen": false,
+          "reactivationBlocked": false,
+          "policy": {
+            "values": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "effective": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "provenance": {
+              "worldReactions": "area:playground/override",
+              "dynamicProps": "area:playground/profile",
+              "propBlocking": "area:playground/profile",
+              "impulseStrength": "engine-default"
+            },
+            "landId": "lab-land",
+            "areaId": "playground",
+            "regions": []
+          }
+        },
+        {
+          "id": "crate-5",
+          "motion": "dynamic",
+          "shape": {
+            "kind": "box",
+            "width": 26,
+            "height": 26
+          },
+          "x": 8,
+          "y": -11,
+          "mass": 2,
+          "restitution": 0.25,
+          "angle": 0,
+          "vx": 0,
+          "vy": 0,
+          "angularVelocity": 0,
+          "sleeping": false,
+          "frozen": false,
+          "reactivationBlocked": false,
+          "policy": {
+            "values": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "effective": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "provenance": {
+              "worldReactions": "area:playground/override",
+              "dynamicProps": "area:playground/profile",
+              "propBlocking": "area:playground/profile",
+              "impulseStrength": "engine-default"
+            },
+            "landId": "lab-land",
+            "areaId": "playground",
+            "regions": []
+          }
+        },
+        {
+          "id": "crossing-crate",
+          "motion": "dynamic",
+          "shape": {
+            "kind": "box",
+            "width": 12,
+            "height": 12
+          },
+          "x": -129,
+          "y": -85,
+          "mass": 1,
+          "damping": 0,
+          "consequences": {
+            "destroyed": false,
+            "claimed": true,
+            "durability": 7
+          },
+          "angle": -2.288381338119507,
+          "vx": 0,
+          "vy": 0,
+          "angularVelocity": 0,
+          "sleeping": false,
+          "frozen": false,
+          "reactivationBlocked": false,
+          "policy": {
+            "values": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 2
+            },
+            "effective": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 2
+            },
+            "provenance": {
+              "worldReactions": "region:circle/override",
+              "dynamicProps": "region:circle/override",
+              "propBlocking": "area:playground/profile",
+              "impulseStrength": "region:polygon/profile"
+            },
+            "landId": "lab-land",
+            "areaId": "playground",
+            "regions": ["circle", "polygon"]
+          }
+        },
+        {
+          "id": "sweep",
+          "motion": "dynamic",
+          "shape": {
+            "kind": "circle",
+            "radius": 4
+          },
+          "x": -180,
+          "y": 110,
+          "mass": 0.5,
+          "restitution": 0,
+          "damping": 0,
+          "ccd": true,
+          "angle": 0,
+          "vx": 0,
+          "vy": 0,
+          "angularVelocity": 0,
+          "sleeping": false,
+          "frozen": false,
+          "reactivationBlocked": false,
+          "policy": {
+            "values": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "effective": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "provenance": {
+              "worldReactions": "area:playground/override",
+              "dynamicProps": "area:playground/profile",
+              "propBlocking": "area:playground/profile",
+              "impulseStrength": "engine-default"
+            },
+            "landId": "lab-land",
+            "areaId": "playground",
+            "regions": []
+          }
+        },
+        {
+          "id": "wall",
+          "motion": "fixed",
+          "shape": {
+            "kind": "box",
+            "width": 12,
+            "height": 300
+          },
+          "x": 128,
+          "y": 0,
+          "angle": 0,
+          "vx": 0,
+          "vy": 0,
+          "angularVelocity": 0,
+          "sleeping": false,
+          "frozen": false,
+          "reactivationBlocked": false,
+          "policy": {
+            "values": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "effective": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "provenance": {
+              "worldReactions": "area:playground/override",
+              "dynamicProps": "area:playground/profile",
+              "propBlocking": "area:playground/profile",
+              "impulseStrength": "engine-default"
+            },
+            "landId": "lab-land",
+            "areaId": "playground",
+            "regions": []
+          }
+        },
+        {
+          "id": "wheel",
+          "motion": "dynamic",
+          "shape": {
+            "kind": "circle",
+            "radius": 16
+          },
+          "x": -140,
+          "y": 45,
+          "mass": 1,
+          "angle": 0,
+          "vx": 0,
+          "vy": 0,
+          "angularVelocity": 0,
+          "sleeping": false,
+          "frozen": false,
+          "reactivationBlocked": false,
+          "policy": {
+            "values": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "effective": {
+              "worldReactions": true,
+              "dynamicProps": true,
+              "propBlocking": true,
+              "impulseStrength": 1
+            },
+            "provenance": {
+              "worldReactions": "area:playground/override",
+              "dynamicProps": "area:playground/profile",
+              "propBlocking": "area:playground/profile",
+              "impulseStrength": "engine-default"
+            },
+            "landId": "lab-land",
+            "areaId": "playground",
+            "regions": []
+          }
+        }
+      ],
+      "events": [],
+      "policies": {
+        "state": {
+          "version": 1,
+          "revision": 3,
+          "masterWorldReactions": true,
+          "boundaryMargin": 1,
+          "authored": {
+            "lands": [
+              {
+                "id": "lab-land",
+                "values": {
+                  "worldReactions": true
+                }
+              }
+            ],
+            "areas": [
+              {
+                "id": "playground",
+                "landId": "lab-land",
+                "values": {
+                  "dynamicProps": true,
+                  "propBlocking": true
+                }
+              }
+            ],
+            "regions": [
+              {
+                "id": "quiet-garden",
+                "areaId": "playground",
+                "priority": 10,
+                "shape": {
+                  "kind": "rectangle",
+                  "x": -260,
+                  "y": -120,
+                  "width": 90,
+                  "height": 100
+                },
+                "values": {
+                  "worldReactions": false
+                }
+              }
+            ]
+          },
+          "profiles": {
+            "lands": [
+              {
+                "id": "lab-land",
+                "values": {
+                  "worldReactions": true
+                }
+              }
+            ],
+            "areas": [
+              {
+                "id": "playground",
+                "landId": "lab-land",
+                "values": {
+                  "dynamicProps": true,
+                  "propBlocking": true
+                }
+              }
+            ],
+            "regions": [
+              {
+                "id": "circle",
+                "areaId": "playground",
+                "priority": 30,
+                "shape": {
+                  "kind": "circle",
+                  "x": -125,
+                  "y": -85,
+                  "radius": 20
+                },
+                "values": {
+                  "dynamicProps": false
+                }
+              },
+              {
+                "id": "polygon",
+                "areaId": "playground",
+                "priority": 40,
+                "shape": {
+                  "kind": "polygon",
+                  "points": [
+                    {
+                      "x": -150,
+                      "y": -105
+                    },
+                    {
+                      "x": -100,
+                      "y": -105
+                    },
+                    {
+                      "x": -100,
+                      "y": -60
+                    },
+                    {
+                      "x": -150,
+                      "y": -60
+                    }
+                  ]
+                },
+                "values": {
+                  "impulseStrength": 2
+                }
+              },
+              {
+                "id": "quiet-garden",
+                "areaId": "playground",
+                "priority": 10,
+                "shape": {
+                  "kind": "rectangle",
+                  "x": -260,
+                  "y": -120,
+                  "width": 90,
+                  "height": 100
+                },
+                "values": {
+                  "worldReactions": false
+                }
+              }
+            ]
+          },
+          "overrides": [
+            {
+              "scope": "land",
+              "id": "lab-land",
+              "values": {
+                "worldReactions": false
+              }
+            },
+            {
+              "scope": "area",
+              "id": "playground",
+              "values": {
+                "worldReactions": true
+              }
+            },
+            {
+              "scope": "region",
+              "id": "circle",
+              "values": {
+                "worldReactions": true,
+                "dynamicProps": true
+              }
+            }
+          ]
+        },
+        "pending": [],
+        "nextRevision": 3,
+        "preview": {
+          "version": 1,
+          "revision": 3,
+          "masterWorldReactions": true,
+          "boundaryMargin": 1,
+          "authored": {
+            "lands": [
+              {
+                "id": "lab-land",
+                "values": {
+                  "worldReactions": true
+                }
+              }
+            ],
+            "areas": [
+              {
+                "id": "playground",
+                "landId": "lab-land",
+                "values": {
+                  "dynamicProps": true,
+                  "propBlocking": true
+                }
+              }
+            ],
+            "regions": [
+              {
+                "id": "quiet-garden",
+                "areaId": "playground",
+                "priority": 10,
+                "shape": {
+                  "kind": "rectangle",
+                  "x": -260,
+                  "y": -120,
+                  "width": 90,
+                  "height": 100
+                },
+                "values": {
+                  "worldReactions": false
+                }
+              }
+            ]
+          },
+          "profiles": {
+            "lands": [
+              {
+                "id": "lab-land",
+                "values": {
+                  "worldReactions": true
+                }
+              }
+            ],
+            "areas": [
+              {
+                "id": "playground",
+                "landId": "lab-land",
+                "values": {
+                  "dynamicProps": true,
+                  "propBlocking": true
+                }
+              }
+            ],
+            "regions": [
+              {
+                "id": "circle",
+                "areaId": "playground",
+                "priority": 30,
+                "shape": {
+                  "kind": "circle",
+                  "x": -125,
+                  "y": -85,
+                  "radius": 20
+                },
+                "values": {
+                  "dynamicProps": false
+                }
+              },
+              {
+                "id": "polygon",
+                "areaId": "playground",
+                "priority": 40,
+                "shape": {
+                  "kind": "polygon",
+                  "points": [
+                    {
+                      "x": -150,
+                      "y": -105
+                    },
+                    {
+                      "x": -100,
+                      "y": -105
+                    },
+                    {
+                      "x": -100,
+                      "y": -60
+                    },
+                    {
+                      "x": -150,
+                      "y": -60
+                    }
+                  ]
+                },
+                "values": {
+                  "impulseStrength": 2
+                }
+              },
+              {
+                "id": "quiet-garden",
+                "areaId": "playground",
+                "priority": 10,
+                "shape": {
+                  "kind": "rectangle",
+                  "x": -260,
+                  "y": -120,
+                  "width": 90,
+                  "height": 100
+                },
+                "values": {
+                  "worldReactions": false
+                }
+              }
+            ]
+          },
+          "overrides": [
+            {
+              "scope": "land",
+              "id": "lab-land",
+              "values": {
+                "worldReactions": false
+              }
+            },
+            {
+              "scope": "area",
+              "id": "playground",
+              "values": {
+                "worldReactions": true
+              }
+            },
+            {
+              "scope": "region",
+              "id": "circle",
+              "values": {
+                "worldReactions": true,
+                "dynamicProps": true
+              }
+            }
+          ]
+        },
+        "capabilities": ["worldReactions", "dynamicProps", "propBlocking", "impulseStrength"],
+        "presets": {
+          "Quiet": {
+            "worldReactions": false,
+            "dynamicProps": false,
+            "propBlocking": false,
+            "impulseStrength": 1
+          },
+          "Reactive": {
+            "worldReactions": true,
+            "dynamicProps": true,
+            "propBlocking": true,
+            "impulseStrength": 1
+          },
+          "Wild": {
+            "worldReactions": true,
+            "dynamicProps": true,
+            "propBlocking": true,
+            "impulseStrength": 2.5
+          },
+          "Sanctuary": {
+            "worldReactions": true,
+            "dynamicProps": true,
+            "propBlocking": false,
+            "impulseStrength": 0.35
+          }
+        }
+      }
+    }
+  ]
+}
