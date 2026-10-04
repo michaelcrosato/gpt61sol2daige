@@ -71,6 +71,12 @@ validated playground snapshots</td>
 <td>DOM, renderer, transport</td>
 </tr>
 <tr>
+<td><code>src/physics/policies.ts</code></td>
+<td>Validated land/area/region profiles, revisions, transaction queue,
+resolution and provenance</td>
+<td>DOM, Rapier handles, transport</td>
+</tr>
+<tr>
 <td><code>src/app/physics-ui.ts</code></td>
 <td>Solo lab controls and real body/collider drawing</td>
 <td>Ownership of Rapier handles</td>
@@ -406,11 +412,13 @@ replay and browser replacement dispose the superseded world and event
 queue. <code>Simulation.dispose()</code> is idempotent. Caller-owned
 simulations returned by <code>replay()</code> must be disposed by the
 caller.</p>
-<p>Version-1 game checkpoints optionally contain a version-1
-<code>playground</code> member. It preserves pinned backend version,
-unit scale, tick, stable body IDs with body/collider handles, recipes,
-snapshot bytes/checksum and bounded contact history. Restore validates
-lengths, byte values, identity uniqueness, registry/world
+<p>Version-1 game checkpoints optionally contain a
+<code>playground</code> member: M01 wrote version 1; M02 writes version
+2 and imports M01 snapshots. It preserves pinned backend version, unit
+scale, tick, stable body IDs with body/collider handles, recipes,
+snapshot bytes/checksum and bounded contact history. Version 2 also
+preserves policy documents, queued edits and applied body state. Restore
+validates lengths, byte values, identity uniqueness, registry/world
 correspondence, shapes, body properties and finite solved state;
 rejected restores preserve the current simulation. Same-build tests
 compare full solved continuation and replay hashes. Raw backend
@@ -425,7 +433,43 @@ before altering the scene; opening a scene during an online or
 connecting room is also rejected. Protocol 3 rejects playground encoding
 instead of silently sending incomplete physical state. Eight actual
 browser clients continue to exercise the ordinary adventure
-protocol.</p></main>
+protocol.</p>
+<h2 id="m02-regional-policies">M02 regional policies</h2>
+<p><code>src/physics/policies.ts</code> owns a validated version-1
+policy document with authored/current land, area and region profiles,
+live overrides, master switch, boundary margin, applied revision and a
+revision-reserving queue. <code>PhysicsWorld</code> validates
+transactions against every body’s area binding, commits them before each
+step, and resolves the center sampled at that boundary. Explicit paused
+apply commits without stepping. Profiles resolve before live overrides;
+specificity, region priority and stable ID determine per-value
+provenance. Master-off gates optional features absolutely. See <a
+href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/physics/POLICIES.md#m02-delivered-contract">exact
+semantics</a>.</p>
+<p>Only world reactions, dynamic props, prop blocking and commanded
+impulse strength are implemented controls. Prop freezing changes Rapier
+body type to fixed at the current pose, discarding velocity, force and
+torque. Waking performs stable pairwise separation before switching to
+dynamic, with zero motion. Unresolved placement remains visibly frozen.
+Real interaction groups preserve essential terrain/prop contacts and
+independently toggle prop-to-actor contacts. A dynamic lab contact
+traveler demonstrates this behavior; it is separate from the adventure
+motor, which remains M03.</p>
+<p>Playground version-2 snapshots retain complete policies/pending
+transactions, tick-start membership/position samples, applied
+values/provenance, frozen and blocked state, lab drive intent and
+validated consequence fields. Binary restore verifies body type, contact
+groups and zero frozen motion, plus resolver consistency at the saved
+sample. It does not resample an end-of-tick region crossing before the
+next boundary. Invalid loads retain the existing simulation.
+<code>{destroyed,claimed,durability?}</code> fields survive controls
+without claiming an implemented destruction system.</p>
+<p>The lab UI and agent use the same configure/apply/place/drive
+operations. Only collider/region overlays persist in localStorage;
+policies live in simulation checkpoints and replay hashes. The solo-only
+transport boundary and network wire 3 remain unchanged. M04 must
+implement authorized shared physics, not infer it from disabled controls
+or room counts.</p></main>
 <footer>Fern · A world engine built for agents · <a href="https://github.com/michaelcrosato/gpt61sol2daige">Source on GitHub</a></footer>
 </body>
 </html>

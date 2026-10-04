@@ -1,7 +1,9 @@
 import type { EventQueue, RigidBody, World } from "@dimforge/rapier2d-compat";
 import { checksum } from "../engine/math.ts";
 import { rapier } from "./bootstrap.ts";
+import { compareIds, PolicyController, type PolicyTransaction, policyId } from "./policies.ts";
 import {
+  type BodyEntry,
   type BodyPose,
   type BodyRecipe,
   type ContactEvent,
@@ -15,7 +17,6 @@ import {
 
 let liveWorlds = 0;
 let liveQueues = 0;
-const compareIds = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
 export const physicsResources = () => ({ worlds: liveWorlds, queues: liveQueues });
 export function finite(value: unknown, name: string, bound = 100_000): number {
   if (typeof value !== "number" || !Number.isFinite(value) || Math.abs(value) > bound)
@@ -51,18 +52,54 @@ export function validateBody(recipe: BodyRecipe): void {
     if (finite(value, name, bound) < 0) throw new Error(`${name} cannot be negative`);
   if (recipe.ccd !== undefined && typeof recipe.ccd !== "boolean")
     throw new Error("ccd must be boolean");
+  if (recipe.role !== undefined && !["prop", "terrain", "actor"].includes(recipe.role))
+    throw new Error("Unknown physics body role");
+  if (
+    (recipe.role === "terrain" && recipe.motion !== "fixed") ||
+    (recipe.role === "actor" && recipe.motion !== "dynamic")
+  )
+    throw new Error("Invalid body role/motion");
+  if (recipe.areaId !== undefined) policyId(recipe.areaId);
+  if (recipe.consequences !== undefined) {
+    const state = recipe.consequences;
+    if (
+      !state ||
+      typeof state !== "object" ||
+      Array.isArray(state) ||
+      Object.keys(state).some((key) => !["destroyed", "claimed", "durability"].includes(key)) ||
+      typeof state.destroyed !== "boolean" ||
+      typeof state.claimed !== "boolean"
+    )
+      throw new Error("Invalid prop consequence state");
+    if (state.durability !== undefined && finite(state.durability, "durability", 1_000_000) < 0)
+      throw new Error("Negative durability");
+  }
 }
+export const bodyRole = (recipe: BodyRecipe) =>
+  recipe.role ?? (recipe.motion === "fixed" ? "terrain" : "prop");
+const collisionGroups = (entry: BodyEntry) => {
+  const role = bodyRole(entry.recipe);
+  const membership = role === "terrain" ? 1 : role === "prop" ? 2 : 4;
+  const filter =
+    role === "prop"
+      ? 3 | (entry.policy?.effective.propBlocking ? 4 : 0)
+      : role === "actor"
+        ? 5 | (entry.policy?.effective.propBlocking ? 2 : 0)
+        : 7;
+  return (membership << 16) | filter;
+};
 
 /** The only owner of Rapier handles. All external coordinates and linear impulses use Fern units. */
 export class PhysicsWorld {
   private world: World;
   private queue: EventQueue;
-  private registry = new Map<string, { recipe: BodyRecipe; handle: number; collider: number }>();
+  private registry = new Map<string, BodyEntry>();
   private colliderIds = new Map<number, string>();
   private disposed = false;
   tick = 0;
   contacts = 0;
   events: ContactEvent[] = [];
+  private policies = new PolicyController();
 
   constructor(world?: World) {
     const api = rapier();
@@ -93,6 +130,7 @@ export class PhysicsWorld {
     if (this.registry.has(recipe.id)) throw new Error("Duplicate physics body ID");
     if (this.registry.size >= MAX_LAB_BODIES)
       throw new Error("Playground body limit reached (4096)");
+    const policy = this.policies.resolve(recipe.areaId ?? "playground", recipe.x, recipe.y);
     const api = rapier();
     const descriptor = (
       recipe.motion === "dynamic" ? api.RigidBodyDesc.dynamic() : api.RigidBodyDesc.fixed()
@@ -116,12 +154,17 @@ export class PhysicsWorld {
           .setActiveEvents(api.ActiveEvents.COLLISION_EVENTS),
         body,
       );
-      this.registry.set(recipe.id, {
+      const entry: BodyEntry = {
         recipe: structuredClone(recipe),
         handle: body.handle,
         collider: collider.handle,
-      });
+        policy,
+        frozen: false,
+        reactivationBlocked: false,
+      };
+      this.registry.set(recipe.id, entry);
       this.colliderIds.set(collider.handle, recipe.id);
+      this.synchronizePolicies();
     } catch (error) {
       this.world.removeRigidBody(body);
       throw error;
@@ -136,13 +179,25 @@ export class PhysicsWorld {
       finite(atY, "atY");
     }
     const body = this.body(id);
+    const entry = this.registry.get(id)!;
+    if (bodyRole(entry.recipe) === "prop" && !entry.policy!.effective.dynamicProps) return; // No stored motion or impulse backlog in a quiet region.
     if (!body.isDynamic()) throw new Error("Fixed bodies cannot receive impulses");
-    const impulse = { x: x / UNITS, y: y / UNITS };
+    const strength =
+      bodyRole(entry.recipe) === "prop" ? entry.policy!.effective.impulseStrength : 1;
+    const impulse = { x: (x * strength) / UNITS, y: (y * strength) / UNITS };
     if (atX === undefined) body.applyImpulse(impulse, true);
     else body.applyImpulseAtPoint(impulse, { x: atX / UNITS, y: atY! / UNITS }, true);
   }
   step(): void {
     this.alive();
+    this.policies.apply();
+    this.synchronizePolicies();
+    for (const entry of this.entries())
+      if (entry.drive) {
+        const body = this.body(entry.recipe.id);
+        body.setLinvel({ x: entry.drive.x / UNITS, y: entry.drive.y / UNITS }, true);
+        body.setAngvel(0, true);
+      }
     this.world.step(this.queue);
     this.tick++;
     this.queue.drainCollisionEvents((a, b, started) => {
@@ -170,7 +225,7 @@ export class PhysicsWorld {
     this.alive();
     return [...this.registry.values()]
       .sort((a, b) => compareIds(a.recipe.id, b.recipe.id))
-      .map(({ recipe, handle }) => {
+      .map(({ recipe, handle, policy, frozen, reactivationBlocked }) => {
         const body = this.world.getRigidBody(handle),
           position = body.translation(),
           velocity = body.linvel();
@@ -183,6 +238,9 @@ export class PhysicsWorld {
           vy: velocity.y * UNITS,
           angularVelocity: body.angvel(),
           sleeping: body.isSleeping(),
+          frozen: frozen ?? false,
+          reactivationBlocked: reactivationBlocked ?? false,
+          policy: structuredClone(policy!),
         };
       });
   }
@@ -194,7 +252,141 @@ export class PhysicsWorld {
       contacts: this.contacts,
       bodies: this.poses(),
       events: structuredClone(this.events),
+      policies: this.policies.inspect(),
     };
+  }
+  private entries() {
+    return [...this.registry.values()].sort((a, b) => compareIds(a.recipe.id, b.recipe.id));
+  }
+  configure(transaction: PolicyTransaction) {
+    this.alive();
+    // Validate every final body binding before enqueue; removal cannot strand a live body.
+    const projected = new PolicyController(this.policies.save());
+    const result = projected.configure(transaction);
+    projected.apply();
+    for (const entry of this.entries()) {
+      const p = this.body(entry.recipe.id).translation();
+      projected.resolve(entry.recipe.areaId ?? "playground", p.x * UNITS, p.y * UNITS);
+    }
+    this.policies.configure(transaction);
+    return result;
+  }
+  applyPolicies(expectedRevision: number) {
+    this.alive();
+    this.policies.apply(expectedRevision);
+    this.synchronizePolicies();
+    return this.inspect();
+  }
+  policyAt(areaId: string, x: number, y: number) {
+    finite(x, "policy x", 10_000);
+    finite(y, "policy y", 10_000);
+    return this.policies.resolve(areaId, x, y);
+  }
+  place(id: string, x: number, y: number) {
+    finite(x, "placement x", 10_000);
+    finite(y, "placement y", 10_000);
+    const body = this.body(id);
+    body.setTranslation({ x: x / UNITS, y: y / UNITS }, true);
+    this.clearMotion(body);
+    this.registry.get(id)!.reactivationBlocked = false;
+    this.synchronizePolicies();
+  }
+  drive(id: string, x: number, y: number) {
+    finite(x, "drive x", 600);
+    finite(y, "drive y", 600);
+    this.body(id);
+    const entry = this.registry.get(id)!;
+    if (bodyRole(entry.recipe) !== "actor") throw new Error("Drive requires a lab contact actor");
+    entry.drive = { x, y };
+  }
+  private clearMotion(body: RigidBody) {
+    body.setLinvel({ x: 0, y: 0 }, false);
+    body.setAngvel(0, false);
+    body.resetForces(false);
+    body.resetTorques(false);
+  }
+  private separate(entry: BodyEntry) {
+    const body = this.body(entry.recipe.id),
+      collider = this.world.getCollider(entry.collider);
+    // Deterministic pairwise correction also works before the first broad-phase step.
+    for (let pass = 0; pass < 32; pass++) {
+      let overlap = false;
+      this.world.propagateModifiedBodyPositionsToColliders();
+      for (const other of this.entries()) {
+        if (other === entry) continue;
+        const a = collisionGroups(entry),
+          b = collisionGroups(other);
+        if (!((a >>> 16) & b & 0xffff) || !((b >>> 16) & a & 0xffff)) continue;
+        const contact = collider.contactCollider(this.world.getCollider(other.collider), 0);
+        if (!contact || contact.distance >= -0.001 / UNITS) continue;
+        const p = body.translation(),
+          correction = -contact.distance + 0.01 / UNITS;
+        body.setTranslation(
+          { x: p.x - contact.normal1.x * correction, y: p.y - contact.normal1.y * correction },
+          false,
+        );
+        this.world.propagateModifiedBodyPositionsToColliders();
+        overlap = true;
+      }
+      if (!overlap) return true;
+    }
+    return false; // Inspector offers deliberate placement when no valid pose can be found.
+  }
+  private synchronizePolicies() {
+    const entries = this.entries(),
+      api = rapier(),
+      waking: BodyEntry[] = [];
+    for (const entry of entries) {
+      const body = this.body(entry.recipe.id),
+        p = body.translation();
+      entry.policy = this.policies.resolve(
+        entry.recipe.areaId ?? "playground",
+        p.x * UNITS,
+        p.y * UNITS,
+        entry.policy?.regions,
+      );
+      entry.policySample = { x: p.x * UNITS, y: p.y * UNITS };
+      const frozen =
+        entry.recipe.motion === "dynamic" &&
+        bodyRole(entry.recipe) === "prop" &&
+        !entry.policy.effective.dynamicProps;
+      if (frozen && !entry.frozen) {
+        this.clearMotion(body);
+        body.setBodyType(api.RigidBodyType.Fixed, false);
+        entry.reactivationBlocked = false;
+      } else if (!frozen && entry.frozen) {
+        this.clearMotion(body);
+        waking.push(entry);
+      }
+      entry.frozen = frozen;
+      this.world.getCollider(entry.collider).setCollisionGroups(collisionGroups(entry));
+    }
+    for (const entry of waking) {
+      const body = this.body(entry.recipe.id),
+        p = body.translation();
+      const valid = this.separate(entry);
+      if (!valid) body.setTranslation(p, false);
+      entry.reactivationBlocked = !valid;
+      entry.frozen = !valid;
+      if (valid) {
+        body.setBodyType(api.RigidBodyType.Dynamic, true);
+        this.clearMotion(body);
+        const corrected = body.translation();
+        // A correction into a quiet region must never leave the body reactive there.
+        entry.policy = this.policies.resolve(
+          entry.recipe.areaId ?? "playground",
+          corrected.x * UNITS,
+          corrected.y * UNITS,
+          entry.policy?.regions,
+        );
+        entry.policySample = { x: corrected.x * UNITS, y: corrected.y * UNITS };
+        if (!entry.policy.effective.dynamicProps) {
+          body.setBodyType(api.RigidBodyType.Fixed, false);
+          entry.frozen = true;
+        }
+        this.world.getCollider(entry.collider).setCollisionGroups(collisionGroups(entry));
+      }
+    }
   }
   overlay(): Float32Array {
     this.alive();
@@ -203,6 +395,7 @@ export class PhysicsWorld {
   }
   sweep() {
     const body = this.body("sweep");
+    if (!body.isDynamic()) throw new Error("Swept body is frozen; enable its policy first");
     const api = rapier();
     const start = { x: -180 / UNITS, y: 110 / UNITS };
     // Pairwise casts also see newly spawned bodies before the first broad-phase step.
@@ -243,7 +436,7 @@ export class PhysicsWorld {
     if (bytes.length > MAX_SNAPSHOT_BYTES)
       throw new Error("Playground checkpoint exceeds its 4 MB binary bound");
     return {
-      version: 1,
+      version: 2,
       backend: RAPIER_VERSION,
       units: UNITS,
       tick: this.tick,
@@ -252,6 +445,7 @@ export class PhysicsWorld {
       bodies: structuredClone([...this.registry.values()]),
       bytes,
       checksum: checksum(bytes),
+      policies: this.policies.save(),
     };
   }
   static restore(snapshot: PhysicsSnapshot): PhysicsWorld {
@@ -262,6 +456,7 @@ export class PhysicsWorld {
       const world = api.World.restoreSnapshot(new Uint8Array(snapshot.bytes));
       if (!world) throw new Error("Rapier rejected snapshot");
       restored = new PhysicsWorld(world);
+      restored.policies = new PolicyController(snapshot.policies);
       if (
         world.bodies.len() !== snapshot.bodies.length ||
         world.colliders.len() !== snapshot.bodies.length ||
@@ -280,7 +475,7 @@ export class PhysicsWorld {
           !collider ||
           collider.parent()?.handle !== body.handle ||
           body.numColliders() !== 1 ||
-          body.isDynamic() !== (entry.recipe.motion === "dynamic") ||
+          body.isDynamic() !== (entry.recipe.motion === "dynamic" && !entry.frozen) ||
           (!body.isDynamic() && !body.isFixed())
         )
           throw new Error("Snapshot body mapping mismatch");
@@ -307,12 +502,60 @@ export class PhysicsWorld {
         )
           throw new Error("Snapshot collider shape mismatch");
         restored.registry.set(entry.recipe.id, structuredClone(entry));
+        if (snapshot.version === 1) {
+          const added = restored.registry.get(entry.recipe.id)!;
+          const p = body.translation();
+          added.policy = restored.policies.resolve(
+            entry.recipe.areaId ?? "playground",
+            p.x * UNITS,
+            p.y * UNITS,
+          );
+          added.frozen = false;
+          added.reactivationBlocked = false;
+          added.policySample = { x: p.x * UNITS, y: p.y * UNITS };
+          collider.setCollisionGroups(collisionGroups(added));
+        } else {
+          const saved = entry.policy!;
+          // Start-of-tick membership is persisted: a moving body can cross before the next boundary.
+          const state = restored.policies.inspect().state;
+          if (
+            !saved ||
+            saved.areaId !== (entry.recipe.areaId ?? "playground") ||
+            !Array.isArray(saved.regions) ||
+            saved.regions.some(
+              (id) => !state.profiles.regions.some((r) => r.id === id && r.areaId === saved.areaId),
+            ) ||
+            JSON.stringify(saved) !==
+              JSON.stringify(
+                restored.policies.resolve(
+                  saved.areaId,
+                  entry.policySample!.x,
+                  entry.policySample!.y,
+                  saved.regions,
+                ),
+              ) ||
+            entry.frozen !==
+              (entry.recipe.motion === "dynamic" &&
+                bodyRole(entry.recipe) === "prop" &&
+                (!saved.effective.dynamicProps || entry.reactivationBlocked)) ||
+            collider.collisionGroups() !== collisionGroups(entry) ||
+            (entry.frozen &&
+              (body.linvel().x !== 0 || body.linvel().y !== 0 || body.angvel() !== 0))
+          )
+            throw new Error("Snapshot applied policy/body mismatch");
+        }
         restored.colliderIds.set(entry.collider, entry.recipe.id);
       }
       restored.tick = snapshot.tick;
       restored.contacts = snapshot.contacts;
       restored.events = structuredClone(snapshot.events);
+      if (snapshot.version === 1) restored.synchronizePolicies();
       for (const pose of restored.poses()) restored.validatePose(pose);
+      // Queue/reference checks must run against all bodies, without changing the restored world.
+      const projected = new PolicyController(restored.policies.save());
+      projected.apply();
+      for (const entry of restored.entries())
+        projected.resolve(entry.recipe.areaId ?? "playground", 0, 0);
       return restored;
     } catch (error) {
       restored?.dispose();
@@ -343,7 +586,7 @@ export class PhysicsWorld {
 export function validatePhysicsSnapshot(snapshot: PhysicsSnapshot): void {
   if (
     !snapshot ||
-    snapshot.version !== 1 ||
+    ![1, 2].includes(snapshot.version) ||
     snapshot.backend !== RAPIER_VERSION ||
     snapshot.units !== UNITS ||
     !Number.isSafeInteger(snapshot.tick) ||
@@ -361,12 +604,33 @@ export function validatePhysicsSnapshot(snapshot: PhysicsSnapshot): void {
     snapshot.events.length > 64
   )
     throw new Error("Invalid or incompatible physics snapshot header/bytes");
+  if (snapshot.version === 2) {
+    if (!snapshot.policies) throw new Error("Missing physics policies");
+    new PolicyController(snapshot.policies);
+  }
   const ids = new Set<string>(),
     handles = new Set<number>(),
     colliders = new Set<number>();
   for (const entry of snapshot.bodies) {
     if (!entry) throw new Error("Invalid physics body registry");
     validateBody(entry.recipe);
+    if (
+      snapshot.version === 2 &&
+      (typeof entry.frozen !== "boolean" ||
+        typeof entry.reactivationBlocked !== "boolean" ||
+        !entry.policy)
+    )
+      throw new Error("Invalid applied body policy");
+    if (snapshot.version === 2) {
+      if (!entry.policySample) throw new Error("Missing applied policy position");
+      finite(entry.policySample.x, "policy sample x", 1e12);
+      finite(entry.policySample.y, "policy sample y", 1e12);
+    }
+    if (entry.drive) {
+      if (bodyRole(entry.recipe) !== "actor") throw new Error("Invalid saved actor drive");
+      finite(entry.drive.x, "drive x", 600);
+      finite(entry.drive.y, "drive y", 600);
+    }
     if (
       ids.has(entry.recipe.id) ||
       handles.has(entry.handle) ||

@@ -2,7 +2,7 @@
 
 This document specifies the implementation target. Source paths listed as new modules are proposed boundaries, not claims that files already exist. Keep the design understandable to a fresh implementation session and adjust a boundary when actual code warrants it; record consequential deviations in [DECISIONS.md](DECISIONS.md).
 
-M01 implements `src/physics/{bootstrap,runtime,types}.ts`, the optional `Simulation.playground` owner and `src/app/physics-ui.ts`. Its confirmed contracts and source are documented in [the engine architecture](../ARCHITECTURE.md#m01-physics-foundation) and [M01 handoff](handoffs/M01.md). Sections below remain the target for subsequent actor, policy, material and networking milestones.
+M01 implements `src/physics/{bootstrap,runtime,types}.ts`, the optional `Simulation.playground` owner and `src/app/physics-ui.ts`. M02 adds `policies.ts`, applied and queued policy checkpoints, live body transitions and a lab contact traveler. Confirmed contracts are documented in [the engine architecture](../ARCHITECTURE.md#m02-regional-policies), [implemented policy semantics](POLICIES.md#m02-delivered-contract) and [M02 handoff](handoffs/M02.md). Sections below remain the target for subsequent actor, material and networking milestones. The lab traveler is a prop-blocking test body, not the M03 adventure motor.
 
 ## One owner of physical motion
 

@@ -1,4 +1,12 @@
 import type { Command } from "../engine/agent.ts";
+import {
+  POLICY_PRESETS,
+  type PolicyEdit,
+  type PolicyScope,
+  type PolicyValues,
+  type PresetName,
+  type RegionProfile,
+} from "../physics/policies.ts";
 import type { PhysicsWorld } from "../physics/runtime.ts";
 
 export function mountPhysicsUI(options: {
@@ -6,6 +14,7 @@ export function mountPhysicsUI(options: {
   solo: () => boolean;
   execute: (command: Command) => unknown;
   pause: (paused: boolean) => void;
+  paused: () => boolean;
 }) {
   const panel = document.createElement("section");
   panel.className = "physics-panel lab-panel";
@@ -24,7 +33,49 @@ export function mountPhysicsUI(options: {
       <button class="secondary-button" id="physics-run">Run playground</button>
       <button class="secondary-button" id="physics-pause">Pause playground</button>
       <label class="check-row"><input id="physics-overlay" type="checkbox" checked> Collider overlay</label>
+      <label class="check-row"><input id="physics-regions-overlay" type="checkbox" checked> Region overlay</label>
     </div>
+    <details class="physics-policy-editor" open>
+      <summary>Regional physics policies</summary>
+      <p class="field-help">Queued edits apply together at the next tick. While paused, use Apply queued policies. Freezing keeps the current pose and discards motion; waking corrects overlaps and starts at zero velocity.</p>
+      <div class="physics-controls">
+        <label>Scope <select id="physics-scope" aria-label="Physics policy scope"><option value="land">Land</option><option value="area" selected>Area</option><option value="region">Region</option></select></label>
+        <label>Profile <select id="physics-scope-id" aria-label="Physics policy profile"></select></label>
+        <label>World reactions <select id="physics-worldReactions" aria-label="World reactions override"><option value="inherit">Inherited</option><option value="true">On</option><option value="false">Off</option></select></label>
+        <label>Dynamic props <select id="physics-dynamicProps" aria-label="Dynamic props override"><option value="inherit">Inherited</option><option value="true">On</option><option value="false">Off</option></select></label>
+        <label>Prop blocking <select id="physics-propBlocking" aria-label="Prop blocking override"><option value="inherit">Inherited</option><option value="true">On</option><option value="false">Off</option></select></label>
+        <label>Impulse multiplier <input id="physics-impulseStrength" aria-label="Impulse multiplier override" type="number" min="0" max="10" step="0.05" placeholder="Inherited"></label>
+        <button class="secondary-button" id="physics-queue">Queue policy edit</button>
+        <button class="secondary-button" id="physics-reset-scope">Reset this scope</button>
+        <button class="secondary-button" id="physics-reset-authored">Reset to authored</button>
+        <label>Preset <select id="physics-preset" aria-label="Physics policy preset">${Object.keys(
+          POLICY_PRESETS,
+        )
+          .map((name) => `<option>${name}</option>`)
+          .join("")}</select></label>
+        <button class="secondary-button" id="physics-queue-preset">Queue preset</button>
+        <button class="secondary-button" id="physics-master">Queue master off</button>
+        <button class="secondary-button" id="physics-apply">Apply queued policies</button>
+      </div>
+      <p id="physics-preset-preview" class="field-help"></p>
+      <p id="physics-policy-status" role="status"></p>
+      <p id="physics-scope-inspector" class="field-help"></p>
+      <details><summary>Author region bounds and profile</summary>
+        <p class="field-help">Edit or add a named region in an existing area. Shapes: circle (center/radius), rectangle (top-left/width/height), polygon (3–64 points). Priority breaks overlaps; smaller ID wins ties. Bounds use canvas world coordinates.</p>
+        <label>Region recipe <textarea id="physics-region-recipe" aria-label="Physics region recipe" rows="5"></textarea></label>
+        <button class="secondary-button" id="physics-region-queue">Queue region recipe</button>
+      </details>
+    </details>
+    <div class="physics-controls">
+      <label>Place X <input id="physics-place-x" aria-label="Physics body placement X" type="number" min="-10000" max="10000" value="-210"></label>
+      <label>Place Y <input id="physics-place-y" aria-label="Physics body placement Y" type="number" min="-10000" max="10000" value="-70"></label>
+      <button class="secondary-button" id="physics-place">Place selected body</button>
+      <button class="secondary-button" id="physics-traveler">Spawn contact traveler</button>
+      <button class="secondary-button" id="physics-drive-left">Traveler left</button>
+      <button class="secondary-button" id="physics-drive-right">Traveler right</button>
+      <button class="secondary-button" id="physics-drive-stop">Stop traveler</button>
+    </div>
+    <p id="physics-body-inspector" class="field-help"></p>
     <p id="physics-status">Open the playground to begin. Save trail also saves this scene.</p>
     <canvas id="physics-canvas" width="960" height="580" aria-label="Physical crate pile, wheel and collision wall"></canvas>`;
   document.querySelector("#lab-view .lab-grid")!.before(panel);
@@ -36,6 +87,41 @@ export function mountPhysicsUI(options: {
   let shownIds = "",
     lastSweep = "",
     error = "";
+  const scope = get<HTMLSelectElement>("physics-scope"),
+    scopeId = get<HTMLSelectElement>("physics-scope-id");
+  let policySignature = "",
+    profileIds = "";
+  const preferencesKey = "fern:physics-overlays:v1";
+  try {
+    const saved = JSON.parse(localStorage.getItem(preferencesKey) ?? "null");
+    for (const key of ["overlay", "regions-overlay"])
+      if (typeof saved?.[key] === "boolean")
+        get<HTMLInputElement>(`physics-${key}`).checked = saved[key];
+  } catch {
+    /* Local preferences never affect authoritative state. */
+  }
+  for (const key of ["overlay", "regions-overlay"])
+    get<HTMLInputElement>(`physics-${key}`).addEventListener("change", () => {
+      try {
+        localStorage.setItem(
+          preferencesKey,
+          JSON.stringify({
+            overlay: get<HTMLInputElement>("physics-overlay").checked,
+            "regions-overlay": get<HTMLInputElement>("physics-regions-overlay").checked,
+          }),
+        );
+      } catch {
+        /* Storage can be unavailable. */
+      }
+    });
+  const selectedScope = () => ({ scope: scope.value as PolicyScope, id: scopeId.value });
+  const queue = (edits: PolicyEdit[]) =>
+    options.execute({
+      op: "physics",
+      action: "configure",
+      expectedRevision: options.world()!.inspect().policies.nextRevision,
+      edits,
+    });
   const act = (id: string, action: () => void) =>
     get<HTMLButtonElement>(id).addEventListener("click", () => {
       try {
@@ -50,6 +136,7 @@ export function mountPhysicsUI(options: {
   act("physics-open", () => {
     options.execute({ op: "physics", action: "reset" });
     lastSweep = "";
+    policySignature = "";
   });
   act("physics-close", () => {
     options.execute({ op: "physics", action: "close" });
@@ -89,6 +176,146 @@ export function mountPhysicsUI(options: {
   });
   act("physics-run", () => options.pause(false));
   act("physics-pause", () => options.pause(true));
+  act("physics-queue", () => {
+    const values: PolicyValues = {};
+    for (const key of ["worldReactions", "dynamicProps", "propBlocking"] as const) {
+      const value = get<HTMLSelectElement>(`physics-${key}`).value;
+      if (value !== "inherit") values[key] = value === "true";
+    }
+    const value = get<HTMLInputElement>("physics-impulseStrength").value;
+    if (value !== "") values.impulseStrength = Number(value);
+    queue([
+      { type: "reset", ...selectedScope(), to: "inherited" },
+      { type: "override", ...selectedScope(), values },
+    ]);
+  });
+  act("physics-reset-scope", () => queue([{ type: "reset", ...selectedScope(), to: "inherited" }]));
+  act("physics-reset-authored", () =>
+    queue([{ type: "reset", ...selectedScope(), to: "authored" }]),
+  );
+  act("physics-queue-preset", () =>
+    queue([
+      {
+        type: "preset",
+        ...selectedScope(),
+        preset: get<HTMLSelectElement>("physics-preset").value as PresetName,
+      },
+    ]),
+  );
+  act("physics-master", () =>
+    queue([
+      {
+        type: "master",
+        enabled: !options.world()!.inspect().policies.preview.masterWorldReactions,
+      },
+    ]),
+  );
+  act("physics-apply", () =>
+    options.execute({
+      op: "physics",
+      action: "apply",
+      expectedRevision: options.world()!.inspect().policies.nextRevision,
+    }),
+  );
+  act("physics-region-queue", () =>
+    queue([
+      {
+        type: "region",
+        profile: JSON.parse(
+          get<HTMLTextAreaElement>("physics-region-recipe").value,
+        ) as RegionProfile,
+      },
+    ]),
+  );
+  act("physics-place", () =>
+    options.execute({
+      op: "physics",
+      action: "place",
+      id: selector.value,
+      x: Number(get<HTMLInputElement>("physics-place-x").value),
+      y: Number(get<HTMLInputElement>("physics-place-y").value),
+    }),
+  );
+  act("physics-traveler", () =>
+    options.execute({
+      op: "physics",
+      action: "spawn",
+      body: {
+        id: "traveler",
+        motion: "dynamic",
+        role: "actor",
+        shape: { kind: "circle", radius: 10 },
+        x: -210,
+        y: 45,
+        mass: 8,
+        damping: 0,
+        restitution: 0,
+      },
+    }),
+  );
+  for (const [id, x] of [
+    ["left", -100],
+    ["right", 100],
+    ["stop", 0],
+  ] as const)
+    act(`physics-drive-${id}`, () =>
+      options.execute({ op: "physics", action: "drive", id: "traveler", x, y: 0 }),
+    );
+  scope.addEventListener("change", () => {
+    profileIds = "";
+    policySignature = "";
+    draw();
+  });
+  scopeId.addEventListener("change", () => {
+    policySignature = "";
+    draw();
+  });
+
+  function policyControls(world: PhysicsWorld | null) {
+    const policy = world?.inspect().policies;
+    get<HTMLButtonElement>("physics-apply").disabled =
+      !options.solo() || !world || !options.paused() || !policy?.pending.length;
+    if (!policy) return;
+    const profileList =
+      policy.preview.profiles[
+        scope.value === "land" ? "lands" : scope.value === "area" ? "areas" : "regions"
+      ];
+    const ids = profileList.map((p) => p.id).join("|");
+    if (ids !== profileIds) {
+      const old = scopeId.value;
+      scopeId.replaceChildren(...profileList.map((p) => new Option(p.id, p.id)));
+      if (profileList.some((p) => p.id === old)) scopeId.value = old;
+      profileIds = ids;
+    }
+    const signature = `${scope.value}:${scopeId.value}:${policy.nextRevision}`;
+    if (signature !== policySignature) {
+      const override = policy.preview.overrides.find(
+        (p) => p.scope === scope.value && p.id === scopeId.value,
+      )?.values;
+      for (const key of ["worldReactions", "dynamicProps", "propBlocking"] as const)
+        get<HTMLSelectElement>(`physics-${key}`).value =
+          override?.[key] === undefined ? "inherit" : String(override[key]);
+      get<HTMLInputElement>("physics-impulseStrength").value =
+        override?.impulseStrength === undefined ? "" : String(override.impulseStrength);
+      const profile = profileList.find((p) => p.id === scopeId.value);
+      get("physics-scope-inspector").textContent =
+        `Authored/current profile values: ${JSON.stringify(profile?.values ?? {})}. Live override: ${JSON.stringify(override ?? {})}. Inherited fields follow the profiles and broader overrides.`;
+      const region =
+        policy.preview.profiles.regions.find((r) => r.id === scopeId.value) ??
+        policy.preview.profiles.regions[0];
+      if (region)
+        get<HTMLTextAreaElement>("physics-region-recipe").value = JSON.stringify(region, null, 2);
+      policySignature = signature;
+    }
+    const preset = get<HTMLSelectElement>("physics-preset").value as PresetName;
+    get("physics-preset-preview").textContent =
+      `Preset preview: ${JSON.stringify(POLICY_PRESETS[preset])}. Applies the implemented prop controls at this scope. Editing individual values creates a custom override.`;
+    get("physics-policy-status").textContent =
+      `Applied revision ${policy.state.revision} · ${policy.pending.length} queued transactions · next revision ${policy.nextRevision} · master ${policy.state.masterWorldReactions ? "on" : "OFF"}${policy.pending.length ? " · Preview changes await a boundary/apply." : ""}`;
+    get<HTMLButtonElement>("physics-master").textContent = policy.preview.masterWorldReactions
+      ? "Queue master off"
+      : "Queue master on";
+  }
 
   function draw() {
     const world = options.world(),
@@ -97,14 +324,33 @@ export function mountPhysicsUI(options: {
     for (const button of panel.querySelectorAll<HTMLButtonElement>("button"))
       button.disabled = !solo || (button.id !== "physics-open" && !world);
     selector.disabled = !solo || !world;
-    const dynamic = poses.filter((body) => body.motion === "dynamic");
-    const ids = dynamic.map((body) => body.id).join("|");
+    for (const control of panel.querySelectorAll<
+      HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
+    >("input,select,textarea")) {
+      if (["physics-overlay", "physics-regions-overlay"].includes(control.id)) continue;
+      control.disabled = !solo || !world;
+    }
+    policyControls(world);
+    const ids = poses.map((body) => body.id).join("|");
     if (ids !== shownIds) {
       const previous = selector.value;
-      selector.replaceChildren(...dynamic.map((body) => new Option(body.id, body.id)));
-      if (dynamic.some((body) => body.id === previous)) selector.value = previous;
+      selector.replaceChildren(...poses.map((body) => new Option(body.id, body.id)));
+      if (poses.some((body) => body.id === previous)) selector.value = previous;
+      else
+        selector.value = poses.find((body) => body.motion === "dynamic")?.id ?? poses[0]?.id ?? "";
       shownIds = ids;
     }
+    const selected = poses.find((body) => body.id === selector.value);
+    for (const id of ["physics-push", "physics-spin"])
+      get<HTMLButtonElement>(id).disabled = !solo || !selected || selected.motion !== "dynamic";
+    get("physics-body-inspector").textContent = selected
+      ? `${selected.id} · (${selected.x.toFixed(1)}, ${selected.y.toFixed(1)}) · ${selected.reactivationBlocked ? "Overlap unresolved: place this body in free space." : selected.frozen ? "FROZEN, motion discarded" : "active"} · regions: ${selected.policy.regions.join(", ") || "none"} · Effective: ${JSON.stringify(selected.policy.effective)} · Sources: ${JSON.stringify(selected.policy.provenance)} · Consequences: ${JSON.stringify(selected.consequences ?? {})}`
+      : "Select a body to inspect its effective policy and provenance.";
+    get<HTMLButtonElement>("physics-traveler").disabled =
+      !solo || !world || poses.some((body) => body.id === "traveler");
+    for (const id of ["left", "right", "stop"])
+      get<HTMLButtonElement>(`physics-drive-${id}`).disabled =
+        !solo || !poses.some((body) => body.id === "traveler");
     status.textContent =
       error ||
       (!solo
@@ -129,6 +375,28 @@ export function mountPhysicsUI(options: {
       ctx.lineTo(280, n);
       ctx.stroke();
     }
+    if (world && get<HTMLInputElement>("physics-regions-overlay").checked) {
+      for (const region of world.inspect().policies.state.profiles.regions) {
+        const shape = region.shape;
+        ctx.fillStyle = "#507e7933";
+        ctx.strokeStyle = "#8fbdb1";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        if (shape.kind === "circle") ctx.arc(shape.x, shape.y, shape.radius, 0, Math.PI * 2);
+        else if (shape.kind === "rectangle") ctx.rect(shape.x, shape.y, shape.width, shape.height);
+        else {
+          ctx.moveTo(shape.points[0].x, shape.points[0].y);
+          for (const p of shape.points.slice(1)) ctx.lineTo(p.x, p.y);
+          ctx.closePath();
+        }
+        ctx.fill();
+        ctx.stroke();
+        const p = shape.kind === "polygon" ? shape.points[0] : shape;
+        ctx.fillStyle = "#b2d5c8";
+        ctx.font = "8px monospace";
+        ctx.fillText(region.id, p.x + 3, p.y - 4);
+      }
+    }
     ctx.setLineDash([4, 5]);
     ctx.strokeStyle = "#679caa";
     ctx.beginPath();
@@ -144,7 +412,15 @@ export function mountPhysicsUI(options: {
       ctx.translate(body.x, body.y);
       ctx.rotate(body.angle);
       ctx.fillStyle =
-        body.motion === "fixed" ? "#56665b" : body.id === "sweep" ? "#9cdded" : "#c79954";
+        body.motion === "fixed"
+          ? "#56665b"
+          : body.role === "actor"
+            ? "#9db8ee"
+            : body.frozen
+              ? "#88aaa4"
+              : body.id === "sweep"
+                ? "#9cdded"
+                : "#c79954";
       ctx.strokeStyle = body.id === selector.value ? "#ffe3a3" : "#5d402c";
       ctx.lineWidth = 1.5;
       if (body.shape.kind === "box") {

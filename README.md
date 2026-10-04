@@ -6,7 +6,7 @@ Keep your familiar wayfarer, carve through monster packs, shape a build across f
 
 [Play Fern](https://gpt61sol2daige.vercel.app) · [Design report](docs/REPORT.md) · [Architecture](docs/ARCHITECTURE.md) · [Agent protocol](docs/AGENT-PROTOCOL.md)
 
-The [reactive physics implementation plan](docs/physics/README.md) covers twelve milestones. M01 supplies Rapier2D in Node and the browser, with a solo physics playground in **Agent lab**: push crates, spin a wheel, sweep a fast body into a wall, inspect colliders and save/restore the scene. Regional controls, physical adventure actors, materials and mechanisms follow in M02–M12. See [status and handoffs](docs/physics/STATUS.md) for verified progress.
+The [reactive physics implementation plan](docs/physics/README.md) covers twelve milestones. M01–M02 supply a solo Rapier2D playground in **Agent lab**: push/spin real props, launch a swept body, configure land/area/region policies, freeze and re-enable the same bodies, and test prop blocking with a lab contact traveler. Inspect effective values and their sources, queue edits or apply them while paused, and save/replay the scene. Adventure actor migration, physical co-op, materials and mechanisms follow in M03–M12. See [status and handoffs](docs/physics/STATUS.md) for verified progress.
 
 ![The familiar wayfarer fighting Brambleheart in the Verdant March](docs/evidence/adventure-boss.png)
 
@@ -27,6 +27,7 @@ npm run preview        # serve dist/ locally
 npm run test:e2e       # combat/build loop, mobile, eight real WebRTC clients
 npm run verify:run     # nine areas through real inputs, including two new towns
 npm run physics        # reproducible Rapier scene, contacts, snapshot continuation and replay
+node tools/physics.ts examples/physics-regions.jsonl # regional switch acceptance and save/replay
 npm run bench          # CPU simulation benchmark → artifacts/benchmark.json
 npm run bench:browser  # 300 rendered frames; requires npm run dev
 npm run bench:quality  # 6k / 16k / 32k / 65,536 creatures in game mode

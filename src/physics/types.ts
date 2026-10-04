@@ -1,3 +1,5 @@
+import type { PolicyCheckpoint, ResolvedPolicy } from "./policies.ts";
+
 export const RAPIER_VERSION = "0.21.0";
 export const WORLD_UNITS_PER_METRE = 16;
 export const PHYSICS_STEP = 1 / 60;
@@ -19,6 +21,9 @@ export interface BodyRecipe {
   restitution?: number;
   damping?: number;
   ccd?: boolean;
+  role?: "prop" | "terrain" | "actor";
+  areaId?: string;
+  consequences?: { destroyed: boolean; claimed: boolean; durability?: number };
 }
 export interface BodyPose extends BodyRecipe {
   x: number;
@@ -28,6 +33,19 @@ export interface BodyPose extends BodyRecipe {
   vy: number;
   angularVelocity: number;
   sleeping: boolean;
+  frozen: boolean;
+  reactivationBlocked: boolean;
+  policy: ResolvedPolicy;
+}
+export interface BodyEntry {
+  recipe: BodyRecipe;
+  handle: number;
+  collider: number;
+  policy?: ResolvedPolicy;
+  policySample?: { x: number; y: number };
+  frozen?: boolean;
+  reactivationBlocked?: boolean;
+  drive?: { x: number; y: number };
 }
 export interface ContactEvent {
   tick: number;
@@ -36,13 +54,14 @@ export interface ContactEvent {
   started: boolean;
 }
 export interface PhysicsSnapshot {
-  version: 1;
+  version: 1 | 2;
   backend: typeof RAPIER_VERSION;
   units: typeof WORLD_UNITS_PER_METRE;
   tick: number;
   contacts: number;
   events: ContactEvent[];
-  bodies: { recipe: BodyRecipe; handle: number; collider: number }[];
+  bodies: BodyEntry[];
   bytes: number[];
   checksum: number;
+  policies?: PolicyCheckpoint;
 }

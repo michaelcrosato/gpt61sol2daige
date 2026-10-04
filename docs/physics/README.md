@@ -2,7 +2,7 @@
 
 Build a world that visibly responds to movement, attacks, collisions and the existing area mechanics. Rapier2D will provide the physical simulation; Fern will own the rules that make it enjoyable. Physical options must be controllable for an entire run, a land, an area and a region within an area.
 
-The plan was prepared on 2026-10-04 against Fern 2.0 at `c47cb119d6f57c70ddf79a4a72db59376d68f1e5`. M01 now implements the Rapier foundation and solo lab playground; see [STATUS.md](STATUS.md) and [the M01 handoff](handoffs/M01.md) for its evidence and merge procedure. The remaining milestones describe the implementation target, not delivered adventure physics.
+The plan was prepared on 2026-10-04 against Fern 2.0 at `c47cb119d6f57c70ddf79a4a72db59376d68f1e5`. M01 implements the Rapier foundation; M02 adds scoped policies and live transitions to its solo lab playground. See [STATUS.md](STATUS.md) and [the M02 handoff](handoffs/M02.md) for evidence and merge procedure. The remaining milestones describe the implementation target, not delivered adventure physics.
 
 ## User priorities
 

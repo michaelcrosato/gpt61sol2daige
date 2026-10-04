@@ -113,6 +113,7 @@ const physicsUI = mountPhysicsUI({
   solo: () => net.status.role === "solo" && net.status.state !== "connecting",
   execute,
   pause: setPaused,
+  paused: () => paused,
 });
 const display = new GameDisplay(
   updateDisplay,
@@ -329,6 +330,10 @@ function execute(command: Command): unknown {
   if (command.op === "physics" && net.status.state === "connecting")
     throw new Error(
       "Wait for the expedition connection to finish before using the solo playground",
+    );
+  if (command.op === "physics" && command.action === "apply" && !paused)
+    throw new Error(
+      "Pause the playground before deliberately applying policies; running edits apply on the next tick.",
     );
   if (
     !["observe", "describe", "inspect", "save", "catalog"].includes(command.op) &&

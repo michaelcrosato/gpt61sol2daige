@@ -22,6 +22,10 @@ for (const [name, title] of [
   const html = (await readFile(output, "utf8"))
     .replaceAll('href="VERIFICATION.md"', 'href="verification.html"')
     .replaceAll(
+      'href="physics/',
+      'href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/physics/',
+    )
+    .replaceAll(
       'href="evidence/',
       'href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/evidence/',
     );

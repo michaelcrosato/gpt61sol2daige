@@ -2522,6 +2522,30 @@ html.game-mode,
 .physics-panel {
   margin: 16px 0;
 }
+.physics-policy-editor {
+  margin: 16px 0;
+  padding: 12px;
+  border: 1px solid #3a5545;
+  border-radius: 8px;
+}
+.physics-policy-editor summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.physics-policy-editor textarea {
+  width: 100%;
+  box-sizing: border-box;
+  background: #13231b;
+  color: #d2e4d2;
+  border: 1px solid #46614e;
+  border-radius: 5px;
+  padding: 8px;
+  font: 12px monospace;
+}
+#physics-body-inspector,
+#physics-scope-inspector {
+  overflow-wrap: anywhere;
+}
 .physics-controls {
   display: flex;
   flex-wrap: wrap;

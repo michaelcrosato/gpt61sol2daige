@@ -18,6 +18,43 @@ try {
   const results = commands.map((command) => agent.execute(command));
   const before = agent.sim.playground?.inspect();
   if (!before) throw new Error("Scene must leave an active playground");
+  const policySamples = commands.flatMap((command, index) =>
+    command.op === "physics" && command.action === "inspect"
+      ? [results[index] as typeof before]
+      : [],
+  );
+  if (source === "examples/physics-regions.jsonl") {
+    assert.equal(policySamples.length, 6);
+    const crates = policySamples.map(
+      (sample) => sample.bodies.find((body) => body.id === "crossing-crate")!,
+    );
+    assert.ok(
+      crates[0].frozen && crates[0].x < -170,
+      "Crate must physically enter the quiet rectangle",
+    );
+    assert.equal(crates[1].x, crates[0].x, "Quiet region suppresses the repeated impulse");
+    assert.equal(crates[1].angle, crates[0].angle, "Frozen angle must stay at its solved pose");
+    assert.ok(
+      !crates[2].frozen && crates[2].vx === 0 && crates[2].angularVelocity === 0,
+      "Return wakes with zero motion",
+    );
+    assert.ok(crates[3].x > crates[2].x + 10, "The same returned crate must respond again");
+    assert.equal(crates[3].policy.provenance.worldReactions, "area:playground/override");
+    assert.ok(
+      crates[4].frozen && !crates[4].policy.effective.propBlocking,
+      "Master-off beats the region's live override",
+    );
+    assert.equal(crates[4].policy.provenance.worldReactions, "session-master-off");
+    assert.ok(!crates[5].frozen && crates[5].vx === 0, "Master re-enable discards disabled motion");
+    assert.equal(crates[5].policy.provenance.worldReactions, "region:circle/override");
+    assert.equal(
+      policySamples[3].tick,
+      policySamples[5].tick,
+      "Paused edits must not step the scene",
+    );
+    for (const crate of crates)
+      assert.deepEqual(crate.consequences, { destroyed: false, claimed: true, durability: 7 });
+  }
   played = replay(agent.execute({ op: "replay" }) as Replay);
   const replayHash = played.stateHash();
   restored = Simulation.restore(JSON.parse(JSON.stringify(agent.sim.save())));
@@ -45,6 +82,7 @@ try {
         replayHash,
         continuationHash: agent.sim.stateHash(),
         snapshotContinuation: "passed",
+        policySamples,
       },
       null,
       2,
