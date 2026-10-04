@@ -7,8 +7,11 @@ import { rollItem } from "../src/game/loot.ts";
 import { SKILLS } from "../src/game/skills.ts";
 import { validateAdventure, validateArea } from "../src/game/validation.ts";
 import { decodeSnapshot, encodeSnapshot } from "../src/net/protocol.ts";
+import { initializePhysics } from "../src/physics/bootstrap.ts";
 import { monsterPixels, rigSvg } from "../src/render/rigs.ts";
 import { fightArea } from "../tools/lib/expedition-bot.ts";
+
+await initializePhysics();
 
 function game(area = 0): Simulation {
   const sim = new Simulation(142, 0);

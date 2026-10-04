@@ -2,6 +2,8 @@
 
 This document specifies the implementation target. Source paths listed as new modules are proposed boundaries, not claims that files already exist. Keep the design understandable to a fresh implementation session and adjust a boundary when actual code warrants it; record consequential deviations in [DECISIONS.md](DECISIONS.md).
 
+M01 implements `src/physics/{bootstrap,runtime,types}.ts`, the optional `Simulation.playground` owner and `src/app/physics-ui.ts`. Its confirmed contracts and source are documented in [the engine architecture](../ARCHITECTURE.md#m01-physics-foundation) and [M01 handoff](handoffs/M01.md). Sections below remain the target for subsequent actor, policy, material and networking milestones.
+
 ## One owner of physical motion
 
 Keep a Rapier world associated with the authoritative simulation's current land. Use zero global gravity for the top-down plane. Regional wind, attraction and similar forces are explicit inputs. Convert between Fern world units and physics units through one adapter; start with 16 world units per physics unit and tune contact tolerances from the playground. The renderer continues to receive Fern coordinates. No custom high-precision build or cross-device floating-point project is required.

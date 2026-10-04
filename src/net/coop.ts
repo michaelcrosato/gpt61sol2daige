@@ -113,6 +113,8 @@ export class Coop {
     return peer;
   }
   async host(): Promise<string> {
+    if (this.getSim().playground)
+      throw new Error("Close the solo physics playground before hosting an expedition");
     this.disconnect();
     const generation = this.generation;
     try {
@@ -268,6 +270,8 @@ export class Coop {
     return conn.open;
   }
   async join(rawRoom: string): Promise<void> {
+    if (this.getSim().playground)
+      throw new Error("Close the solo physics playground before joining an expedition");
     let room = rawRoom.trim();
     if (room.startsWith("http")) {
       try {

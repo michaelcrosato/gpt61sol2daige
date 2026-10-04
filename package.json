@@ -16,6 +16,7 @@
     "check": "biome check . && npm run typecheck && npm test",
     "format": "biome check --write .",
     "agent": "node tools/agent.ts",
+    "physics": "node tools/physics.ts",
     "bench": "node tools/bench.ts",
     "bench:browser": "node tools/browser-bench.ts",
     "bench:quality": "node tools/quality-bench.ts",
@@ -27,6 +28,7 @@
     "verify:run": "node tools/adventure.ts playthrough 9"
   },
   "dependencies": {
+    "@dimforge/rapier2d-compat": "0.21.0",
     "peerjs": "1.5.5"
   },
   "devDependencies": {

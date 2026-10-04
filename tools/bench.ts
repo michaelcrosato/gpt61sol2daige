@@ -2,6 +2,9 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { cpus, platform, release } from "node:os";
 import { Simulation } from "../src/engine/simulation.ts";
 import { encodeSnapshot } from "../src/net/protocol.ts";
+import { initializePhysics } from "../src/physics/bootstrap.ts";
+
+await initializePhysics();
 
 const results = [];
 for (const count of [1000, 2400, 6000, 8192]) {

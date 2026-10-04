@@ -4,7 +4,7 @@ The evidence here distinguishes tested behavior from operating limits. Source te
 
 ## Reproduction gates
 
-Version 2.0 passes **41 headless tests** and **14 browser scenarios**, including the earlier streaming, settings, fullscreen and actual WebRTC coverage. The new checks exercise combat, skills, shop purchases, equipment, drops, death, outward progression, guest action authority, shared party XP/gold, personal respawn and exact save/replay continuation. Version 1.1 had 26 headless tests and 10 browser scenarios; its measurements remain labeled below.
+M01 passes **48 headless tests** and **17 browser scenarios**. Fern 2.0's preceding release had 41 headless tests and 14 browser scenarios, exercising combat, skills, shop purchases, equipment, drops, death, outward progression, guest action authority, shared party XP/gold, personal respawn and exact save/replay continuation. Version 1.1 had 26 headless tests and 10 browser scenarios; its measurements remain labeled below.
 
 ```bash
 npm ci
@@ -12,6 +12,7 @@ npm run check
 npm run build
 npm run test:e2e
 npm run verify:run
+npm run physics
 npm run bench
 # With npm run dev running:
 npm run bench:browser
@@ -128,3 +129,20 @@ The physics tests cover circles, static terrain and the reference game's interac
 ## Join recovery
 
 Transport diagnostics exposed a connected WebRTC peer that had not completed application admission. The game now reconciles already-open native channels with PeerJS, acknowledges client readiness with repeated hello/welcome messages, and makes up to three bounded attempts after a transient initial connection failure. Full rooms, incompatible versions and invalid data still fail explicitly. Generation guards keep canceled attempts from replacing a newer session. A browser test closes the first real native data channel deliberately, then verifies that a fresh real connection joins successfully.
+
+## M01 Rapier foundation evidence
+
+On 2026-10-04, `npm run check` passed all 48 headless tests, `npm run build` produced the production bundle and `npm run test:e2e` passed all 17 browser scenarios. The actual eight-client WebRTC scenario also passed after adding explicit host/guest rejection of playground commands and disabled online playground controls. The intentional failed-module test blocks the Rapier chunk, confirms a visible boot alert and verifies reload recovery. A page-disposal test waits five animation frames after unload and confirms that the disposed simulation is not stepped again.
+
+| M01 acceptance | Evidence |
+| --- | --- |
+| Actual movement, spin and contacts | `tests/physics.test.ts`, `e2e/physics.spec.ts`, [headless scene](evidence/physics-m01.json), [rendered scene](evidence/physics-m01.png) |
+| Swept motion | Pairwise cast predicts the wall at fraction 0.745000064; the real CCD body reaches contact without crossing the wall; trajectory tolerance is one Fern unit around the expected center x=118 |
+| Browser/Node initialization | Browser bootstrap, CLI, tests and browser save/reload all await the shared barrier; no browser globals are needed by engine imports |
+| Snapshot continuation and replay | JSON round trip preserves stable IDs and solved motion; 120 additional test ticks produce the same poses/hash; CLI recording replays successfully |
+| Reset/dispose/failure/cancel | 25 reset/restore loops retain exactly one world and queue; close/reset/dispose return counts to baseline; injected failure/retry and canceled waiters do not allocate worlds; page unload cancels animation |
+| Solo boundary and existing multiplayer | Host/join reject an open scene; host/guest lab edits are rejected; protocol 3 rejects physical encoding; ordinary eight-client connections, input, combat, progression and slot release pass |
+
+`node tools/physics.ts` reproduces `examples/physics-playground.jsonl` with seed 142 and no ambient population. Its 150-tick scene records 13 contact starts. The wheel moves from x=-140 to x=60.588676 and rotates to -2.155276 radians; the snapshot/replay checks pass. These observations demonstrate mechanics, not balance or performance. The lab exposes its own 4,096-body/4 MB binary-checkpoint safety limits. Adventure actor physics, regional policies and physical co-op remain future milestones.
+
+The former `fps > 20` browser assertion is removed. Entity coverage, visible drawing, interaction and error assertions remain. Build emits an informational size warning for the embedded-WASM Rapier chunk (approximately 3.40 MB minified, 1.30 MB gzip); no FPS or package-size target gates this milestone. CI, merged commit and affected production verification must be inspected through the milestone PR's final receipt, not inferred from these local results.

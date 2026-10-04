@@ -5,6 +5,9 @@ import { hash, noise } from "../src/engine/math.ts";
 import { collideCircles, moveBody, SpatialHash } from "../src/engine/physics.ts";
 import { idleInput, MAX_NPCS, Simulation } from "../src/engine/simulation.ts";
 import { Decor, LANDMARKS, Terrain, World } from "../src/engine/world.ts";
+import { initializePhysics } from "../src/physics/bootstrap.ts";
+
+await initializePhysics();
 
 test("coordinate hashing and smooth noise are stable across negative and distant coordinates", () => {
   assert.equal(hash(-32000, 65482, 142), hash(-32000, 65482, 142));

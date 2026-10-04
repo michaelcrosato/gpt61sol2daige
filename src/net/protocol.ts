@@ -49,6 +49,7 @@ export function encodeSnapshot(
   playerId: string,
   interest: number | SnapshotView = 1500,
 ): ArrayBuffer {
+  if (sim.playground) throw new Error("Physics playground snapshots are solo-only until M04");
   const p = sim.players.get(playerId),
     originX = p?.x ?? 0,
     originY = p?.y ?? 0;

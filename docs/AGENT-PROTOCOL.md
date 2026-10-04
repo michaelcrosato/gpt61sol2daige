@@ -162,3 +162,36 @@ node tools/adventure.ts playthrough 9           # Actual input-driven run; JSON 
 6. Run the relevant benchmark when changing hot loops, entity limits or rendering detail.
 
 `npm run check`, `npm run build`, and `npm run test:e2e` define the repository's verification gates. Tests use local signaling by default; production tests must explicitly target the deployed URL.
+
+## Physics playground (M01)
+
+In solo **Agent lab**, choose **Open / reset playground**, select a body and use **Push right**, **Push off center** or **Launch swept body**. The collider checkbox is presentation-only. Pause/run and explicit tick controls use the same simulation clock. Save trail, Snapshot JSON and replay include the physical scene. Close the playground before hosting/joining; online and connecting rooms reject playground commands until M04.
+
+The discoverable `physics` operation supplies these actions:
+
+| `action` | Fields / result |
+| --- | --- |
+| `inspect` (default) | Backend, unit scale, tick, bodies with solved poses/velocities and sleeping state, total contact starts and the last 64 contact transitions; `{active:false}` when closed |
+| `reset` | Open/recreate the ten-body crate/wheel/wall recipe, disposing the previous world and queue |
+| `close` | Dispose the scene without changing adventure progress |
+| `spawn` | `body`: `{id,motion:"dynamic"|"fixed",shape:{kind:"circle",radius}|{kind:"box",width,height},x,y,angle?,mass?,friction?,restitution?,damping?,ccd?}` |
+| `impulse` | `id`, `x?`, `y?` (default 0); optional `atX` and `atY` world-space application point together; linear impulse units are kg·Fern units/s |
+| `sweep` | Predict the nearest collider on the authored lane and launch the real CCD body; returns its ID, path and hit fraction; use `step` to observe contact |
+
+```json
+{"op":"physics","action":"reset"}
+{"op":"physics","action":"impulse","id":"wheel","x":240,"y":0,"atX":-140,"atY":54}
+{"op":"step","ticks":60}
+{"op":"physics","action":"inspect"}
+{"op":"physics","action":"spawn","body":{"id":"my-crate","motion":"dynamic","shape":{"kind":"box","width":24,"height":24},"x":-100,"y":-90,"mass":2}}
+```
+
+Body IDs use 1–80 letters/digits/underscores/hyphens and must be unique. Spawn coordinates lie within ±10,000; circle radii are 1–256 and box dimensions 1–512. Mass is 0.01–10,000 (default 1), friction 0–10 (default 0.6), restitution 0–1 (default 0.3), damping 0–100 (default 0.35), and CCD defaults on. Angles and impulse components/application coordinates are finite and bounded by ±100,000. Fixed bodies reject impulses. The lab has explicit 4,096-body and 4 MB binary-checkpoint limits; these do not alter ambient population. These props remain an experimental scene and do not collide with adventure actors yet.
+
+```bash
+npm run physics                          # asserts the default scene's movement, spin, contacts, CCD and snapshot/replay
+node tools/physics.ts my-scene.jsonl      # runs an authored command sequence and checks its snapshot/replay continuation
+node tools/agent.ts --count 0 < examples/physics-playground.jsonl
+```
+
+When importing the engine directly, await `initializePhysics()` from `src/physics/bootstrap.ts` first; synchronous construction, restore, commands and replay follow that barrier. Dispose caller-owned `Simulation` instances when finished. Raw playground snapshots identify Rapier 0.21.0 and reject incompatible versions; old version-1 saves without this member retain the ordinary adventure path. FPS/throughput telemetry is informational, with no FPS acceptance threshold.

@@ -2518,3 +2518,47 @@ html.game-mode,
     padding-top: 79px;
   }
 }
+/* The lab owns a deliberate, solo-only physical scene. */
+.physics-panel {
+  margin: 16px 0;
+}
+.physics-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.physics-controls label {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  font-size: 12px;
+}
+.physics-controls select,
+.physics-controls input[type="number"] {
+  width: 100px;
+  padding: 8px;
+  color: #d1ddcb;
+  background: #14241d;
+  border: 1px solid #45614b;
+  border-radius: 6px;
+}
+#physics-canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 8px;
+}
+#physics-status {
+  min-height: 1.4em;
+  font-size: 12px;
+  color: #b3c4af;
+}
+#physics-boot {
+  position: absolute;
+  inset: 0;
+  z-index: 100;
+  padding: 32px;
+  background: #14241d;
+  color: #d1ddcb;
+}
