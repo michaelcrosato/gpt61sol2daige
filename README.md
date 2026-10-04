@@ -6,6 +6,8 @@ Keep your familiar wayfarer, carve through monster packs, shape a build across f
 
 [Play Fern](https://gpt61sol2daige.vercel.app) · [Design report](docs/REPORT.md) · [Architecture](docs/ARCHITECTURE.md) · [Agent protocol](docs/AGENT-PROTOCOL.md)
 
+The next development phase is specified in the [reactive physics implementation plan](docs/physics/README.md): twelve milestones for Rapier2D, regional controls, destructible materials, mechanisms, physical combat, expressive rigs and procedural interactions. The plan includes fresh-session handoffs; these features are planned, not yet part of the 2.0 runtime.
+
 ![The familiar wayfarer fighting Brambleheart in the Verdant March](docs/evidence/adventure-boss.png)
 
 ## Run in this environment
