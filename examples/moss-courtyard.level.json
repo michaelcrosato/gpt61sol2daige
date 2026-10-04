@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "seed": 142,
+  "brushes": [
+    { "tx": -10, "ty": -10, "width": 20, "height": 20, "terrain": 1 },
+    { "tx": -6, "ty": -6, "width": 12, "height": 12, "terrain": 6 },
+    { "tx": -10, "ty": -10, "width": 20, "height": 1, "terrain": 1, "decor": 2 },
+    { "tx": -10, "ty": 9, "width": 20, "height": 1, "terrain": 1, "decor": 2 },
+    { "tx": -8, "ty": -1, "width": 1, "height": 3, "terrain": 1, "decor": 7 }
+  ]
+}

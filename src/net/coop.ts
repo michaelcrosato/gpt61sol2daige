@@ -1,0 +1,357 @@
+import Peer, { type DataConnection, type PeerOptions } from "peerjs";
+import { type Input, idleInput, type Simulation } from "../engine/simulation.ts";
+import { decodeSnapshot, encodeSnapshot, PROTOCOL_VERSION, snapshotBuffer } from "./protocol.ts";
+
+export type NetworkStatus = {
+  role: "solo" | "host" | "guest";
+  state: "offline" | "connecting" | "connected" | "error";
+  room: string;
+  message: string;
+  peers: number;
+  received: number;
+  sent: number;
+  population: number;
+};
+export class Coop {
+  readonly status: NetworkStatus = {
+    role: "solo",
+    state: "offline",
+    room: "",
+    message: "A little solitude",
+    peers: 0,
+    received: 0,
+    sent: 0,
+    population: 0,
+  };
+  localId = "local";
+  lastSnapshot = 0;
+  private peer?: Peer;
+  private readonly connections = new Map<string, DataConnection>();
+  private readonly lastInput = new Map<string, number>();
+  private readonly lastSequence = new Map<string, number>();
+  private readonly interest = new Map<string, number>();
+  private readonly getSim: () => Simulation;
+  private readonly replaceSim: (sim: Simulation) => void;
+  private readonly changed: () => void;
+  private elapsed = 0;
+  private sequence = 0;
+  private lastSent = 0;
+  private generation = 0;
+  constructor(
+    getSim: () => Simulation,
+    replaceSim: (sim: Simulation) => void,
+    changed: () => void,
+  ) {
+    this.getSim = getSim;
+    this.replaceSim = replaceSim;
+    this.changed = changed;
+  }
+  private options(): PeerOptions {
+    const env = import.meta.env;
+    const options: PeerOptions = { debug: 0 };
+    if (env.VITE_SIGNAL_HOST) {
+      options.host = env.VITE_SIGNAL_HOST;
+      options.port = Number(env.VITE_SIGNAL_PORT ?? 9000);
+      options.path = env.VITE_SIGNAL_PATH ?? "/fern";
+      options.secure = env.VITE_SIGNAL_SECURE === "true";
+    }
+    if (env.VITE_ICE_SERVERS) options.config = { iceServers: JSON.parse(env.VITE_ICE_SERVERS) };
+    return options;
+  }
+  private async open(id?: string): Promise<Peer> {
+    this.status.state = "connecting";
+    this.status.message = "Finding a path through the trees…";
+    this.changed();
+    const peer = id ? new Peer(id, this.options()) : new Peer(this.options());
+    this.peer = peer;
+    await new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        peer.destroy();
+        reject(new Error("Signaling timed out. Check your connection and try again."));
+      }, 15000);
+      peer.once("open", () => {
+        clearTimeout(timer);
+        resolve();
+      });
+      peer.once("error", (error) => {
+        clearTimeout(timer);
+        reject(new Error(error.message));
+      });
+    });
+    peer.on("error", (error) => {
+      this.status.message =
+        error.type === "peer-unavailable"
+          ? "That expedition has ended or the room code is incorrect."
+          : error.message;
+      this.changed();
+    });
+    peer.on("disconnected", () => {
+      if (!peer.destroyed) {
+        this.status.message = "Signaling interrupted. Existing travelers remain connected.";
+        this.changed();
+        peer.reconnect();
+      }
+    });
+    return peer;
+  }
+  async host(): Promise<string> {
+    this.disconnect();
+    const generation = this.generation;
+    try {
+      const room = `fern-${crypto.randomUUID()}`,
+        peer = await this.open(room);
+      if (generation !== this.generation) throw new Error("Connection canceled");
+      this.status.role = "host";
+      this.status.state = "connected";
+      this.status.room = room;
+      this.status.message = "Your expedition is open";
+      peer.on("connection", (conn) => this.accept(conn));
+      this.changed();
+      return room;
+    } catch (error) {
+      this.fail(error);
+      throw error;
+    }
+  }
+  private accept(conn: DataConnection): void {
+    conn.on("error", () => conn.close());
+    conn.on("open", () => {
+      if (
+        this.status.role !== "host" ||
+        conn.metadata?.version !== PROTOCOL_VERSION ||
+        this.getSim().players.size >= 8
+      ) {
+        conn.send({
+          type: "error",
+          message:
+            this.getSim().players.size >= 8
+              ? "This expedition is full (8 players)."
+              : "Incompatible engine version.",
+        });
+        setTimeout(() => conn.close(), 200);
+        return;
+      }
+      if (this.connections.has(conn.peer)) {
+        conn.close();
+        return;
+      }
+      this.connections.set(conn.peer, conn);
+      this.getSim().addPlayer(conn.peer, `Wayfarer ${this.getSim().players.size + 1}`);
+      this.lastInput.set(conn.peer, performance.now());
+      this.status.peers = this.connections.size;
+      conn.send({ type: "welcome", id: conn.peer, version: PROTOCOL_VERSION });
+      conn.send(encodeSnapshot(this.getSim(), conn.peer));
+      this.changed();
+    });
+    conn.on("data", (raw) => {
+      if (!this.connections.has(conn.peer) || !raw || typeof raw !== "object") return;
+      const data = raw as Record<string, unknown>;
+      if (
+        data.type !== "input" ||
+        typeof data.seq !== "number" ||
+        !Number.isSafeInteger(data.seq) ||
+        data.seq <= (this.lastSequence.get(conn.peer) ?? -1)
+      )
+        return;
+      const now = performance.now();
+      if (now - (this.lastInput.get(conn.peer) ?? 0) < 12) return;
+      if (
+        typeof data.x !== "number" ||
+        typeof data.y !== "number" ||
+        !Number.isFinite(data.x) ||
+        !Number.isFinite(data.y)
+      )
+        return;
+      this.getSim().setInput(conn.peer, {
+        x: data.x,
+        y: data.y,
+        dash: data.dash === true,
+        pulse: data.pulse === true,
+        interact: data.interact === true,
+      });
+      this.lastInput.set(conn.peer, now);
+      this.lastSequence.set(conn.peer, data.seq);
+      if (typeof data.radius === "number" && Number.isFinite(data.radius))
+        this.interest.set(conn.peer, Math.max(400, Math.min(15000, data.radius)));
+    });
+    conn.on("close", () => {
+      if (this.connections.get(conn.peer) !== conn) return;
+      this.connections.delete(conn.peer);
+      this.lastInput.delete(conn.peer);
+      this.lastSequence.delete(conn.peer);
+      this.interest.delete(conn.peer);
+      this.getSim().removePlayer(conn.peer);
+      this.status.peers = this.connections.size;
+      this.changed();
+    });
+  }
+  async join(rawRoom: string): Promise<void> {
+    let room = rawRoom.trim();
+    if (room.startsWith("http")) {
+      try {
+        room = new URL(room).searchParams.get("room") ?? "";
+      } catch {
+        throw new Error("Enter a room code or invite link");
+      }
+    }
+    if (!/^fern-[a-f0-9-]{36}$/.test(room))
+      throw new Error("Enter the full room code or invite link");
+    this.disconnect();
+    const generation = this.generation;
+    try {
+      const peer = await this.open();
+      if (generation !== this.generation) throw new Error("Connection canceled");
+      this.status.role = "guest";
+      this.status.room = room;
+      const conn = peer.connect(room, {
+        reliable: true,
+        serialization: "binary",
+        metadata: { version: PROTOCOL_VERSION },
+      });
+      this.connections.set(room, conn);
+      await new Promise<void>((resolve, reject) => {
+        let welcomed = false,
+          completed = false;
+        const timer = setTimeout(
+          () =>
+            reject(
+              new Error(
+                "Could not reach the host. They must keep their expedition open. Some networks require a TURN relay.",
+              ),
+            ),
+          22000,
+        );
+        const done = () => {
+          if (completed) return;
+          completed = true;
+          clearTimeout(timer);
+          resolve();
+        };
+        conn.on("data", (raw) => {
+          try {
+            if (raw instanceof ArrayBuffer || ArrayBuffer.isView(raw)) {
+              if (!welcomed) return;
+              const packet = snapshotBuffer(raw);
+              const { sim, population } = decodeSnapshot(packet, this.getSim());
+              if (!sim.players.has(this.localId)) throw new Error("Host removed this traveler");
+              this.replaceSim(sim);
+              this.status.population = population;
+              this.status.received += raw.byteLength;
+              this.status.peers = sim.players.size - 1;
+              this.lastSnapshot = performance.now();
+              this.status.state = "connected";
+              this.status.message = "Wandering together";
+              this.changed();
+              done();
+            } else if (raw && typeof raw === "object") {
+              const data = raw as Record<string, unknown>;
+              if (
+                data.type === "welcome" &&
+                data.version === PROTOCOL_VERSION &&
+                data.id === peer.id
+              ) {
+                this.localId = peer.id;
+                welcomed = true;
+              } else if (data.type === "error") {
+                clearTimeout(timer);
+                reject(new Error(String(data.message).slice(0, 200)));
+              }
+            }
+          } catch (error) {
+            clearTimeout(timer);
+            reject(error);
+            if (completed) {
+              this.disconnect();
+              this.fail(error);
+            }
+          }
+        });
+        conn.on("error", (error) => {
+          clearTimeout(timer);
+          reject(error);
+        });
+        conn.on("close", () => {
+          clearTimeout(timer);
+          if (!completed) reject(new Error("The host closed the connection."));
+          if (generation === this.generation) {
+            this.disconnect();
+            this.status.message = "The host left. You can keep exploring solo.";
+            this.changed();
+          }
+        });
+        peer.once("error", (error) => {
+          clearTimeout(timer);
+          reject(error);
+        });
+      });
+    } catch (error) {
+      this.disconnect();
+      this.fail(error);
+      throw error;
+    }
+  }
+  private fail(error: unknown): void {
+    this.status.state = "error";
+    this.status.message = error instanceof Error ? error.message : "Connection failed";
+    this.changed();
+  }
+  update(dt: number, input: Input, radius = 1500): void {
+    const now = performance.now();
+    if (this.status.role === "guest" && this.status.state === "connected") {
+      const conn = this.connections.values().next().value;
+      if (conn?.open && now - this.lastSent > 30) {
+        conn.send({ type: "input", seq: this.sequence++, radius, ...input });
+        this.lastSent = now;
+      }
+      if (now - this.lastSnapshot > 10000) {
+        this.disconnect();
+        this.status.message = "Host stopped responding. Continuing solo.";
+        this.changed();
+      }
+      return;
+    }
+    if (this.status.role !== "host") return;
+    for (const [id, time] of this.lastInput)
+      if (now - time > 300) this.getSim().setInput(id, idleInput());
+    this.elapsed += dt;
+    if (this.elapsed < 0.1) return;
+    this.elapsed = 0;
+    for (const [id, conn] of this.connections)
+      if (conn.open && conn.dataChannel.bufferedAmount < 262144) {
+        const packet = encodeSnapshot(this.getSim(), id, this.interest.get(id) ?? 1500);
+        conn.send(packet);
+        this.status.sent += packet.byteLength;
+      }
+  }
+  disconnect(): void {
+    this.generation++;
+    for (const conn of this.connections.values()) conn.close();
+    this.connections.clear();
+    this.lastInput.clear();
+    this.lastSequence.clear();
+    this.interest.clear();
+    this.peer?.destroy();
+    this.peer = undefined;
+    const sim = this.getSim(),
+      me = sim.players.get(this.localId);
+    sim.players.clear();
+    this.localId = "local";
+    if (me) {
+      me.id = "local";
+      me.input = idleInput();
+      sim.players.set("local", me);
+    } else sim.addPlayer("local");
+    if (this.status.role === "guest" && this.status.population > sim.count)
+      sim.setPopulation(this.status.population);
+    Object.assign(this.status, {
+      role: "solo",
+      state: "offline",
+      room: "",
+      peers: 0,
+      message: "A little solitude",
+      received: 0,
+      sent: 0,
+    });
+    this.changed();
+  }
+}

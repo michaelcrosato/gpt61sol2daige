@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#17251c">
+<title>Verification — Fern</title>
+<link rel="icon" href="/fern.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/docs/docs.css">
+</head>
+<body>
+<nav aria-label="Documentation"><a href="/">fern. <span>Back to the world</span></a><a href="/docs/report.html">Design report</a><a href="/docs/agent-protocol.html">Agent protocol</a><a href="/docs/verification.html">Verification</a></nav>
+<main><h1 id="verification-record">Verification record</h1>
+<p>The evidence here distinguishes tested behavior from operating
+limits. Source tests are executable; selected captures and benchmark
+JSON are committed under <code>docs/evidence/</code>. Full test traces
+and generated output stay in ignored local artifact directories.</p>
+<h2 id="reproduction-gates">Reproduction gates</h2>
+<pre class="bash"><code>npm ci
+npm run check
+npm run build
+npm run test:e2e
+npm run bench
+# With npm run dev running:
+npm run bench:browser</code></pre>
+<p>The browser suite starts isolated app/signaling processes on ports
+5187 and 9018. <code>BASE_URL</code> targets an existing app, including
+production. No simulated WebRTC adapter is used. Chrome runs headlessly
+with background throttling disabled for multiple test tabs. The
+eight-client test places most clients in the lab to avoid conflating
+connection correctness with eight competing renderers on one
+workstation; one guest renders the 6,000-NPC view.</p>
+<h2 id="requirement-to-evidence-map">Requirement-to-evidence map</h2>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr>
+<th>Brief requirement</th>
+<th>Implementation</th>
+<th>Acceptance evidence</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Ground-up 2D top-down engine</td>
+<td>Pure TypeScript simulation, own renderer/physics/world/quest</td>
+<td>Source modules plus headless and browser suites</td>
+</tr>
+<tr>
+<td>Fast, token-efficient agent development</td>
+<td>Bounded JSON observations, command discovery, explicit stepping,
+shared browser/Node API</td>
+<td>CLI JSONL example executed and recorded; replay hash matched</td>
+</tr>
+<tr>
+<td>Massive open-world streaming</td>
+<td>Seed/coordinate generation, negative coordinates, 256-chunk LRU,
+bounded render cache</td>
+<td>Eviction/regeneration test visits 60 widely separated chunks with an
+8-chunk test budget; cache and content checks pass</td>
+</tr>
+<tr>
+<td>Up to eight online co-op players</td>
+<td>Real WebRTC star network with host simulation and input
+authority</td>
+<td>Eight isolated browser contexts; movement, shared beacon,
+6,000-entity state, terrain edits, ninth-player rejection, slot
+replacement and host disconnect</td>
+</tr>
+<tr>
+<td>Good physics for the game</td>
+<td>Spatial broad phase, impulses, unequal masses, restitution,
+tile/trunk contacts, substeps, wading and forces</td>
+<td>Momentum, broad-phase, high-speed wall, gameplay dash/pulse and
+deterministic simulation tests</td>
+</tr>
+<tr>
+<td>Thousands of on-screen NPCs</td>
+<td>8,192-capacity typed arrays, culling/LOD</td>
+<td>8,192-NPC headless test; 6,000 actually drawn during 300 browser
+frames</td>
+</tr>
+<tr>
+<td>Close and far zoom</td>
+<td>0.08×–5× camera, detail/overview rendering</td>
+<td>Browser controls, far-view entity count and screenshots</td>
+</tr>
+<tr>
+<td>Modern pixel graphics and smooth animation</td>
+<td>Procedural pixel recipes, cached poses, 60 Hz position
+interpolation</td>
+<td>Desktop/mobile visual inspection, atlas/lab captures, browser frame
+benchmark</td>
+</tr>
+<tr>
+<td>Procedural graphics and animation tools</td>
+<td>Shared runtime/export pixel recipes, palette validation</td>
+<td>SVG generation and animation tests; custom sprite recipe exported
+successfully</td>
+</tr>
+<tr>
+<td>Procedural sound and music</td>
+<td>Pure seeded PCM synthesis, Web Audio, WAV export</td>
+<td>Every sound checked for finite, bounded, non-silent samples and
+correct WAV headers; browser sound toggle exercised</td>
+</tr>
+<tr>
+<td>Agent level-design tools</td>
+<td>JSON terrain brushes, patch files, preview SVG, chunk export</td>
+<td>Brush invalidation/checkpoint/replay tests; level/chunk CLI runs;
+online patch replication</td>
+</tr>
+<tr>
+<td>Better verification</td>
+<td>Versioned saves, deterministic replay, complete checkpoint
+comparison</td>
+<td>Headless repeatability and exact post-restore equality; browser
+recording replayed by Node</td>
+</tr>
+<tr>
+<td>Environment reproducibility</td>
+<td>Node 24, pinned lockfile, local Chrome, locally bundled
+assets/fonts</td>
+<td>Successful install/typecheck/tests/build and documented commands; no
+runtime LLM or GPU API</td>
+</tr>
+<tr>
+<td>Approach/design/time-allocation report</td>
+<td><code>docs/REPORT.md</code> and hosted static documentation</td>
+<td>Report covers decisions, alternatives, procedural investment, work
+allocation, measured results and limits</td>
+</tr>
+<tr>
+<td>Public GitHub repository and Vercel production</td>
+<td>Repository and deployment configuration</td>
+<td>Final delivery checks inspect GitHub visibility, remote commit,
+Vercel readiness, public HTTP response and deployed browser
+behavior</td>
+</tr>
+</tbody>
+</table>
+<h2 id="measurements">Measurements</h2>
+<p>CPU workload: seed 142, one moving player, 120 warm-up ticks, 360
+measured ticks per population. Node v24.21.0 on Ubuntu/WSL2, Intel
+i7-14700F, 20 logical cores.</p>
+<table>
+<colgroup>
+<col style="width: 20%" />
+<col style="width: 20%" />
+<col style="width: 20%" />
+<col style="width: 20%" />
+<col style="width: 20%" />
+</colgroup>
+<thead>
+<tr>
+<th>Active NPCs</th>
+<th>Median tick</th>
+<th>p95 tick</th>
+<th>Mean tick</th>
+<th>Full-range snapshot</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1,000</td>
+<td>0.382 ms</td>
+<td>0.739 ms</td>
+<td>0.430 ms</td>
+<td>16,510 bytes</td>
+</tr>
+<tr>
+<td>2,400</td>
+<td>0.901 ms</td>
+<td>1.081 ms</td>
+<td>0.931 ms</td>
+<td>38,910 bytes</td>
+</tr>
+<tr>
+<td>6,000</td>
+<td>2.756 ms</td>
+<td>3.534 ms</td>
+<td>2.828 ms</td>
+<td>96,510 bytes</td>
+</tr>
+<tr>
+<td>8,192</td>
+<td>5.271 ms</td>
+<td>8.100 ms</td>
+<td>5.561 ms</td>
+<td>131,582 bytes</td>
+</tr>
+</tbody>
+</table>
+<p>These measurements were captured before the terrain-patch metadata
+field was added; snapshots now also carry that small header field and
+any edited tiles. They are a measured baseline, not a byte-exact size
+assertion for every current packet. <a
+href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/evidence/benchmark.json">Raw CPU benchmark</a>.</p>
+<p>The 300-frame browser measurement includes both Canvas rendering and
+live simulation: 1440×1000, 6,000 visible creatures, 0.18× zoom, mean
+<strong>60.14 FPS</strong>, p95 frame interval <strong>16.8 ms</strong>.
+The nominal display refresh rate caps this measurement. It is not a
+minimum FPS guarantee on other machines. <a
+href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/evidence/browser-benchmark.json">Raw browser benchmark</a>.</p>
+<h2 id="fixes-exposed-by-verification">Fixes exposed by
+verification</h2>
+<ul>
+<li>A browser test initially encountered a different project’s dev
+server on a shared port. The suite now owns dedicated ports and refuses
+to reuse an existing server.</li>
+<li>Large PeerJS messages arrived as Uint8Array after reassembly rather
+than ArrayBuffer. The transport now normalizes both forms; a typed-array
+offset test and the 6,000-entity co-op test exercise that path.</li>
+<li>A synthetic mobile test supplied an inactive pointer ID. It now uses
+a real pressed pointer and checks for browser errors.</li>
+<li>Replay recording restarts on transition from an online session to
+solo, and imported browser saves normalize player ownership.</li>
+<li>Detailed terrain uses a working-set cap so wide zooms switch
+representation before exceeding the terrain image cache.</li>
+</ul>
+<h2 id="scope-limits">Scope limits</h2>
+<p>The physics tests cover circles, static terrain and the reference
+game’s interactions. They do not establish arbitrary-polygon rigid-body
+behavior. Eight contexts prove real transport and shared-state operation
+on the tested host; they are not eight remote households behind
+different NATs. No cross-region latency or TURN fleet capacity has been
+measured. Browser audio verification checks activation plus generated
+PCM correctness; there was no human listening panel. The active NPC pool
+recycles dormant entities, while terrain and quest/resource edits
+persist. These limitations are explained in the architecture and design
+report.</p></main>
+<footer>Fern · A world engine built for agents · <a href="https://github.com/michaelcrosato/gpt61sol2daige">Source on GitHub</a></footer>
+</body>
+</html>

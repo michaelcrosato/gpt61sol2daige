@@ -1,0 +1,161 @@
+@import url("/fonts/fonts.css");
+:root {
+  font-family: "DM Sans", sans-serif;
+  color: #cbd8bd;
+  background: #17251c;
+  line-height: 1.8;
+  font-size: 15px;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+}
+nav {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  padding: 24px max(24px, calc((100% - 1000px) / 2));
+  border-bottom: 1px solid #3b5135;
+  flex-wrap: wrap;
+  font-size: 12px;
+}
+nav > a:first-child {
+  font:
+    32px Georgia,
+    serif;
+  color: #e2edc1;
+  margin-right: auto;
+}
+nav span {
+  font:
+    10px "DM Sans",
+    sans-serif;
+  display: block;
+  color: #95ad81;
+}
+main {
+  max-width: 960px;
+  margin: 55px auto;
+  padding: 0 28px;
+}
+h1,
+h2,
+h3 {
+  font-family: Georgia, serif;
+  font-weight: 400;
+  line-height: 1.2;
+  color: #e3ebcd;
+}
+h1 {
+  font-size: 44px;
+  margin: 0 0 30px;
+}
+h2 {
+  font-size: 30px;
+  margin: 50px 0 20px;
+}
+h3 {
+  font-size: 23px;
+  margin: 30px 0 14px;
+}
+p,
+li {
+  color: #b4c5a3;
+}
+a {
+  color: #d4e99f;
+  text-underline-offset: 4px;
+}
+nav a {
+  text-decoration: none;
+}
+a:hover {
+  color: #f0f6d4;
+}
+table {
+  display: block;
+  overflow: auto;
+  border-collapse: collapse;
+  margin: 25px 0;
+  font-size: 13px;
+}
+td,
+th {
+  text-align: left;
+  vertical-align: top;
+  padding: 12px 15px;
+  border: 1px solid #3c5335;
+}
+th {
+  background: #263b27;
+  color: #dce8c2;
+}
+code {
+  font-family: monospace;
+  color: #dae9b8;
+  font-size: 0.9em;
+  background: #253b26;
+  border-radius: 4px;
+  padding: 2px 5px;
+}
+pre {
+  background: #102217;
+  border: 1px solid #3d5734;
+  border-radius: 6px;
+  overflow: auto;
+  padding: 20px;
+  line-height: 1.8;
+  font-size: 13px;
+}
+pre code {
+  padding: 0;
+  background: none;
+}
+strong {
+  font-weight: 600;
+  color: #e0e8cc;
+}
+footer {
+  padding: 26px;
+  border-top: 1px solid #364e30;
+  font-size: 11px;
+  text-align: center;
+  color: #91ab7c;
+}
+blockquote {
+  padding-left: 20px;
+  border-left: 2px solid #a9c582;
+}
+img {
+  max-width: 100%;
+  border: 1px solid #405a35;
+  border-radius: 5px;
+}
+@media (max-width: 600px) {
+  nav {
+    gap: 18px;
+    padding: 20px;
+  }
+  main {
+    margin: 35px auto;
+    padding: 0 20px;
+  }
+  h1 {
+    font-size: 34px;
+  }
+  h2 {
+    font-size: 26px;
+  }
+  table {
+    font-size: 12px;
+  }
+  pre {
+    font-size: 11px;
+    padding: 15px;
+  }
+  :root {
+    font-size: 14px;
+  }
+}

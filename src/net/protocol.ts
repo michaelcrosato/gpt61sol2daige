@@ -1,0 +1,195 @@
+import {
+  type GameEvent,
+  idleInput,
+  MAX_NPCS,
+  MAX_PLAYERS,
+  type Player,
+  Simulation,
+} from "../engine/simulation.ts";
+import { type TerrainPatch, validatePatches, WORLD_LIMIT } from "../engine/world.ts";
+
+export const PROTOCOL_VERSION = 1;
+export const MAX_PACKET = 262144;
+const encoder = new TextEncoder(),
+  decoder = new TextDecoder();
+
+/** PeerJS returns Uint8Array for reassembled messages and ArrayBuffer for small ones. */
+export function snapshotBuffer(value: ArrayBuffer | ArrayBufferView): ArrayBuffer {
+  if (value.byteLength > MAX_PACKET) throw new Error("Invalid snapshot size");
+  if (value instanceof ArrayBuffer) return value;
+  return new Uint8Array(value.buffer, value.byteOffset, value.byteLength).slice().buffer;
+}
+interface Header {
+  version: 1;
+  seed: number;
+  tick: number;
+  population: number;
+  shards: number;
+  beacons: string[];
+  collected: string[];
+  patches: TerrainPatch[];
+  players: Player[];
+  events: GameEvent[];
+  originX: number;
+  originY: number;
+}
+
+/** 16-byte entity records, relative float positions keep precision at distant coordinates. */
+export function encodeSnapshot(sim: Simulation, playerId: string, radius = 1500): ArrayBuffer {
+  const p = sim.players.get(playerId),
+    originX = p?.x ?? 0,
+    originY = p?.y ?? 0;
+  const ids: number[] = [];
+  for (let i = 0; i < sim.count; i++)
+    if ((sim.x[i] - originX) ** 2 + (sim.y[i] - originY) ** 2 <= radius * radius) ids.push(i);
+  const header: Header = {
+    version: 1,
+    seed: sim.world.seed,
+    tick: sim.tick,
+    population: sim.count,
+    shards: sim.shards,
+    beacons: [...sim.beacons],
+    patches: [...sim.world.patches.values()],
+    collected: [...sim.collected]
+      .filter((s) => {
+        const [x, y] = s.split(",").map(Number);
+        return Math.abs(x * 16 - originX) < radius && Math.abs(y * 16 - originY) < radius;
+      })
+      .slice(-1024),
+    players: [...sim.players.values()],
+    events: sim.events.slice(-12),
+    originX,
+    originY,
+  };
+  const json = encoder.encode(JSON.stringify(header)),
+    packet = new ArrayBuffer(8 + json.length + ids.length * 16),
+    view = new DataView(packet);
+  view.setUint32(0, json.length, true);
+  view.setUint32(4, ids.length, true);
+  new Uint8Array(packet, 8, json.length).set(json);
+  let offset = 8 + json.length;
+  for (const i of ids) {
+    view.setUint16(offset, i, true);
+    view.setUint8(offset + 2, sim.kind[i]);
+    view.setUint8(offset + 3, sim.attuned[i]);
+    view.setFloat32(offset + 4, sim.x[i] - originX, true);
+    view.setFloat32(offset + 8, sim.y[i] - originY, true);
+    view.setInt16(offset + 12, Math.round(sim.vx[i] * 16), true);
+    view.setInt16(offset + 14, Math.round(sim.vy[i] * 16), true);
+    offset += 16;
+  }
+  return packet;
+}
+export function decodeSnapshot(
+  packet: ArrayBuffer,
+  previous?: Simulation,
+): { sim: Simulation; population: number } {
+  if (!(packet instanceof ArrayBuffer) || packet.byteLength < 8 || packet.byteLength > MAX_PACKET)
+    throw new Error("Invalid snapshot size");
+  const view = new DataView(packet),
+    length = view.getUint32(0, true),
+    count = view.getUint32(4, true);
+  if (length > 100000 || count > MAX_NPCS || 8 + length + count * 16 !== packet.byteLength)
+    throw new Error("Invalid snapshot framing");
+  const h = JSON.parse(decoder.decode(new Uint8Array(packet, 8, length))) as Header;
+  if (
+    h.version !== PROTOCOL_VERSION ||
+    !Number.isInteger(h.seed) ||
+    !Number.isInteger(h.tick) ||
+    h.tick < 0 ||
+    !Number.isInteger(h.population) ||
+    h.population < 0 ||
+    h.population > MAX_NPCS ||
+    !Number.isSafeInteger(h.shards) ||
+    h.shards < 0 ||
+    !Number.isFinite(h.originX) ||
+    !Number.isFinite(h.originY) ||
+    Math.abs(h.originX) > WORLD_LIMIT ||
+    Math.abs(h.originY) > WORLD_LIMIT ||
+    !Array.isArray(h.players) ||
+    h.players.length > MAX_PLAYERS ||
+    !Array.isArray(h.beacons) ||
+    h.beacons.some((b) => !["north", "west", "south"].includes(b)) ||
+    !Array.isArray(h.collected) ||
+    h.collected.length > 1024 ||
+    h.collected.some((s) => typeof s !== "string" || !/^-?\d+,-?\d+$/.test(s)) ||
+    !Array.isArray(h.events) ||
+    h.events.length > 12
+  )
+    throw new Error("Invalid snapshot header");
+  validatePatches(h.patches ?? []);
+  // Validate completely before mutating the current simulation.
+  const ids = new Set<string>();
+  for (const p of h.players) {
+    if (
+      !p ||
+      !/^[\w-]{1,80}$/.test(p.id) ||
+      ids.has(p.id) ||
+      typeof p.name !== "string" ||
+      p.name.length > 24 ||
+      [p.x, p.y, p.vx, p.vy, p.energy, p.facing, p.steps].some((v) => !Number.isFinite(v)) ||
+      Math.abs(p.x) > WORLD_LIMIT ||
+      Math.abs(p.y) > WORLD_LIMIT ||
+      !Number.isInteger(p.color) ||
+      p.color < 0 ||
+      p.color >= MAX_PLAYERS
+    )
+      throw new Error("Invalid snapshot player");
+    ids.add(p.id);
+  }
+  for (const e of h.events)
+    if (
+      !e ||
+      !Number.isFinite(e.tick) ||
+      !Number.isFinite(e.x) ||
+      !Number.isFinite(e.y) ||
+      typeof e.message !== "string" ||
+      e.message.length > 256 ||
+      !["pulse", "dash", "shard", "beacon", "rest"].includes(e.type)
+    )
+      throw new Error("Invalid snapshot event");
+  let offset = 8 + length;
+  for (let i = 0; i < count; i++, offset += 16)
+    if (
+      !Number.isFinite(view.getFloat32(offset + 4, true)) ||
+      !Number.isFinite(view.getFloat32(offset + 8, true)) ||
+      Math.abs(view.getFloat32(offset + 4, true)) > WORLD_LIMIT * 2 ||
+      Math.abs(view.getFloat32(offset + 8, true)) > WORLD_LIMIT * 2 ||
+      view.getUint8(offset + 2) > 2 ||
+      view.getUint8(offset + 3) > 1
+    )
+      throw new Error("Invalid snapshot entity");
+  const sim = previous?.world.seed === h.seed ? previous : new Simulation(h.seed, 0);
+  if (JSON.stringify([...sim.world.patches.values()]) !== JSON.stringify(h.patches ?? []))
+    sim.world.setPatches(h.patches ?? []);
+  sim.tick = h.tick;
+  sim.count = count;
+  sim.shards = h.shards;
+  sim.beacons.clear();
+  for (const b of h.beacons) sim.beacons.add(b);
+  for (const key of h.collected) sim.collected.add(key);
+  const oldPlayers = new Map(sim.players);
+  sim.players.clear();
+  for (const p of h.players)
+    sim.players.set(p.id, {
+      ...p,
+      radius: 6,
+      px: oldPlayers.get(p.id)?.x ?? p.x,
+      py: oldPlayers.get(p.id)?.y ?? p.y,
+      input: idleInput(),
+    });
+  sim.events.length = 0;
+  sim.events.push(...h.events);
+  offset = 8 + length;
+  for (let i = 0; i < count; i++, offset += 16) {
+    sim.x[i] = h.originX + view.getFloat32(offset + 4, true);
+    sim.y[i] = h.originY + view.getFloat32(offset + 8, true);
+    sim.vx[i] = view.getInt16(offset + 12, true) / 16;
+    sim.vy[i] = view.getInt16(offset + 14, true) / 16;
+    sim.px[i] = sim.x[i] - sim.vx[i] * 0.1;
+    sim.py[i] = sim.y[i] - sim.vy[i] * 0.1;
+    sim.kind[i] = view.getUint8(offset + 2);
+    sim.attuned[i] = view.getUint8(offset + 3);
+  }
+  return { sim, population: h.population };
+}

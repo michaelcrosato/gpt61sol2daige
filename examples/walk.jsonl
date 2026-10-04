@@ -1,0 +1,8 @@
+{"op":"describe"}
+{"op":"input","x":1,"y":0}
+{"op":"step","ticks":120}
+{"op":"input","x":0,"pulse":true}
+{"op":"step","ticks":1}
+{"op":"input","x":0}
+{"op":"inspect","x":150,"y":30,"radius":200,"limit":4}
+{"op":"observe"}

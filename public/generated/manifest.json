@@ -1,0 +1,126 @@
+{
+  "version": 1,
+  "seed": 142,
+  "sprites": [
+    {
+      "kind": "pine",
+      "frames": 8,
+      "files": [
+        "pine-0.svg",
+        "pine-1.svg",
+        "pine-2.svg",
+        "pine-3.svg",
+        "pine-4.svg",
+        "pine-5.svg",
+        "pine-6.svg",
+        "pine-7.svg"
+      ]
+    },
+    {
+      "kind": "oak",
+      "frames": 8,
+      "files": [
+        "oak-0.svg",
+        "oak-1.svg",
+        "oak-2.svg",
+        "oak-3.svg",
+        "oak-4.svg",
+        "oak-5.svg",
+        "oak-6.svg",
+        "oak-7.svg"
+      ]
+    },
+    {
+      "kind": "player",
+      "frames": 8,
+      "files": [
+        "player-0.svg",
+        "player-1.svg",
+        "player-2.svg",
+        "player-3.svg",
+        "player-4.svg",
+        "player-5.svg",
+        "player-6.svg",
+        "player-7.svg"
+      ]
+    },
+    {
+      "kind": "deer",
+      "frames": 8,
+      "files": [
+        "deer-0.svg",
+        "deer-1.svg",
+        "deer-2.svg",
+        "deer-3.svg",
+        "deer-4.svg",
+        "deer-5.svg",
+        "deer-6.svg",
+        "deer-7.svg"
+      ]
+    },
+    {
+      "kind": "wisp",
+      "frames": 8,
+      "files": [
+        "wisp-0.svg",
+        "wisp-1.svg",
+        "wisp-2.svg",
+        "wisp-3.svg",
+        "wisp-4.svg",
+        "wisp-5.svg",
+        "wisp-6.svg",
+        "wisp-7.svg"
+      ]
+    },
+    {
+      "kind": "beetle",
+      "frames": 8,
+      "files": [
+        "beetle-0.svg",
+        "beetle-1.svg",
+        "beetle-2.svg",
+        "beetle-3.svg",
+        "beetle-4.svg",
+        "beetle-5.svg",
+        "beetle-6.svg",
+        "beetle-7.svg"
+      ]
+    },
+    {
+      "kind": "rock",
+      "frames": 8,
+      "files": [
+        "rock-0.svg",
+        "rock-1.svg",
+        "rock-2.svg",
+        "rock-3.svg",
+        "rock-4.svg",
+        "rock-5.svg",
+        "rock-6.svg",
+        "rock-7.svg"
+      ]
+    },
+    {
+      "kind": "crystal",
+      "frames": 8,
+      "files": [
+        "crystal-0.svg",
+        "crystal-1.svg",
+        "crystal-2.svg",
+        "crystal-3.svg",
+        "crystal-4.svg",
+        "crystal-5.svg",
+        "crystal-6.svg",
+        "crystal-7.svg"
+      ]
+    }
+  ],
+  "audio": [
+    "pulse.wav",
+    "shard.wav",
+    "beacon.wav",
+    "dash.wav",
+    "step.wav",
+    "ambient.wav"
+  ]
+}

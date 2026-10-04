@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#17251c">
+<title>$title$ — Fern</title>
+<link rel="icon" href="/fern.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/docs/docs.css">
+</head>
+<body>
+<nav aria-label="Documentation"><a href="/">fern. <span>Back to the world</span></a><a href="/docs/report.html">Design report</a><a href="/docs/agent-protocol.html">Agent protocol</a><a href="/docs/verification.html">Verification</a></nav>
+<main>$body$</main>
+<footer>Fern · A world engine built for agents · <a href="https://github.com/michaelcrosato/gpt61sol2daige">Source on GitHub</a></footer>
+</body>
+</html>

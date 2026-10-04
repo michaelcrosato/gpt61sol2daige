@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#17251c">
+<title>Agent protocol — Fern</title>
+<link rel="icon" href="/fern.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/docs/docs.css">
+</head>
+<body>
+<nav aria-label="Documentation"><a href="/">fern. <span>Back to the world</span></a><a href="/docs/report.html">Design report</a><a href="/docs/agent-protocol.html">Agent protocol</a><a href="/docs/verification.html">Verification</a></nav>
+<main><h1 id="agent-protocol">Agent protocol</h1>
+<p>Call <code>describe</code> first. Commands are shared by the Node
+JSONL tool, <code>AgentRuntime.execute</code>, and
+<code>window.fern.command</code>. Browser networking has an additional
+small control API.</p>
+<h2 id="headless-session">Headless session</h2>
+<pre class="bash"><code>node tools/agent.ts --seed 142 --count 2400 &lt; examples/walk.jsonl
+node tools/agent.ts --seed 142 --record artifacts/walk.json &lt; examples/walk.jsonl
+node tools/agent.ts replay artifacts/walk.json</code></pre>
+<p>The command server reads one JSON object per line and returns one
+response per line. Errors are structured and do not terminate the
+session. Keep lines under 8 MB. When supplied, <code>id</code> is echoed
+as the request identifier (the <code>join</code>/<code>leave</code>
+command also uses <code>id</code> as its player identifier).</p>
+<pre class="json"><code>{&quot;op&quot;:&quot;input&quot;,&quot;x&quot;:1,&quot;y&quot;:0}
+{&quot;op&quot;:&quot;step&quot;,&quot;ticks&quot;:60}
+{&quot;op&quot;:&quot;observe&quot;}</code></pre>
+<p>An accepted call returns <code>{"ok":true,"result":…}</code>; failure
+returns <code>{"ok":false,"error":"…"}</code>. The engine emits no
+unsolicited diagnostic prose to stdout. CLI banners from
+<code>npm run</code> can be avoided by invoking Node directly.</p>
+<h2 id="commands">Commands</h2>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr>
+<th><code>op</code></th>
+<th>Fields</th>
+<th>Result / contract</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>describe</code></td>
+<td>none</td>
+<td>Version, commands, limits and landmarks</td>
+</tr>
+<tr>
+<td><code>observe</code></td>
+<td>none</td>
+<td>Compact state, checksum, players, quest, streaming/physics counters,
+last eight events</td>
+</tr>
+<tr>
+<td><code>input</code></td>
+<td><code>player?</code>, <code>x?</code>, <code>y?</code>,
+<code>dash?</code>, <code>pulse?</code>, <code>interact?</code></td>
+<td>Replaces input; missing axes/buttons become idle; axes clamp to
+−1…1</td>
+</tr>
+<tr>
+<td><code>step</code></td>
+<td><code>ticks</code>, 0…36,000</td>
+<td>Advances exactly that many fixed ticks; prefer small batches in the
+browser</td>
+</tr>
+<tr>
+<td><code>inspect</code></td>
+<td><code>x</code>, <code>y</code>, <code>radius?</code> (0…5,000),
+<code>limit?</code> (0…100)</td>
+<td>Tile, biome and a bounded set of nearby entities</td>
+</tr>
+<tr>
+<td><code>population</code></td>
+<td><code>count</code>, 0…8,192</td>
+<td>Resizes active NPC pool</td>
+</tr>
+<tr>
+<td><code>teleport</code></td>
+<td><code>player?</code>, <code>x</code>, <code>y</code></td>
+<td>Requires a walkable point within world bounds</td>
+</tr>
+<tr>
+<td><code>paint</code></td>
+<td><code>tx</code>, <code>ty</code>, <code>width?</code>,
+<code>height?</code>, <code>terrain</code>, <code>decor?</code></td>
+<td>Applies a rectangular tile brush atomically; at most 2,048 edited
+tiles total</td>
+</tr>
+<tr>
+<td><code>reset</code></td>
+<td><code>seed</code> (uint32), <code>count?</code></td>
+<td>Starts a new simulation and local player</td>
+</tr>
+<tr>
+<td><code>join</code></td>
+<td><code>id</code>, <code>name?</code></td>
+<td>Adds a headless simulated player; maximum eight; <strong>not an
+online connection</strong></td>
+</tr>
+<tr>
+<td><code>leave</code></td>
+<td><code>id</code></td>
+<td>Removes a headless simulated player</td>
+</tr>
+<tr>
+<td><code>save</code></td>
+<td>none</td>
+<td>Full versioned checkpoint including typed-array contents and terrain
+patches</td>
+</tr>
+<tr>
+<td><code>restore</code></td>
+<td><code>state</code></td>
+<td>Validates and restores a checkpoint</td>
+</tr>
+<tr>
+<td><code>replay</code></td>
+<td>none</td>
+<td>Initial checkpoint, recorded commands and final checksum</td>
+</tr>
+</tbody>
+</table>
+<p>Terrain values: <code>0 forest</code>, <code>1 meadow</code>,
+<code>2 sand</code>, <code>3 shallow water</code>,
+<code>4 solid deep water</code>, <code>5 path</code>,
+<code>6 stone</code>. Decoration values: <code>0 none</code>,
+<code>1 pine</code>, <code>2 oak</code>, <code>3 rock</code>,
+<code>4 flowers</code>, <code>5 reeds</code>, <code>6 mushroom</code>,
+<code>7 crystal</code>. Tile coordinates multiply by 16 to produce world
+coordinates. Painting under a body can create a solid tile; the next
+physics step resolves the overlap. Use paused QA when making structural
+changes.</p>
+<p>Observe is intentionally bounded; request <code>save</code> only when
+you need the complete world state. State hashes are diagnostic
+checksums, not cryptographic proofs. Performance counters measure the
+last stepping call and are excluded from deterministic state.</p>
+<h2 id="browser-control">Browser control</h2>
+<pre class="js"><code>window.fern.pause(true);
+window.fern.batch([
+  {op: &quot;population&quot;, count: 6000},
+  {op: &quot;input&quot;, x: 1, y: 0},
+  {op: &quot;step&quot;, ticks: 120},
+  {op: &quot;input&quot;, x: 0}
+]);
+window.fern.observe();
+window.fern.zoom(0.18);
+window.fern.view(&quot;world&quot;);
+window.fern.pause(false);</code></pre>
+<p>Other methods: <code>describe()</code>, <code>start()</code>,
+<code>recording()</code>, <code>view("world"|"atlas"|"lab")</code>.
+<code>observe()</code> adds renderer and network telemetry.
+<code>batch</code> accepts at most 1,000 commands and applies them
+sequentially; it is not transactional. Pause before deterministic
+browser experiments so the animation loop does not advance between
+commands. Browser <code>input</code> commands remain active until
+changed or real movement/view input takes over.</p>
+<p>Browser checkpoint loading normalizes the session to one
+<code>local</code> traveler. Engine/CLI checkpoint restoration preserves
+the original players exactly. Solo replay recording restarts after
+leaving an online room; online replay is deliberately unavailable.
+Exported snapshots remain available for online inspection.</p>
+<h2 id="actual-online-sessions">Actual online sessions</h2>
+<pre class="js"><code>const room = await window.fern.network.host();
+// In another independently loaded browser/context:
+await window.fern.network.join(room);
+window.fern.network.input({x: 1, y: 0});
+window.fern.network.input({x: 0, y: 0});
+window.fern.network.status();
+window.fern.network.leave();</code></pre>
+<p>These methods establish real WebRTC connections. The separate
+<code>join</code> simulation command does not. The host enforces the
+eight-player limit and guest authority. Guests can inspect and save
+observations, but cannot reset, teleport, paint or change population.
+Host lab commands that would invalidate an ongoing room are also
+rejected. Hosts can paint terrain and change population; both
+synchronize.</p>
+<h2 id="assets-and-level-design">Assets and level design</h2>
+<pre class="bash"><code>npm run assets
+npm run assets -- sprite examples/autumn-traveler.sprite.json --out artifacts/autumn
+npm run assets -- level examples/moss-courtyard.level.json --out artifacts/courtyard
+npm run assets -- chunk -1 2 142 --out artifacts/chunks</code></pre>
+<p>The default creates 64 SVG frames, six WAV files and a manifest in
+<code>public/generated</code>. The runtime generates its own matching
+sprites/audio in memory, so it does not need to fetch the exported
+examples. A sprite recipe supplies version, kind, seed, and optional
+palette of 5–16 six-digit colors. Add new silhouettes by extending
+<code>spritePixels</code> once; Canvas and SVG export will agree.</p>
+<p>Level recipes supply a seed and an ordered list of rectangular
+brushes. The exporter produces a patch file and a 48×48-tile SVG preview
+centered on the origin. Apply the same recipe interactively with
+<code>window.fern.batch(recipe.brushes.map(b =&gt; ({op:"paint", ...b})))</code>,
+after resetting to the recipe seed. From Node,
+<code>world.setPatches(level.patches)</code> loads the exported patch
+file. Snapshots and network packets preserve the resulting edits.</p>
+<p>Chunk export returns terrain, decoration and variant arrays in
+row-major order. Coordinate hashing lets agents search seeds or generate
+distant chunks without first visiting intervening terrain. Do not edit
+generated PNG/SVG/WAV outputs and expect the runtime to change: recipes
+and source are authoritative.</p>
+<h2 id="a-useful-change-loop">A useful change loop</h2>
+<ol type="1">
+<li>Capture a seed, checkpoint and input/command sequence that
+reproduces the problem.</li>
+<li>Inspect the relevant bounded region instead of dumping all
+entities.</li>
+<li>Make the change in a pure engine module or validated asset
+recipe.</li>
+<li>Replay it headlessly; compare the expected behavior and checksum,
+not just whether it runs.</li>
+<li>Check the browser for visual, input or transport consequences.</li>
+<li>Run the relevant benchmark when changing hot loops, entity limits or
+rendering detail.</li>
+</ol>
+<p><code>npm run check</code>, <code>npm run build</code>, and
+<code>npm run test:e2e</code> define the repository’s verification
+gates. Tests use local signaling by default; production tests must
+explicitly target the deployed URL.</p></main>
+<footer>Fern · A world engine built for agents · <a href="https://github.com/michaelcrosato/gpt61sol2daige">Source on GitHub</a></footer>
+</body>
+</html>

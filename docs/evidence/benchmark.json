@@ -1,0 +1,56 @@
+{
+  "measuredAt": "2026-10-04T02:24:46.505Z",
+  "environment": {
+    "node": "v24.21.0",
+    "os": "linux 6.18.33.2-microsoft-standard-WSL2",
+    "cpu": "Intel(R) Core(TM) i7-14700F",
+    "logicalCores": 20
+  },
+  "method": "120 warm-up ticks, 360 measured ticks, seed 142, one moving player. CPU simulation only; not a rendering or internet-latency benchmark.",
+  "results": [
+    {
+      "count": 1000,
+      "ticks": 360,
+      "p50Ms": 0.382,
+      "p95Ms": 0.739,
+      "maxMs": 1.564,
+      "averageMs": 0.43,
+      "chunks": 86,
+      "hash": "786a1579",
+      "snapshotBytes": 16510
+    },
+    {
+      "count": 2400,
+      "ticks": 360,
+      "p50Ms": 0.901,
+      "p95Ms": 1.081,
+      "maxMs": 1.731,
+      "averageMs": 0.931,
+      "chunks": 88,
+      "hash": "7fb8559d",
+      "snapshotBytes": 38910
+    },
+    {
+      "count": 6000,
+      "ticks": 360,
+      "p50Ms": 2.756,
+      "p95Ms": 3.534,
+      "maxMs": 4.809,
+      "averageMs": 2.828,
+      "chunks": 88,
+      "hash": "b344fd8a",
+      "snapshotBytes": 96510
+    },
+    {
+      "count": 8192,
+      "ticks": 360,
+      "p50Ms": 5.271,
+      "p95Ms": 8.1,
+      "maxMs": 9.907,
+      "averageMs": 5.561,
+      "chunks": 88,
+      "hash": "accead89",
+      "snapshotBytes": 131582
+    }
+  ]
+}

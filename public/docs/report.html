@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#17251c">
+<title>Design report — Fern</title>
+<link rel="icon" href="/fern.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/docs/docs.css">
+</head>
+<body>
+<nav aria-label="Documentation"><a href="/">fern. <span>Back to the world</span></a><a href="/docs/report.html">Design report</a><a href="/docs/agent-protocol.html">Agent protocol</a><a href="/docs/verification.html">Verification</a></nav>
+<main><h1 id="fern-building-a-world-engine-for-coding-agents">Fern:
+building a world engine for coding agents</h1>
+<h2 id="the-result">The result</h2>
+<p>The result is a working engine and a playable cooperative exploration
+game, not an editor mockup. Fern generates a large forest from a seed,
+streams terrain with bounded caches, simulates thousands of creatures,
+renders close-up pixel art and distant landscapes, synthesizes its own
+soundtrack, and connects up to eight travelers through a shared
+host-authoritative world. Agents can drive that same simulation through
+JSON, without opening the game.</p>
+<p>The central design decision was to make the world easy to reproduce,
+inspect and change. Visual quality still matters: a human needs to be
+able to judge the game. But a human-oriented scene editor would have put
+the main source of truth behind a workflow our intended developer never
+needs. In Fern, the source of truth is code, validated recipes, seed
+coordinates, checkpoints and input history.</p>
+<p>The detailed acceptance record is in <a
+href="verification.html">VERIFICATION.md</a>. The accompanying evidence
+includes screenshots and raw benchmark measurements, so the performance
+statements here can be checked rather than taken on confidence.</p>
+<h2 id="what-built-for-agents-changes">What “built for agents”
+changes</h2>
+<p>An agent’s expensive operations include reading large amounts of
+context, inferring hidden state, manipulating a visual editor and
+waiting to reproduce a bug. Reducing those costs matters more than
+minimizing the number of lines written on day one.</p>
+<p>Fern therefore exposes four short paths. <code>describe</code>
+reports the command vocabulary. <code>observe</code> returns a compact
+summary rather than thousands of entities. <code>inspect</code> asks for
+a bounded local region. <code>step</code> advances explicit ticks
+without real-time waiting. A complete checkpoint is available when
+needed, but is not the default response.</p>
+<p>Every simulation feature fits into a repeatable loop: choose a seed,
+apply commands, advance time, inspect the result, and replay it. The
+same command interpreter operates in Node and in the browser lab. This
+reduces the chance that a test tool accidentally verifies a different
+implementation from the one players use.</p>
+<p>The early investment in checkpoints and replay paid for itself during
+browser work. A browser gameplay recording can be replayed in Node, and
+a restored simulation is checked for an identical future checkpoint. A
+visible failure no longer has to be described as “something went wrong
+around the trees.” It can become a small file with a precise starting
+state and a sequence of actions.</p>
+<h2 id="why-this-technology-stack">Why this technology stack</h2>
+<p>I selected TypeScript, Node 24, Canvas 2D and Web Audio because they
+are directly executable and observable in this workstation. TypeScript
+provides explicit contracts without forcing a separate runtime language
+for tools. Node imports the simulation and asset generators without a
+DOM. Chrome supplies a real rendering/input/audio/network environment
+that Playwright can inspect headlessly.</p>
+<p>Canvas 2D is a deliberate rendering budget decision. Cached terrain
+images, sprite atlases, culling, y-sorting and distance-based
+representations are sufficient for this top-down world. A GPU API would
+add another implementation and verification boundary before the basic
+requirements demanded it. The measurements give a concrete baseline for
+deciding later when that trade becomes worthwhile.</p>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr>
+<th>Option considered</th>
+<th>What it would offer</th>
+<th>Why it was not the starting point</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Godot or another established engine</td>
+<td>Mature editor, asset import, broad physics and tooling</td>
+<td>The brief requested a ground-up agent-first engine; editor resources
+and engine-specific APIs would become additional state and context</td>
+</tr>
+<tr>
+<td>Native Rust/C++ with SDL</td>
+<td>Tight memory control and a strong CPU performance ceiling</td>
+<td>More bindings, build steps and a separate automation bridge before a
+complete observable game loop</td>
+</tr>
+<tr>
+<td>WebGL/WebGPU renderer</td>
+<td>Larger GPU-driven draw budgets and advanced effects</td>
+<td>More work around shaders, adapters and readback; current Canvas
+measurements already cover the requested visible scale</td>
+</tr>
+<tr>
+<td>A server-only multiplayer design</td>
+<td>Persistent authority and a host-independent session</td>
+<td>Requires a continuously running service and operational ownership;
+invited co-op can be validated with a browser host first</td>
+</tr>
+<tr>
+<td>TypeScript + Canvas 2D</td>
+<td>One source tree for simulation, tools, assets and browser QA</td>
+<td>Chosen; the cost is that rendering and simulation still share the
+browser’s main thread</td>
+</tr>
+</tbody>
+</table>
+<p>These are engineering judgments, not claims that the other approaches
+cannot work. The module boundaries leave room for a new renderer or a
+dedicated simulation process later. Vercel hosting sits outside those
+boundaries: it serves the ordinary static build and did not require
+changes to the core technology or simulation model.</p>
+<h2 id="procedural-systems-received-the-upfront-investment">Procedural
+systems received the upfront investment</h2>
+<p>Terrain generation uses stateless integer coordinate hashing and
+smooth noise. A chunk requested tomorrow has the same contents as one
+requested today, and loading a neighboring chunk first makes no
+difference. That property enables eviction, parallel exploration by
+different travelers, deterministic testing and distant map inspection
+with very little stored data.</p>
+<p>The world spans a bounded square of 32 million world units per side.
+With 16-unit tiles, that represents four trillion addressable tile
+positions; it does not allocate four trillion objects. Only 256
+simulation chunks are resident. The renderer maintains a separate
+bounded image cache and switches to coarse terrain when the detailed
+working set would exceed that cache.</p>
+<p>Procedural graphics are also shared code, not a collection of opaque
+outputs. A sprite recipe yields colored pixel rectangles. The renderer
+turns them into cached Canvas sprites; the asset tool exports matching
+SVG frames. A palette or silhouette change therefore reaches both
+outputs. Tree layers, deer legs, cloaks, wisps, crystals, stones,
+flowers, campsite props, particles and lighting are all generated in
+code.</p>
+<p>The audio path follows the same principle. A pure synthesizer
+produces deterministic PCM samples. The browser plays those samples
+through Web Audio, and the asset CLI exports WAV files from the same
+function. Pulse, dash, collection, beacon and footstep sounds have
+separate envelopes; an ambient score combines a sustained harmonic bed
+with a seeded arpeggio. There is no recorded-music dependency and no
+runtime generative-AI bill.</p>
+<p>For level design, agents can paint bounded rectangular tile regions
+through JSON or provide a level recipe. The patch layer changes terrain,
+decoration and collision together, invalidates the appropriate generated
+caches, survives checkpointing and synchronizes to guests. This is a
+useful authoring primitive even though the initial game could have
+shipped with seeded terrain alone.</p>
+<h2 id="how-the-simulation-reaches-thousands-of-creatures">How the
+simulation reaches thousands of creatures</h2>
+<p>The engine uses typed arrays for the hot entity state and a fixed
+spatial hash for neighbor queries. That avoids allocating an object
+graph for every creature on every tick. Nearby creatures receive
+full-rate steering and static collision work; distant ones receive those
+decisions at 15 Hz while their positions continue to integrate at 60 Hz.
+Pairwise contacts still run in stable ID order.</p>
+<p>Rendering has its own level of detail. A traveler at close zoom sees
+animated sprites and canopy layering. At far zoom, the same live
+creatures become small colored marks. That distinction is necessary:
+thousands of full-size silhouettes would be both expensive and
+unreadable when the entire region occupies one screen.</p>
+<p>A headless CPU benchmark measured a 3.53 ms p95 tick for 6,000 NPCs
+and 8.10 ms for 8,192 NPCs on the supplied Intel i7-14700F workstation.
+This is simulation time, not a claim about every machine’s frame rate. A
+separate browser benchmark measured 300 consecutive frames at 1440×1000,
+with all 6,000 creatures visible at 0.18× zoom, averaging 60.1 FPS with
+a 16.8 ms p95 frame interval. See the committed JSON for methodology and
+exact values.</p>
+<p>There are limits behind those numbers. Active NPCs recycle when far
+from every traveler; they do not retain a lifetime history throughout
+the whole coordinate space. Detailed terrain rendering is bounded by
+cache capacity. Eight people zoomed out over thousands of creatures put
+more pressure on the host’s upload bandwidth than people exploring a
+close-up scene. These are explicit operating characteristics that an
+agent can measure and reason about.</p>
+<h2 id="physics-and-smoothness">Physics and smoothness</h2>
+<p>The physics implementation concentrates on top-down movement: circle
+contacts, inverse masses, restitution, separation, tile/trunk collision,
+wading, dash movement and pulse forces. High-speed motion uses
+conservative substeps. One regression test launches a body at 4,000
+units per second toward a one-tile wall and confirms it does not tunnel
+through. Another checks momentum under an unequal-mass elastic
+collision.</p>
+<p>The physics tick is fixed; rendering interpolates positions
+independently. Camera movement and zoom are smoothed. Procedural
+animation poses are cached, and sprite movement does not depend on frame
+rate. This gives agents a stable simulation to test while humans see
+continuous motion.</p>
+<p>This is not yet a general-purpose rigid-body library. There are no
+arbitrary convex polygons, joints or stacked-box constraints. For the
+actual exploration game, specialized circle and terrain physics cover
+the required interactions with considerably less code and a smaller
+failure surface.</p>
+<h2 id="online-co-op-and-the-bug-that-justified-real-testing">Online
+co-op and the bug that justified real testing</h2>
+<p>The host owns movement, NPCs, shard collection, beacons and level
+edits. Guests send input; the host sends compact snapshots over WebRTC.
+The initial implementation connected eight clients successfully, but
+stopped updating when the entity snapshot grew. A room counter alone
+would have hidden this failure.</p>
+<p>The actual cause was the transport’s large-message path: small PeerJS
+messages arrived as ArrayBuffer, while reassembled messages arrived as
+Uint8Array. Normalizing those forms fixed the failure, and a dedicated
+regression test now protects it. The expanded browser test keeps eight
+isolated contexts connected, moves a guest, lights a shared beacon,
+expands the world to 6,000 NPCs, verifies a guest receives them, applies
+synchronized terrain edits, rejects a ninth traveler and fills the
+released slot after someone leaves.</p>
+<p>This verifies real WebRTC connections and real shared state. It does
+not demonstrate arbitrary cross-country latency, every corporate
+firewall or every NAT pairing. The default rendezvous service is PeerJS
+Cloud. Self-hosted signaling is included, and TURN configuration is
+supported when a network needs a relay. Host migration, competitive
+anti-cheat and persistent dedicated authority remain architectural
+extensions, not hidden claims of this version.</p>
+<h2 id="how-i-allocated-the-work">How I allocated the work</h2>
+<p>I organized the work around dependency and evidence rather than
+around the most visible screen first.</p>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr>
+<th>Stage</th>
+<th>Main investment</th>
+<th>Reason</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Foundation</td>
+<td>Deterministic world, entity layout, collision and complete
+checkpoint state</td>
+<td>Everything else needs a stable, testable world</td>
+</tr>
+<tr>
+<td>Agent access and content</td>
+<td>Commands, observation, replay, shared sprite/audio recipes, level
+brushes</td>
+<td>Reduces the cost of building and verifying later features</td>
+</tr>
+<tr>
+<td>Playable integration</td>
+<td>Exploration loop, responsive UI, atlas, controls, sound,
+multiplayer</td>
+<td>Makes the engine’s claims observable in a real game</td>
+</tr>
+<tr>
+<td>Verification and delivery</td>
+<td>Physics/replay tests, visual checks, eight-client tests, benchmarks,
+documentation, public repository and deployment</td>
+<td>Turns a plausible implementation into a reviewable deliverable</td>
+</tr>
+</tbody>
+</table>
+<p>The biggest deliberate upfront costs were the reusable generators and
+the agent control surface. A small hand-painted scene would have been
+faster initially, but would not advance the requested engine. I also
+reserved substantial integration time for networking and browser checks;
+that is where the transport-format failure and a synthetic touch-test
+issue surfaced. The latter was corrected to use an actual active pointer
+rather than a fabricated pointer ID.</p>
+<p>The final artifacts include the source, pinned dependencies, exported
+procedural assets, recipe examples, agent instructions, local
+reproduction commands, benchmark scripts and an acceptance record.
+Future agents can start from those files rather than reconstruct the
+design from this conversation.</p>
+<h2 id="what-i-would-invest-in-next">What I would invest in next</h2>
+<p>The next rendering or networking change should follow measured
+workload. A worker-hosted simulation would protect responsiveness when
+the main thread is busy. A dedicated Node authority with the existing
+protocol would remove the requirement to keep a host tab active.
+Persistent chunk event journals would allow named NPCs and richer world
+changes to survive far-distance recycling. A declarative behavior graph
+could give agents more expressive creatures without touching hot-loop
+code.</p>
+<p>I would add those systems against small acceptance scenarios and
+replay fixtures. The engine’s value is that new work can be checked at
+its boundaries: a recipe becomes visible content, a command becomes a
+state change, a checkpoint reproduces a problem, and a packet becomes
+the same shared world in another browser. That is the foundation for
+faster, more token-efficient development and consistently higher-quality
+output.</p>
+<p>Technical references used for transport/build integration: <a
+href="https://peerjs.com/docs/">PeerJS API</a>, <a
+href="https://peerjs.com/server/cloud">PeerServer Cloud</a>, <a
+href="https://peerjs.com/client/faq">PeerJS network limitations</a>, <a
+href="https://vite.dev/guide/">Vite guide</a>, and <a
+href="https://vercel.com/docs/deployments">Vercel deployment
+documentation</a>. All engine behavior and performance claims are
+supported by this repository’s implementation and verification
+artifacts.</p></main>
+<footer>Fern · A world engine built for agents · <a href="https://github.com/michaelcrosato/gpt61sol2daige">Source on GitHub</a></footer>
+</body>
+</html>

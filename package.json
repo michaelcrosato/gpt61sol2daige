@@ -1,0 +1,36 @@
+{
+  "name": "fern-agent-engine",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --host 0.0.0.0",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test tests/*.test.ts",
+    "test:e2e": "playwright test",
+    "check": "biome check . && npm run typecheck && npm test",
+    "format": "biome check --write .",
+    "agent": "node tools/agent.ts",
+    "bench": "node tools/bench.ts",
+    "bench:browser": "node tools/browser-bench.ts",
+    "assets": "node tools/assets.ts",
+    "docs": "node tools/docs.ts",
+    "signal": "node tools/signal.ts"
+  },
+  "dependencies": {
+    "peerjs": "1.5.5"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.4.8",
+    "@playwright/test": "1.63.0",
+    "@types/node": "24.10.1",
+    "peer": "1.0.2",
+    "typescript": "5.9.3",
+    "vite": "8.3.2"
+  }
+}

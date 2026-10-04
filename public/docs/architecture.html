@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#17251c">
+<title>Architecture — Fern</title>
+<link rel="icon" href="/fern.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/docs/docs.css">
+</head>
+<body>
+<nav aria-label="Documentation"><a href="/">fern. <span>Back to the world</span></a><a href="/docs/report.html">Design report</a><a href="/docs/agent-protocol.html">Agent protocol</a><a href="/docs/verification.html">Verification</a></nav>
+<main><h1 id="architecture">Architecture</h1>
+<p>Fern is a single TypeScript repository with a browser-independent
+simulation. There is no imported game engine, scene editor, rendering
+framework, physics library, artwork pack or audio pack.</p>
+<pre class="text"><code>JSONL / browser commands ─── AgentRuntime ─── Simulation (60 Hz)
+                                                │
+                           World generation ────┤
+                           Spatial hash/physics ┤
+                           Quest and players ───┤
+                                                │
+                      checkpoints/replays ◄─────┼────► binary network snapshots
+                                                │
+                                Canvas 2D ◄─────┴────► procedural Web Audio</code></pre>
+<h2 id="ownership-and-modules">Ownership and modules</h2>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr>
+<th>Module</th>
+<th>Owns</th>
+<th>Must not depend on</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>src/engine/math.ts</code></td>
+<td>Integer coordinate hashes, smooth noise, checksums</td>
+<td>DOM, network, wall-clock randomness</td>
+</tr>
+<tr>
+<td><code>src/engine/world.ts</code></td>
+<td>Seeded terrain, tile patches, bounded chunk cache</td>
+<td>Camera, renderer, mutable RNG</td>
+</tr>
+<tr>
+<td><code>src/engine/physics.ts</code></td>
+<td>Spatial buckets, circle impulses, static contacts, swept
+substeps</td>
+<td>Game UI or audio</td>
+</tr>
+<tr>
+<td><code>src/engine/simulation.ts</code></td>
+<td>Fixed-step state, NPC arrays, players, shared quest,
+checkpoints</td>
+<td>Browser or transport</td>
+</tr>
+<tr>
+<td><code>src/engine/agent.ts</code></td>
+<td>Validated commands, observation and replay</td>
+<td>Browser or filesystem</td>
+</tr>
+<tr>
+<td><code>src/net/protocol.ts</code></td>
+<td>Bounded packet validation and binary snapshots</td>
+<td>PeerJS, DOM</td>
+</tr>
+<tr>
+<td><code>src/net/coop.ts</code></td>
+<td>Connection lifecycle, host authority, input and snapshot
+delivery</td>
+<td>World generation decisions</td>
+</tr>
+<tr>
+<td><code>src/render/</code></td>
+<td>Camera, interpolation, culling, terrain caches, procedural
+sprites</td>
+<td>Simulation ownership</td>
+</tr>
+<tr>
+<td><code>src/audio/</code></td>
+<td>Pure sample synthesis and browser playback adapter</td>
+<td>Simulation timing decisions</td>
+</tr>
+<tr>
+<td><code>src/main.ts</code></td>
+<td>Input, UI, frame accumulator and adapters</td>
+<td>New physics rules</td>
+</tr>
+<tr>
+<td><code>tools/</code></td>
+<td>JSONL entry point, reproducible asset exporters, benchmarks</td>
+<td>Hidden editor state</td>
+</tr>
+</tbody>
+</table>
+<h2 id="coordinate-and-time-model">Coordinate and time model</h2>
+<p>One world unit is one base-art pixel. Tiles are 16 units and chunks
+are 16×16 tiles. Collision and simulation coordinates use world units.
+Tile brush coordinates explicitly use tiles, so <code>tx:10</code>
+starts at world x=160. The nominal world square spans ±16,000,000 units;
+bodies are clamped slightly inside that bound. Chunk coordinates use
+mathematical floor, including negative positions.</p>
+<p>Simulation runs at 60 fixed ticks per second. Browser frame deltas
+feed an accumulator; at most five ticks run per frame, with a maximum
+accepted frame delta of 100 ms. Overload slows simulation rather than
+inventing a variable timestep. Frame interpolation is presentation-only.
+Node tools advance an explicit tick count. Float64 positions preserve
+precision over large travel distances. Velocities live in Float32
+arrays. Determinism is verified in the supported Node/Chrome
+environment; bit-identical trigonometry across unrelated JavaScript
+engines is not promised.</p>
+<h2 id="streaming-and-lifetime">Streaming and lifetime</h2>
+<p>Terrain is a pure function of seed and tile coordinates, with a small
+validated patch layer. Request order cannot change content. The
+simulation’s LRU retains at most 256 chunks; each chunk contains three
+256-byte arrays for terrain, decoration and variant. That is 192 KiB of
+raw tile data at capacity, excluding map/object overhead. Drawing
+retains at most 96 256×256 terrain canvases (24 MiB of uncompressed RGBA
+pixels, excluding browser overhead). If too many chunks would be visible
+for that cache, rendering selects a coarse terrain representation
+instead of thrashing it.</p>
+<p>NPC storage is a fixed pool of 8,192 slots. Positions, previous
+positions, velocities, species, attunement and generation use typed
+arrays. A creature more than 2,200 units from every player becomes
+eligible to recycle around a party member. Its generation increments and
+its placement is deterministically regenerated. This is active-world
+population streaming, not a persistent biography for every creature in
+the coordinate space.</p>
+<p>Collected crystal coordinates, lit beacons and terrain patches
+survive unloading and checkpointing. The edited-tile layer has an
+explicit 2,048-tile limit. There is no global ever-growing cache of
+terrain or sprite objects.</p>
+<h2 id="physics-and-creature-behavior">Physics and creature
+behavior</h2>
+<p>The spatial hash uses fixed head/next/cell arrays and 24-unit cells.
+Neighbor queries verify cell coordinates after hashing, preventing
+collisions in the hash table from returning unrelated or duplicate
+cells. NPC pairs resolve in stable ID order. Circle contact response
+includes inverse-mass separation and an impulse with restitution.
+Players also collide with one another. Creature encounters are
+intentionally non-blocking for travelers; pulses provide the physical
+interaction with wildlife.</p>
+<p>Static collision handles deep-water tile rectangles, tree trunks and
+rocks. Motion is subdivided according to distance and radius, so a fast
+dash cannot skip a one-tile wall. Shallow water reduces player speed.
+Dash consumes spirit and has a cooldown; spirit regenerates. Pulse
+applies radial forces and attunes nearby wisps once per active
+lifetime.</p>
+<p>Creatures near any player steer and resolve static contacts at 60 Hz.
+Far creatures perform those expensive decisions at 15 Hz, while their
+positions still integrate at 60 Hz. Pairwise creature contacts remain
+active. Wisp drift, beetle wandering and deer avoidance use
+deterministic functions of tick, seed and ID. No decision reads real
+time.</p>
+<h2 id="rendering-and-assets">Rendering and assets</h2>
+<p>Canvas 2D draws cached terrain, then sorts visible
+props/creatures/players by their ground y-coordinate. Tree canopies fade
+when they obscure the local traveler. High-detail sprites come from
+rectangle recipes, with eight generated poses and species-specific
+walk/bob motion. At distant zoom levels, creatures become readable
+colored marks. Zoom spans 0.08× to 5× (62.5:1). The minimap and atlas
+sample the same world function; they do not maintain a second map
+model.</p>
+<p><code>spritePixels()</code> supplies both the Canvas sprite cache and
+the SVG exporter. Custom palettes and recipes are validated.
+<code>synthesize()</code> supplies both browser audio buffers and PCM
+WAV export. Audio includes seeded noise, pitched pulses, a rising beacon
+chord and an eight-second ambient harmonic/arpeggio loop. Audio timing,
+fog/motes and lighting never alter simulation state. Fonts are the only
+third-party visual assets, bundled with their OFL licenses.</p>
+<h2 id="online-co-op">Online co-op</h2>
+<p>One browser owns simulation. Up to seven browsers connect to it
+through PeerJS/WebRTC data channels. PeerJS Cloud is the default
+rendezvous service; <code>tools/signal.ts</code> provides a self-hosted
+alternative. The same build supports optional ICE configuration. There
+is no Vercel function pretending to maintain a persistent WebSocket
+process.</p>
+<p>Guests send input at approximately 30 Hz. The host clamps input,
+enforces monotonically increasing sequence numbers, limits acceptance
+rate, and clears stale input after 300 ms. Guests do not supply
+authoritative positions, shard counts or quest completion. The host
+sends snapshots at approximately 10 Hz and skips sending when a data
+channel is congested. The current camera determines interest radius,
+clamped to 400–15,000 units.</p>
+<p>Each visible NPC costs 16 bytes: ID, species, attunement, relative
+float positions and quantized velocities. JSON metadata contains
+players, seed/tick, quest, nearby collected resources, patches and
+recent effects. Relative float encoding retains subpixel detail far from
+the origin. Total packet size, counts, values and enum ranges are
+validated before state mutation. Both ArrayBuffer and reassembled
+Uint8Array delivery are supported and regression-tested.</p>
+<p>Guests interpolate snapshots. They do not run a competing simulation
+or deterministic network lockstep. The host’s open, active tab is a
+requirement; host loss ends the shared room, resets input and leaves
+guests with a solo copy. There is no automatic host migration,
+anti-cheat guarantee or server-side account ownership. NAT/firewall
+reachability may require a TURN relay. The default is suitable for
+invited cooperative play, with stronger deployment requirements
+documented separately from local verification.</p>
+<h2 id="agent-contracts">Agent contracts</h2>
+<p>Agents can inspect state without a screenshot, advance time without
+waiting, author terrain without a GUI and compare deterministic results
+without guessing. Every accepted mutating command can be recorded.
+Replays contain an initial versioned checkpoint and an ordered command
+list; adjacent idle simulation steps are coalesced. A final checksum
+verifies the result. Checksums are non-cryptographic and quantize
+numbers to a thousandth; exact checkpoint continuation also has a
+full-state equality test.</p>
+<p>Solo browser recording covers gameplay inputs and simulation
+advancement. Online recording is disabled because guest input arrives
+asynchronously through a different authority. When the session becomes
+solo, recording starts from the received checkpoint. CLI checkpoints
+preserve all players; browser loads choose one local traveler and resume
+solo. The browser lab is a QA console, not an editor that future agents
+must operate.</p></main>
+<footer>Fern · A world engine built for agents · <a href="https://github.com/michaelcrosato/gpt61sol2daige">Source on GitHub</a></footer>
+</body>
+</html>
