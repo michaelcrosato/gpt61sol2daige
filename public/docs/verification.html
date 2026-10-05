@@ -813,6 +813,133 @@ intact.</td>
 byte-identical across calls. In the browser, a held real mouse button
 and a held J key each produce slash events within two seconds, after a
 grab and throw. These are mechanics observations, not performance
+claims.</p>
+<h2 id="m07-jointed-mechanisms-evidence">M07 jointed mechanisms
+evidence</h2>
+<p>On 2026-10-05, <code>npm run check</code> passed <strong>111 headless
+tests</strong>, <code>npm run build</code> produced the bundle and
+<code>npm run test:e2e</code> passed <strong>32 browser
+scenarios</strong>, including the preserved eight-client WebRTC stories
+and three new M07 scenarios. <code>npm run verify:run</code> cleared all
+nine areas (level 18, 2,676 gold; <a
+href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/evidence/physics-m07-route.jsonl">route</a>). The numbers below
+come from the <a href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/evidence/physics-m07.json">receipt</a> (seed 142,
+area 1, monsters and area mechanics cleared).</p>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr>
+<th>M07 acceptance</th>
+<th>Evidence</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A gate swings around its hinge</td>
+<td>A 600 impulse swings the leaf to exactly its 1.9 rad limit with the
+pin gap at 0. It latches open (<code>gate:latched</code>, motor target
+1.6, saved) and holds 1.62 rad two seconds later. A slow push closes it
+(<code>gate:closed</code>).</td>
+</tr>
+<tr>
+<td>A tether limits motion</td>
+<td>Pulling the vine pod for 40 ticks keeps it at 69.9 of its 70-unit
+reach with every link intact. A 700 units/s yank loads the tether to 373
+(break load 260): the pod rope snaps (cause <code>strain</code>) and the
+pod flies 327 units out.</td>
+</tr>
+<tr>
+<td>A broken anchor releases with visible inherited motion</td>
+<td>The ball swings at 227 units/s, 53 units from its post (reach 58.5).
+Cutting the anchor leaves it at 220 units/s in the same direction
+(cosine 1.00); 40 ticks later it is 86 units out. The event is
+<code>chain:anchor:cut</code> owned by the traveler. <a
+href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/evidence/physics-m07-chain.png">Swinging</a>, <a
+href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/evidence/physics-m07-freed.png">freed</a>.</td>
+</tr>
+<tr>
+<td>Switching joints off</td>
+<td><code>mechanisms</code> off freezes all 19 dynamic members of area
+1; loose crates keep moving. Poses are bit-identical after an impulse
+and 30 ticks. A pod cut while frozen becomes a loose prop. On resume,
+parts wake with at most 1.69 units/s and 0.02 units of displacement; the
+cut link stays cut.</td>
+</tr>
+<tr>
+<td>Switching joint breakage off</td>
+<td>A 700 units/s yank loads the anchor to 4,275 (break load 2,600) and
+nothing snaps. A cut is refused (<code>protectedByPolicy</code>). With
+breakage back on, the same yank snaps the anchor and the ball joint.
+With joints off and breakage on, a cut severs a frozen joint, and the
+freed ball moves 125 units once mechanisms resume.</td>
+</tr>
+<tr>
+<td>No half chain across a region boundary</td>
+<td>A quiet region over the ball alone leaves the chain moving, because
+the part follows its post. A quiet region over the post freezes all 5
+dynamic members. A checkpoint whose member’s policy sample differs from
+its root is rejected.</td>
+</tr>
+<tr>
+<td>Required travel stays reachable; shortcuts stay worthwhile</td>
+<td>Every mechanism part and companion is at least 95 units from the
+entry–exit lane and every portal. Of 200 encounter rolls, 1 fell in the
+gate pen and was moved out: no wave starts penned. Over 20 ticks, a
+traveler crosses 41.7 units on the causeway and 22.3 wading beside it. A
+frozen anchored causeway (master off) still gives 41.7. Cutting both
+lashings emits <code>bridge:span-lost</code> and ends the deck.</td>
+</tr>
+<tr>
+<td>Authored events versus physical-only motion</td>
+<td>The launcher is cocked at −10.2 units by a held pull. Released, it
+fires (<code>launcher:fired</code> owned by the traveler) and throws its
+stone at 388 units/s, instigated by the cocker. Chain, vine and vane
+move only physically. <a href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/evidence/physics-m07-touch.png">Touch
+cocking</a>.</td>
+</tr>
+<tr>
+<td>Whorl, pulling, throwing and charges</td>
+<td>Whorl sends the ball to 103 units/s, owned by the traveler. A held
+gate dragged away opens to 1.08 rad and loads its hinge to 1,200 (break
+load 1,400). A thrown pod snaps the vine
+(<code>vine-1:pod:strain</code>), owned by the thrower. An enemy charge
+swings the gate to 1.2 rad.</td>
+</tr>
+<tr>
+<td>Units and portals</td>
+<td>A freed chain (ball plus four links) carried through a rift lands
+with zero offset error and intact joints. An anchored gate releases the
+hold and stays put.</td>
+</tr>
+<tr>
+<td>Membership, broken links and motor state survive save/load and late
+join</td>
+<td>An unstepped raw checkpoint round-trips byte for byte. A raw restore
+matches the host hash after 10 ticks, the agent replay matches
+(<code>7669d8d3</code>) and portable joint state is equal. A late-join
+replica carries identical joints and mechanism state. Leaving for
+another land and returning keeps the cut vine link and both motors (gate
+1.6, vane −2). In the browser, a guest over actual WebRTC throws the pod
+free through host actions, and a late joiner sees every broken link, the
+latch and its motor.</td>
+</tr>
+<tr>
+<td>M06 migration</td>
+<td>A real M06 checkpoint (envelope 4 / world 6, from <code>main</code>
+dcff3f9) restores to envelope 5 / world 7. It gains 24 assemblies once
+(a second restore adds nothing) and its pre-M07 archived land is
+untouched until it is entered again; returning adds that land’s
+mechanisms and keeps its destroyed pot.</td>
+</tr>
+</tbody>
+</table>
+<p><a href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/evidence/physics-m07-meadow.png">North meadow with a latched
+gate, the drifting cut causeway, the launcher and the vane</a>. The
+registry export hashes to <code>b0a40cb4…</code> and is byte-identical
+across calls. These are mechanics observations, not performance
 claims.</p></main>
 <footer>Fern · A world engine built for agents · <a href="https://github.com/michaelcrosato/gpt61sol2daige">Source on GitHub</a></footer>
 </body>

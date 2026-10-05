@@ -710,6 +710,29 @@ export class CombatRenderer {
         this.light(ctx, e.x, e.y, radius * 0.9, e.color, (1 - age / duration) * 0.16);
       }
       if (e.type === "impact" || e.type === "break") drawMaterialEvent(ctx, e, age, zoom);
+      if (e.type === "assembly" && zoom > 0.6 && age < 1.1) {
+        // Mechanism feedback: a short floating label where the change happened.
+        const label =
+          {
+            "gate:latched": "Latched",
+            "gate:closed": "Shut",
+            "launcher:cocked": "Cocked",
+            "launcher:fired": "Launch!",
+            "bridge:span-lost": "Causeway adrift",
+          }[e.text] ??
+          (e.text.endsWith(":cut") ? "Cut" : e.text.endsWith(":snapped") ? "Snap!" : "");
+        if (label) {
+          ctx.save();
+          ctx.globalAlpha = 1 - age / 1.1;
+          ctx.font = "bold 7px monospace";
+          ctx.textAlign = "center";
+          ctx.fillStyle = "#1b3028";
+          ctx.fillText(label, e.x + 0.6, e.y - 14 - age * 18 + 0.6);
+          ctx.fillStyle = e.color;
+          ctx.fillText(label, e.x, e.y - 14 - age * 18);
+          ctx.restore();
+        }
+      }
       if ((e.type === "hit" || e.type === "hurt") && zoom > 0.65 && age < 0.8) {
         ctx.save();
         ctx.globalAlpha = 1 - age / 0.8;

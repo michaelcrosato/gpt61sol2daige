@@ -123,6 +123,8 @@ export class World {
           if (region.layout === "causeway" && Math.abs(dy) > 190 && Math.abs(dx) < 200)
             terrain = Terrain.Water;
           if (region.layout === "orchard" && Math.abs(dx % 100) < 16) terrain = Terrain.Path;
+          // M07: a wadeable creek across the north meadow, spanned by the area's causeway.
+          if (Math.abs(dy + 216) < 17 && Math.abs(dx) < 210) terrain = Terrain.Water;
         }
         const decor =
           terrain === Terrain.Meadow && d > (region.kind === "town" ? 180 : 65) && h % 17 === 0

@@ -5,6 +5,7 @@ import { World } from "../engine/world.ts";
 import { enemyBodyId, type PropHit, playerBodyId } from "../physics/adventure.ts";
 import { LOOT_SETTLE_TICKS, type PendingImpact } from "../physics/combat.ts";
 import { MATERIALS } from "../physics/materials.ts";
+import { insidePen } from "../physics/mechanisms.ts";
 import type { AreaRecipe } from "./content.ts";
 import {
   ARCHETYPES,
@@ -1308,7 +1309,8 @@ export class Adventure {
       (elite ? 2 : 1) *
       (1 + (sim.players.size - 1) * 0.45);
     const hp = baseHealth * s.tuning.enemyHealth * s.tuning.difficulty;
-    if (!sim.world.walkable(x, y)) {
+    // Nothing starts a wave penned behind a gate (M07): a jammed gate must not trap the goal.
+    if (!sim.world.walkable(x, y) || insidePen(s.recipe, x, y)) {
       x = s.recipe.x + ((ordinal % 7) - 3) * 18;
       y = s.recipe.y + ((ordinal % 5) - 2) * 18;
     }
@@ -1530,6 +1532,8 @@ export class Adventure {
     if (kind === "rift") {
       const other = s.mechanics.find((m) => m.id === mechanic.pair);
       if (other) {
+        // An unanchored held part rides along through the rift as one unit.
+        sim.physical?.carry(sim, p.id, other.x - p.x, other.y - p.y);
         this.place(p, other.x, other.y, sim);
         h.invulnerableUntil = sim.tick + 20;
         other.readyAt = Math.max(other.readyAt, sim.tick + 60);
@@ -1551,7 +1555,12 @@ export class Adventure {
     const s = this.state,
       tick = sim.tick;
     // Contacts collected by the previous solve become damage at this command boundary.
-    if (sim.physical) this.applyImpacts(sim, sim.physical.combat.takeImpacts());
+    if (sim.physical) {
+      this.applyImpacts(sim, sim.physical.combat.takeImpacts());
+      // Mechanism changes (latches, launches, snapped or cut links) from the previous solve.
+      for (const e of sim.physical.mechanisms.take())
+        this.emit(sim, "assembly", e.x, e.y, e.owner, e.text, 0, 0, "#e7d7a1");
+    }
     for (const p of sim.players.values()) {
       const h = this.hero(p.id),
         stats = this.stats(p.id, tick);

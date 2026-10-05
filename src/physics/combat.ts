@@ -10,7 +10,7 @@ import {
 } from "../game/interactions.ts";
 import type { Drop } from "../game/types.ts";
 import { compareIds } from "./policies.ts";
-import type { PhysicsWorld } from "./runtime.ts";
+import { type PhysicsWorld, passesActors } from "./runtime.ts";
 import type { BodyRecipe } from "./types.ts";
 
 /**
@@ -139,6 +139,8 @@ export class CombatPhysics {
     if (sim.adventure.hero(player).dead) throw new Error("The fallen cannot lift anything");
     if (typeof id !== "string" || !isPropId(id) || !world.has(id))
       throw new Error("Choose a loose prop to grab");
+    // Deck planks are underfoot and raised vanes overhead (M07): neither is in reach of hands.
+    if (passesActors(world.recipeOf(id))) throw new Error("That part is out of reach");
     const motion = world.motionOf(id),
       policy = world.policyOf(id);
     if (!motion.dynamic || motion.frozen || !policy.effective.dynamicProps)

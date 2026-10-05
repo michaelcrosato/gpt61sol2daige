@@ -1,0 +1,221 @@
+{
+  "milestone": "M07",
+  "date": "2026-10-05",
+  "base": "main dcff3f94e8bbf5dd3cc342bc73892434c232e462",
+  "method": "Headless Node scenarios mirroring tests/physics-mechanisms.test.ts (seed 142, area 1, monsters and area mechanics cleared); values rounded to 0.01.",
+  "gates": {
+    "check": "111 headless tests passed",
+    "testE2e": "32 browser scenarios passed",
+    "verifyRun": "nine areas cleared (level 18, 2,676 gold)"
+  },
+  "registry": {
+    "exportSha256": "b0a40cb4e88849c45d67fe198dfacbcdedb3215afba395d687067faff6551894",
+    "assembliesPerLand": 24,
+    "area1": [
+      {
+        "id": "bridge-1",
+        "kind": "bridge",
+        "event": "deck",
+        "members": 6
+      },
+      {
+        "id": "chain-1",
+        "kind": "chain",
+        "event": "none",
+        "members": 6
+      },
+      {
+        "id": "gate-1",
+        "kind": "gate",
+        "event": "latch",
+        "members": 2
+      },
+      {
+        "id": "launcher-1",
+        "kind": "launcher",
+        "event": "launch",
+        "members": 2
+      },
+      {
+        "id": "vane-1",
+        "kind": "vane",
+        "event": "none",
+        "members": 2
+      },
+      {
+        "id": "vine-1",
+        "kind": "vine",
+        "event": "none",
+        "members": 8
+      }
+    ],
+    "area1JointKinds": {
+      "hinge": 12,
+      "slider": 1,
+      "spring": 1,
+      "rope": 7
+    },
+    "jointsPerLand": 84,
+    "maxPinGap": 0
+  },
+  "gate": {
+    "pushImpulse": 600,
+    "peakAngle": 1.9,
+    "limit": 1.9,
+    "pinGap": 0,
+    "events": ["gate:latched/"],
+    "latchedMotorTarget": 1.6,
+    "angleAfter2s": 1.62,
+    "swungFrom": 0,
+    "movedCenter": 31.32
+  },
+  "tether": {
+    "reach": 70,
+    "maxPodDistanceUnderPull": 69.9,
+    "intactUnderPull": true,
+    "yankPeakLoad": 372.86,
+    "breakLoad": 260,
+    "snapped": [
+      {
+        "id": "vine-1:pod",
+        "cause": "strain"
+      }
+    ],
+    "podDistanceAfter": 327.37
+  },
+  "anchorCut": {
+    "ballDistanceBeforeCut": 52.95,
+    "chainReach": 58.5,
+    "speedBefore": 227.48,
+    "speedAfter": 220.2,
+    "directionCosine": 1,
+    "distanceAfter40Ticks": 86.03,
+    "event": "chain:anchor:cut/local"
+  },
+  "mechanismsOff": {
+    "dynamicMembers": 19,
+    "frozenWhileOff": 19,
+    "cratesFrozen": false,
+    "unchangedAfterImpulseAnd30Ticks": true,
+    "cutWhileOffFreesPodAsLooseProp": true,
+    "maxWakeSpeed": 1.69,
+    "maxWakeDisplacement": 0.02,
+    "cutLinkRestored": false
+  },
+  "breakageOff": {
+    "yankPeakLoad": 4274.9,
+    "anchorBreakLoad": 2600,
+    "brokenWhileOff": 0,
+    "cutWhileOff": {
+      "id": "chain-1:anchor",
+      "damage": 0,
+      "threshold": 60,
+      "broken": false,
+      "protectedByPolicy": true
+    },
+    "brokenWhenOn": [
+      {
+        "id": "chain-1:anchor",
+        "cause": "strain",
+        "load": 4274.9
+      },
+      {
+        "id": "chain-1:ball",
+        "cause": "strain",
+        "load": 4274.9
+      }
+    ]
+  },
+  "jointsOffBreakageOn": {
+    "cutBroken": true,
+    "stillWhileFrozen": true,
+    "movedAfterResume": 124.69
+  },
+  "regionRoot": {
+    "quietRegionOnBallOnly": {
+      "ballFrozen": false
+    },
+    "quietRegionOnPost": {
+      "members": 5,
+      "frozen": 5
+    },
+    "forgedMemberSampleRejected": "Error: Assembly part policy is not its root's"
+  },
+  "travel": {
+    "minDistanceFromLane": 95,
+    "minDistanceFromPortals": 95.11,
+    "encounterRollsInsidePen": 1,
+    "wavesStartedInsidePen": 0,
+    "crossing20Ticks": {
+      "onDeck": 41.67,
+      "wading": 22.32,
+      "onFrozenDeckMasterOff": 41.67
+    },
+    "afterCuttingLashings": {
+      "spanLostEvent": true,
+      "deckAtPlank": false
+    }
+  },
+  "launcher": {
+    "cockedOffset": -10.21,
+    "stoneSpeedAfter4Ticks": 388.31,
+    "stoneOwner": "local",
+    "events": ["launcher:cocked/local", "launcher:fired/local"]
+  },
+  "integration": {
+    "whorl": {
+      "ballSpeed": 103.09,
+      "owner": "local"
+    },
+    "pull": {
+      "leafAngle": 1.08,
+      "hingePeakLoad": 1200.35,
+      "hingeBreakLoad": 1400,
+      "pinGap": 0
+    },
+    "thrown": {
+      "brokenVineJoints": ["vine-1:pod:strain"],
+      "podOwner": "local"
+    },
+    "charge": {
+      "leafAngleAfter10Ticks": 1.2
+    }
+  },
+  "rift": {
+    "carriedPart": [
+      "prop-chain-1-ball",
+      "prop-chain-1-link0",
+      "prop-chain-1-link1",
+      "prop-chain-1-link2",
+      "prop-chain-1-link3"
+    ],
+    "maxOffsetError": 0,
+    "anchoredHoldReleased": true,
+    "anchoredLeafMoved": 0
+  },
+  "persistence": {
+    "replayHash": "7669d8d3",
+    "hostHash": "7669d8d3",
+    "unsteppedRawBytesRoundTrip": true,
+    "rawRestoreAfter10Ticks": ["c31ecf06", "c31ecf06"],
+    "portableJointStateEqual": true,
+    "lateJoinJointsAndMechanismsEqual": true,
+    "landRecall": {
+      "vineSeg3Broken": true,
+      "gateMotorTarget": 1.6,
+      "vaneMotorTarget": -2
+    },
+    "brokenJoints": ["vine-1:seg3"]
+  },
+  "migration": {
+    "fixture": "m06-raw.json.gz",
+    "source": "main dcff3f9",
+    "envelope": [4, 5],
+    "world": [6, 7],
+    "assembliesAdded": 24,
+    "archivedLandUntouched": true,
+    "secondRestoreAddsNothing": true,
+    "returnAddsMechanisms": true,
+    "destructionKept": ["prop-pot-1-0"]
+  }
+}

@@ -356,6 +356,7 @@ export function validateAdventure(s: AdventureState): void {
           "impact",
           "break",
           "grab",
+          "assembly",
         ].includes(e.type),
       "event",
     );

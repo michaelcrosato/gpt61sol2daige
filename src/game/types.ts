@@ -148,7 +148,8 @@ export interface CombatEvent {
     | "boss"
     | "impact"
     | "break"
-    | "grab";
+    | "grab"
+    | "assembly";
   x: number;
   y: number;
   owner: string;

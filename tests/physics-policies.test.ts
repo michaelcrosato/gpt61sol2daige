@@ -499,6 +499,9 @@ test("working presets, numeric zero and scope resets preserve the scene", () => 
       "impactStrength",
       "projectileWorld",
       "physicalLoot",
+      "mechanisms",
+      "jointBreakage",
+      "jointStrength",
     ]);
   } finally {
     world.dispose();
@@ -595,6 +598,8 @@ test("applied/off and queued policies survive JSON save, replay, continuation; c
       delete snapshot.scene;
       delete snapshot.continuation;
       delete snapshot.policies;
+      delete snapshot.assemblies;
+      delete snapshot.joints;
       for (const body of snapshot.bodies) {
         delete body.policy;
         delete body.policySample;
@@ -603,7 +608,7 @@ test("applied/off and queued policies survive JSON save, replay, continuation; c
         delete body.state;
       }
       const migrated = PhysicsWorld.restore(snapshot);
-      assert.equal(migrated.save().version, 6);
+      assert.equal(migrated.save().version, 7);
       assert.equal(
         pose(migrated, "legacy-quiet").frozen,
         true,

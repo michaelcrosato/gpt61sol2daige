@@ -838,7 +838,93 @@ off, drops are recovered immediately and remain collectible.</p>
 world <strong>6</strong> changes prop collision filters, so v5 and older
 raw bytes restore through the semantic rebuild. Room protocol
 <strong>7</strong> carries the new actions. Real M05 checkpoints
-migrate.</p></main>
+migrate.</p>
+<h2 id="m07-jointed-mechanisms-and-assemblies">M07 jointed mechanisms
+and assemblies</h2>
+<p><code>PhysicsWorld</code> owns assemblies and joints next to bodies.
+An <code>AssemblyRecipe</code> names its kind, area, declared root and
+members (each member’s <code>BodyRecipe.assembly</code> names it back);
+a <code>JointRecipe</code> connects two members as a hinge (revolute),
+fixed attachment, rope (tether), spring or slider (prismatic), with
+local anchors, optional limits, an optional motor, a
+<code>breakLoad</code> and a cut <code>toughness</code>. Each
+<code>JointEntry</code> keeps its Rapier handle while intact (−1 once
+broken), cut damage, latest and peak load, current motor and when/why it
+broke. Joints never re-form: disabling a feature, restoring or
+re-entering a land keeps every break.</p>
+<p><strong>Rapier usage.</strong> Joints are created with no wake-up and
+without any joint setter. Rapier queues setter wake-ups in a hash set
+whose iteration order changes across a snapshot restore until the next
+step, so checkpoints taken in between would not round-trip byte for byte
+(a zero-length step to flush it corrupted Rapier’s islands). Hinge and
+slider limits and motors are therefore Fern rules applied before each
+solve (<code>driveJoints</code>): a position motor is a damped spring
+(stiffness 1/s², damping 1/s), a velocity motor approaches its speed at
+rate <code>damping</code>, and limits stop motion exactly at them. Spin
+changes keep the part’s linear velocity consistent with its pin.
+Authored gaps keep linked parts apart, so collision between them stays
+on; raised vanes meet nothing. After each solve,
+<code>projectJoints</code> walks every connected part outward from its
+root and pulls drifted hinge pins together and over-long ropes back to
+length: Rapier’s iterative solver otherwise let a held eight-body vine
+stretch past twice its length.</p>
+<p><strong>Strain.</strong> Rapier 0.21 exposes no joint impulses.
+Before each solve, a joint’s load is the momentum of its connected part
+moving away from its anchor: Σ mass × outward speed relative to the
+anchor point, counting ropes only when taut, springs only past 2.5× rest
+and sliders only across their axis. Gameplay impulses, hold drives and
+charges arrive as velocity before the solve, so a yank or a heavy blow
+snaps the joint in the same tick and the released part keeps that tick’s
+motion. Free swinging is tangential and loads nothing. A joint snaps
+when load &gt; <code>breakLoad × jointStrength</code> and
+<code>jointBreakage</code> is on.</p>
+<p><strong>Cuts.</strong> Mechanism parts are never destroyed (their
+families have no toughness, and removing a member is refused). A
+damaging attack that reaches a member cuts the intact joint of that
+member nearest the attack’s origin, by the member material’s damage
+after resistance; it severs at <code>toughness × jointStrength</code>.
+Agents can cut directly (<code>actors/cut</code>).</p>
+<p><strong>Policy.</strong> Connected parts are derived from intact
+joints. Every member resolves its region policy at its part’s root (the
+declared root, or the first listed member of a part cut free) and saves
+that root sample, which checkpoint validation enforces. A dynamic member
+freezes when dynamics are off or, if it is jointed, when
+<code>mechanisms</code> is off; a waking part wakes whole and only where
+it stands. <code>place</code> moves a jointed part as one unit and
+<code>transport</code> (rifts, agents) carries an unanchored part with
+its motion; anchored parts refuse.</p>
+<p><strong>Mechanisms</strong> (<code>src/physics/mechanisms.ts</code>).
+<code>areaMechanisms(area, palette)</code> lays out six assemblies per
+area plus companions: a penned gate (hinge ±1.9 rad, return spring, a
+fence pen holding an 18-gold cache chest), a chained iron ball (four
+links), a vine (six segments on ropes plus a seed pod), a sprung
+launcher (slider plus a 2000-stiffness spring, a stone payload), a
+raised wind vane (driven pivot) and a four-plank causeway between bank
+posts. They sit in the north meadow and west edge, away from the entry,
+exit, return portal and lane. Every area now has a wadeable creek across
+its north meadow (shallow water has no physics body).
+<code>MechanismPhysics</code> adds the authored events: a gate pushed
+past 83° latches open (its motor target is saved) and a slow push closes
+it; a launcher pulled back 9+ units and released fast throws whatever
+lies in front of it at 420 units/s as its cocker’s; and a causeway loses
+its span when no path joins its bank posts. Joint breaks become events
+with the responsible traveler. A traveler standing on a plank still tied
+to a bank post does not wade (<code>deckAt</code>, also computed from a
+received scene on guests). Planks and vanes are not cover and cannot be
+grabbed. Waves never start inside a gate pen.</p>
+<p><code>Adventure.step</code> emits pending mechanism events
+(<code>assembly</code> events: <code>gate:latched</code>,
+<code>gate:closed</code>, <code>launcher:cocked</code>,
+<code>launcher:fired</code>, <code>bridge:span-lost</code>,
+<code>&lt;kind&gt;:&lt;joint&gt;:snapped|cut</code>). Rifts carry a held
+unanchored part as a unit.</p>
+<p><strong>Versions.</strong> Physical world <strong>7</strong> adds
+<code>assemblies</code> and <code>joints</code>; adventure envelope
+<strong>5</strong> adds mechanism state and archives a land’s
+assemblies, joints and mechanisms with its props. Room protocol
+<strong>8</strong>. Real M06 checkpoints migrate: mechanisms join the
+active land once, and an archived pre-M07 land gains them when it is
+entered again; destruction is kept.</p></main>
 <footer>Fern · A world engine built for agents · <a href="https://github.com/michaelcrosato/gpt61sol2daige">Source on GitHub</a></footer>
 </body>
 </html>

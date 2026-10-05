@@ -457,6 +457,15 @@ export class Renderer {
       if (prop.x > left - 40 && prop.x < right + 40 && prop.y > top - 40 && prop.y < bottom + 70)
         items.push({ kind: "physical", x: prop.x, y: prop.y, type: 0, variant: 0, physical: prop });
     items.sort((a, b) => a.y - b.y || a.x - b.x);
+    const links = sim
+      .physicalLinks(alpha)
+      .filter(
+        (l) =>
+          Math.max(l.ax, l.bx) > left - 40 &&
+          Math.min(l.ax, l.bx) < right + 40 &&
+          Math.max(l.ay, l.by) > top - 40 &&
+          Math.min(l.ay, l.by) < bottom + 70,
+      );
     const frame = Math.floor(time * 9);
     for (const item of items) {
       if (item.kind === "decor") this.drawDecor(item, player, time);
@@ -523,6 +532,7 @@ export class Renderer {
         }
       }
     }
+    this.props.links(ctx, links, time);
     this.combat.effects(ctx, sim, localId, this.zoom);
     if (this.grabHint && this.zoom > 0.8) {
       const { x, y, text } = this.grabHint;
