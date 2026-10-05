@@ -126,7 +126,7 @@ Show scope selection, named region bounds, inherited versus overridden values, r
 
 ## Required switch demonstrations
 
-For every implemented feature: observe its real effect, disable it, repeat the cause and verify suppression, enable it again and verify recovery. Also cross a region boundary in both directions, apply a broader override, save/restore the off state, and observe it from an actual guest. Test the dependency combinations that change meaning, especially master-off with feature-on, joints-off with breakage-on, destruction-off with impact damage on, and reactions-off with base combat still active. Exhaustively testing every possible boolean combination is unnecessary.
+For every implemented feature: observe its real effect, disable it, repeat the cause and verify suppression, enable it again and verify recovery. Also cross a region boundary in both directions, apply a broader override, save/restore the off state, and confirm a guest replica receives it. Test the dependency combinations that change meaning, especially master-off with feature-on, joints-off with breakage-on, destruction-off with impact damage on, and reactions-off with base combat still active. Exhaustively testing every possible boolean combination is unnecessary.
 
 ## M03 delivered controls
 

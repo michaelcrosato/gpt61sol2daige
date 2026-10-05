@@ -67,7 +67,7 @@ Only the decisions the next milestone needs.
 
 ## Evidence
 Exact commands and results; reproducible seeds/scenes; screenshot or video paths;
-multiplayer checks; known test tuning. Do not claim CI/production checks that have not run.
+co-op replication/smoke checks; known test tuning. Do not claim CI/production checks that have not run.
 
 ## Remaining work
 Real gaps or none. If incomplete, list the unmet acceptance items and keep this milestone active.
