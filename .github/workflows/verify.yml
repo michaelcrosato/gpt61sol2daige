@@ -8,7 +8,9 @@ permissions:
 jobs:
   engine-and-browser:
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    # The full suite grows with each feature milestone (M07 took 11 minutes); duration is not a
+    # gate (D53), so the job limit leaves headroom while every check must still pass.
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7.0.1
       - uses: actions/setup-node@v7.0.0
