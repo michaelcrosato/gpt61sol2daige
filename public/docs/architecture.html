@@ -781,8 +781,64 @@ sway driven by solved velocity and a short shake when durability drops
 (so replicas respond from received state). Sway rests where effective
 world reactions are off. Material particles and floating RESIST/KEPT
 labels come from replicated events. <code>src/audio/synth.ts</code> adds
-one deterministic voice per material plus a crumble for
-breaks.</p></main>
+one deterministic voice per material plus a crumble for breaks.</p>
+<h2 id="m06-combat-forces-projectiles-and-physical-loot">M06 combat
+forces, projectiles and physical loot</h2>
+<p><code>src/game/interactions.ts</code> is the shared attack
+interaction specification. Each recipe names its team, query shape, prop
+impulse (units/s), torque, scenery material multiplier, scenery rule
+(cover, pierce, phase), pierce and ricochet counts. Slash combo stages,
+Whorl, Bloom Nova, Thornlance, dash, the Living Bastion bloom, area
+mechanics and delayed effects, enemy charges, enemy shots and
+launched-prop impacts all resolve through it. Gameplay still decides
+authored damage and rewards; a hero’s <code>force</code> and
+<code>shatter</code> stats scale only the physical part.
+<code>actors/attacks</code> exports the registry.</p>
+<p>Attacks reach scenery through
+<code>AdventurePhysics.damageProps</code>, which now applies the
+recipe’s impulse and torque and the material multiplier. It records the
+attacker as each pushed prop’s instigator, and <code>once</code> keys
+strike a prop at most once per charge. Fracture pieces inherit the
+launch velocity and the breaker’s ownership.</p>
+<p>Projectiles sweep their tick’s path with Rapier shape casts
+(<code>PhysicsWorld.castScenery</code>, via <code>sceneryHit</code>)
+against props and rooted terrain; deep water is not cover. Enemy shots
+stop at the first scenery and damage fragile cover. Thornlance breaks
+fragile material and flies on, spends a pierce on wood, and stops on
+stone, metal and stumps. With ricochets it reflects about the contact
+normal instead. <code>Projectile</code> records struck scenery and
+remaining ricochets; both are optional for older saves.</p>
+<p><code>src/physics/combat.ts</code> (<code>CombatPhysics</code>, owned
+and saved by <code>AdventurePhysics</code>) keeps instigators (owner,
+team, cause, expiry), pending impacts, per-pair suppression, holds and
+settled loot. Before each solve it drives held props toward the holder’s
+aim and samples props moving at 110+ units/s. After the solve it turns
+started contacts into pending impacts with team rules: party and unowned
+props hurt monsters, enemy props hurt heroes, and any prop hurts props.
+<code>Adventure.step</code> applies them at the next tick boundary
+through the ordinary <code>hit</code>, <code>damageHero</code> and
+<code>damageProps</code> paths, so kills, XP, gold, drops and procs
+happen exactly once. An unowned non-boss kill counts for the area but
+grants no credit or drops.</p>
+<p>Grab and release are acknowledged adventure actions validated on the
+host (reach 72, mass ≤ 8, dynamic and unfrozen, one holder). The drag
+target is the existing aim input. Held props carry a saved
+<code>held</code> flag that removes traveler contacts but keeps monster
+contacts, so a swung prop can hit enemies without shoving its holder.
+Throws use the aim, the hero’s force and the region’s impulse strength,
+and assign ownership.</p>
+<p>Loot drops get bodies <code>loot-&lt;id&gt;</code> (actor kind
+<code>loot</code>, meeting terrain and props only; props now accept loot
+contacts). They launch on their tick, bounce for 30 ticks, then the
+magnet removes gold/XP bodies and flies them to the traveler as before.
+Item drops stay physical until E. Resting drops on deep water, rooted
+decor or fixed scenery move to the nearest reachable tile; with physics
+off, drops are recovered immediately and remain collectible.</p>
+<p>Adventure envelope <strong>4</strong> adds the combat state. Physical
+world <strong>6</strong> changes prop collision filters, so v5 and older
+raw bytes restore through the semantic rebuild. Room protocol
+<strong>7</strong> carries the new actions. Real M05 checkpoints
+migrate.</p></main>
 <footer>Fern · A world engine built for agents · <a href="https://github.com/michaelcrosato/gpt61sol2daige">Source on GitHub</a></footer>
 </body>
 </html>

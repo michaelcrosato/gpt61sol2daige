@@ -104,6 +104,10 @@ export interface Projectile {
   pierce: number;
   hit: number[];
   theme: ThemeId;
+  /** M06: bounces left off hard scenery. */
+  ricochet?: number;
+  /** M06: scenery this projectile already struck (it never strikes the same prop twice). */
+  scenery?: string[];
 }
 export interface Mechanic {
   id: number;
@@ -143,7 +147,8 @@ export interface CombatEvent {
     | "potion"
     | "boss"
     | "impact"
-    | "break";
+    | "break"
+    | "grab";
   x: number;
   y: number;
   owner: string;
@@ -211,6 +216,12 @@ export interface HeroStats {
   chain: number;
   execute: number;
   spirit: number;
+  /** M06: multiplier on the physical impulse of this hero's attacks and throws. */
+  force: number;
+  /** M06: multiplier on this hero's material damage to scenery. */
+  shatter: number;
+  /** M06: Thornlance bounces off hard scenery. */
+  ricochet: number;
   lance: boolean;
   nova: boolean;
   powers: string[];
@@ -228,6 +239,8 @@ export type AdventureAction =
         | "sell-spares";
     }
   | { type: "skill"; id: string }
+  | { type: "grab"; id: string }
+  | { type: "release"; throw: boolean }
   | { type: "equip" | "sell"; id: string }
   | { type: "buy"; index: number }
   | { type: "tuning"; values: Partial<Tuning> };

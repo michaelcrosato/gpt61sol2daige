@@ -10,6 +10,10 @@ export const POLICY_DEFAULTS = {
   destruction: true,
   materialDurability: 1,
   debrisLifetime: 0,
+  impactDamage: true,
+  impactStrength: 1,
+  projectileWorld: true,
+  physicalLoot: true,
 };
 export type PolicyValues = Partial<typeof POLICY_DEFAULTS>;
 export type PolicyScope = "land" | "area" | "region";
@@ -82,15 +86,19 @@ export const POLICY_PRESETS = {
     propBlocking: false,
     crowdContacts: false,
     destruction: false,
+    impactDamage: false,
+    projectileWorld: false,
+    physicalLoot: false,
   },
   Reactive: { ...POLICY_DEFAULTS },
-  Wild: { ...POLICY_DEFAULTS, impulseStrength: 2.5, materialDurability: 0.6 },
+  Wild: { ...POLICY_DEFAULTS, impulseStrength: 2.5, materialDurability: 0.6, impactStrength: 2 },
   Sanctuary: {
     ...POLICY_DEFAULTS,
     propBlocking: false,
     crowdContacts: false,
     impulseStrength: 0.35,
     destruction: false,
+    impactDamage: false,
   },
 };
 export type PresetName = keyof typeof POLICY_PRESETS;
@@ -125,12 +133,16 @@ export function validateValues(values: PolicyValues) {
     "ambientPhysics",
     "sweptCollision",
     "destruction",
+    "impactDamage",
+    "projectileWorld",
+    "physicalLoot",
   ] as const)
     if (key in values && typeof values[key] !== "boolean")
       throw new Error(`${key} must be boolean`);
   if ("impulseStrength" in values) number(values.impulseStrength, 0, 10);
   if ("materialDurability" in values) number(values.materialDurability, 0.05, 20);
   if ("debrisLifetime" in values) number(values.debrisLifetime, 0, 3600);
+  if ("impactStrength" in values) number(values.impactStrength, 0, 10);
 }
 const cross = (
   a: { x: number; y: number },
@@ -469,12 +481,20 @@ function composePolicy(
       "ambientPhysics",
       "sweptCollision",
       "destruction",
+      "impactDamage",
+      "projectileWorld",
+      "physicalLoot",
     ] as const)
       if (patch[key] !== undefined) {
         values[key] = patch[key];
         provenance[key] = source;
       }
-    for (const key of ["impulseStrength", "materialDurability", "debrisLifetime"] as const)
+    for (const key of [
+      "impulseStrength",
+      "materialDurability",
+      "debrisLifetime",
+      "impactStrength",
+    ] as const)
       if (patch[key] !== undefined) {
         values[key] = patch[key];
         provenance[key] = source;
@@ -505,6 +525,9 @@ function composePolicy(
       ambientPhysics: values.worldReactions && values.ambientPhysics,
       sweptCollision: values.worldReactions && values.sweptCollision,
       destruction: values.worldReactions && values.destruction,
+      impactDamage: values.worldReactions && values.impactDamage,
+      projectileWorld: values.worldReactions && values.projectileWorld,
+      physicalLoot: values.worldReactions && values.physicalLoot,
     },
     provenance,
     landId: land.id,

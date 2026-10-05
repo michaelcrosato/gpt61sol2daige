@@ -91,17 +91,17 @@ export class AdventureUI {
       );
     el("dash").insertAdjacentHTML(
       "beforebegin",
-      `<button class="ability" id="lance-button" aria-label="Thornlance" title="Unlock Thornlance in Stormstep"><kbd>R</kbd>${icon("diagonal", 22)}<span>Thornlance</span></button><button class="ability" id="nova-button" aria-label="Bloom Nova" title="Unlock Bloom Nova in Emberwake"><kbd>F</kbd>${icon("fire", 22)}<span>Bloom Nova</span></button>`,
+      `<button class="ability" id="lance-button" aria-label="Thornlance" title="Unlock Thornlance in Stormstep"><kbd>R</kbd>${icon("diagonal", 22)}<span>Thornlance</span></button><button class="ability" id="nova-button" aria-label="Bloom Nova" title="Unlock Bloom Nova in Emberwake"><kbd>F</kbd>${icon("fire", 22)}<span>Bloom Nova</span></button><button class="ability" id="grab-button" aria-label="Grab a nearby loose prop" title="Grab a nearby loose prop (V). Attack throws it; V sets it down."><kbd>V</kbd>${icon("hand", 22)}<span id="grab-label">Grab</span></button>`,
     );
     el("dash").insertAdjacentHTML(
       "afterend",
       `<button class="ability flask-ability" id="potion-button" aria-label="Use healing flask" title="Healing flask (1)"><kbd>1</kbd>${icon("flask", 22)}<span id="flask-count">3 / 3</span></button>`,
     );
     document.querySelector(".input-hints")!.innerHTML =
-      `<span><kbd>W A S D</kbd> move</span><span><kbd>LMB / J</kbd> attack</span><span><kbd>E</kbd> interact</span><span><kbd>P</kbd> pause</span>`;
+      `<span><kbd>W A S D</kbd> move</span><span><kbd>LMB / J</kbd> attack</span><span><kbd>E</kbd> interact</span><span><kbd>V</kbd> grab · throw</span><span><kbd>P</kbd> pause</span>`;
     el("world-canvas").setAttribute(
       "aria-label",
-      "Fern hack-and-slash. WASD moves, left mouse or J attacks, Q casts Whorl, Shift or Space dashes, E interacts, 1 heals.",
+      "Fern hack-and-slash. WASD moves, left mouse or J attacks, Q casts Whorl, Shift or Space dashes, E interacts, V grabs a loose prop (attack throws it), 1 heals.",
     );
     el("viewport").insertAdjacentHTML(
       "beforeend",

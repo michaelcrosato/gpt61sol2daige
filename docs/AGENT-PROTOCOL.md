@@ -314,3 +314,24 @@ Every clearing now holds crates, barrels (one volatile), pots, a log, loose ston
 New IDs: `prop-<family>-<area>-<n>` for clearing scenery and `<parent id>-<piece>` for fracture pieces (`plank0`, `shard3`, `chunk1`, `rim2`, `hub`, `hoop`, `canopy`, `wheel0`, `rail1`, `half0`, `frame`, `pane`, `stump`, `log`). Broken pieces that are themselves families (a tree's `log`, a wagon's `wheel0`) can break again; debris and stumps move but never break. `PropHit` reports `resisted` (material resistance absorbed a weak hit), `protectedByPolicy` (destruction off: damage is preserved, nothing new happens), `durability`, `stage` 0–3 and `broken {pieces, reward}`. Combat events add `impact` (`<material>:resisted|protected|stage<n>`) and `break` (`<family>:<material>`, amount = pieces); they are bounded observations outside replay hashes.
 
 Policy values add `destruction` (boolean), `materialDurability` (0.05–20, divides material damage) and `debrisLifetime` (0–3,600 s; 0 keeps debris for the scene). Saves write adventure envelope 3 / world 5; rooms use protocol 6. Real M04 checkpoints migrate with exact legacy bodies. Guests read `props`/`recipes` but cannot `damage`. See [the M05 contract](ARCHITECTURE.md#m05-materials-and-destructible-scenery).
+
+## M06 combat forces, grab/throw and physical loot
+
+| Command | Fields and behavior |
+| --- | --- |
+| `{"op":"actors","action":"attacks"}` | The shared attack spec: impulse, torque, material multiplier and cover/pierce/ricochet rules per ability, plus impact formula, ownership window and team rules. Works on guests. |
+| `{"op":"adventure","action":{"type":"grab","id":"crate-1-3"}}` | Host-validated: a loose, unfrozen prop within 72 units and mass ≤ 8 that nobody else holds. The prop follows the traveler's aim (`aimX/aimY`, else facing). |
+| `{"op":"adventure","action":{"type":"release","throw":true}}` | Throw along the aim (speed 430 × force × impulse strength, slower for heavy props) and own it for 2.5 s; `throw:false` sets it down. |
+| `actors` `inspect` → `combat` | `{instigators, impacts, suppressed, holds, settled}`; guests' replica inspection includes the same record. |
+
+```json
+{"op":"encounter","index":1}
+{"op":"adventure","action":{"type":"grab","id":"crate-1-3"}}
+{"op":"input","aimX":1,"aimY":0}
+{"op":"step","ticks":10}
+{"op":"adventure","action":{"type":"release","throw":true}}
+{"op":"step","ticks":30}
+{"op":"actors","action":"inspect"}
+```
+
+Combat events add `impact` texts `impact:hit` (a launched prop struck a monster), `<material>:cover` and `<material>:deflect`, and `grab` events (`<id>`, `throw:<id>`, `drop:<id>`). An environmental kill emits `kill` with owner `""` and text `environment`. New policy values: `impactDamage`, `projectileWorld`, `physicalLoot` (booleans) and `impactStrength` (0–10). Item affixes and `HeroStats` add `force`, `shatter` and `ricochet`. Saves write adventure envelope 4 / world 6; rooms use protocol 7. See [the M06 contract](ARCHITECTURE.md#m06-combat-forces-projectiles-and-physical-loot).
