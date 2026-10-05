@@ -22,7 +22,10 @@ import { type Input, idleInput, type SaveState, Simulation, STEP } from "./engin
 import { LANDMARKS } from "./engine/world.ts";
 import type { AdventureAction } from "./game/types.ts";
 import { Coop } from "./net/coop.ts";
+import { variantName } from "./physics/blueprints.ts";
 import { initializePhysics } from "./physics/bootstrap.ts";
+import { GRAB_MAX_MASS, GRAB_REACH } from "./physics/combat.ts";
+import type { BodyPose } from "./physics/types.ts";
 import { Renderer } from "./render/renderer.ts";
 
 mountUI();
@@ -150,6 +153,71 @@ const adventureUI = new AdventureUI({
     latestCombatEvent = 0;
   },
 });
+/** The local traveler's held prop: the solver's on a host, the received scene's on a guest. */
+function heldProp(): string | null {
+  const sim = runtime.sim;
+  if (sim.physical) return sim.physical.combat.holding(net.localId);
+  return sim.replicaPhysics?.combat?.holds.find((h) => h.player === net.localId)?.id ?? null;
+}
+/** Nearest loose prop within reach that the host will accept for a grab. */
+function grabTarget(): BodyPose | null {
+  const player = runtime.sim.players.get(net.localId);
+  if (!player) return null;
+  let best: BodyPose | null = null,
+    distance = GRAB_REACH;
+  for (const prop of runtime.sim.physicalProps()) {
+    if (prop.motion !== "dynamic" || prop.frozen || (prop.mass ?? 1) > GRAB_MAX_MASS) continue;
+    const d = Math.hypot(prop.x - player.x, prop.y - player.y);
+    if (d < distance || (d === distance && best && prop.id < best.id)) {
+      best = prop;
+      distance = d;
+    }
+  }
+  return best;
+}
+function toggleGrab(): void {
+  if (!started) begin();
+  if (heldProp()) {
+    void adventureUI.act({ type: "release", throw: false });
+    return;
+  }
+  const target = grabTarget();
+  if (!target) {
+    toast("Nothing loose within reach to grab.");
+    return;
+  }
+  void adventureUI.act({ type: "grab", id: target.id });
+}
+/** Local presentation of the grab mode: prompt, outline and hotbar state. */
+function updateGrabHint(): void {
+  const held = heldProp(),
+    player = runtime.sim.players.get(net.localId);
+  renderer.heldProp = held;
+  el("grab-button").classList.toggle("active", held !== null);
+  el("grab-label").textContent = held ? "Set down" : "Grab";
+  if (!player || runtime.sim.adventure.hero(net.localId).dead) {
+    renderer.grabHint = null;
+    return;
+  }
+  if (held) {
+    renderer.grabHint = { x: player.x, y: player.y - 8, text: "[LMB / J] Throw · [V] Set down" };
+    return;
+  }
+  const target = grabTarget();
+  renderer.grabHint = target
+    ? {
+        x: target.x,
+        y: target.y,
+        text: `[V] Grab ${target.blueprint ? variantName(target.blueprint) : "prop"}`,
+      }
+    : null;
+}
+/** While holding, the attack input throws instead of slashing. */
+function throwHeld(): boolean {
+  if (!heldProp()) return false;
+  void adventureUI.act({ type: "release", throw: true });
+  return true;
+}
 async function gameAction(action: AdventureAction): Promise<unknown> {
   if (net.status.role === "guest") return net.action(action);
   const result = execute({ op: "adventure", action });
@@ -342,7 +410,7 @@ function execute(command: Command): unknown {
     !["observe", "describe", "inspect", "save", "catalog"].includes(command.op) &&
     !(
       command.op === "actors" &&
-      ["inspect", "body", "policy", "props", "recipes"].includes(
+      ["inspect", "body", "policy", "props", "recipes", "attacks"].includes(
         String(command.action ?? "inspect"),
       )
     ) &&
@@ -571,9 +639,11 @@ el("pulse").addEventListener("click", () => {
   if (!started) begin();
   pulseUntil = performance.now() + 180;
 });
+el("grab-button").addEventListener("click", () => toggleGrab());
 el("attack-button").addEventListener("pointerdown", (event) => {
   event.preventDefault();
   if (!started) begin();
+  if (throwHeld()) return;
   inputOverride = null;
   pointerAim = false;
   attacking = true;
@@ -789,8 +859,9 @@ canvas.addEventListener("pointerdown", (event) => {
   if (event.button === 0) {
     if (!started) begin();
     inputOverride = null;
-    attacking = true;
     pointerAim = true;
+    if (throwHeld()) return;
+    attacking = true;
     canvas.setPointerCapture(event.pointerId);
   }
   if (event.button === 2) {
@@ -905,6 +976,15 @@ document.addEventListener("keydown", (event) => {
     return;
   }
   if (view !== "world") return;
+  if (key === "v" && !event.repeat) {
+    event.preventDefault();
+    toggleGrab();
+    return;
+  }
+  if (key === "j" && !event.repeat && throwHeld()) {
+    event.preventDefault();
+    return;
+  }
   if (movementKeys.includes(key)) {
     event.preventDefault();
     if (!started) begin();
@@ -956,7 +1036,7 @@ function getInput(now: number): Input {
     dash: keys.has("shift") || keys.has(" ") || now < dashUntil,
     pulse: keys.has("q") || keys.has("2") || now < pulseUntil,
     interact: keys.has("e") || now < interactUntil,
-    attack: attacking || keys.has("j") || now < attackUntil,
+    attack: !heldProp() && (attacking || keys.has("j") || now < attackUntil),
     lance: keys.has("r") || keys.has("3") || now < lanceUntil,
     nova: keys.has("f") || keys.has("4") || now < novaUntil,
     potion: keys.has("1") || now < potionUntil,
@@ -1076,7 +1156,7 @@ function processEvents(): void {
       if ((MATERIAL_SOUNDS as readonly string[]).includes(material))
         audio.play(material as MaterialSound);
       if (event.type === "break") audio.play("crumble");
-    }
+    } else if (event.type === "grab") audio.play(event.text.startsWith("throw") ? "dash" : "step");
   }
   if (runtime.sim.adventure.state.events.length)
     latestCombatEvent = runtime.sim.adventure.state.events.at(-1)!.id;
@@ -1131,6 +1211,7 @@ function loop(now: number): void {
         ? 1
         : clamp(accumulator / STEP, 0, 1);
   if (view === "world") {
+    updateGrabHint();
     renderer.draw(
       runtime.sim,
       net.localId,

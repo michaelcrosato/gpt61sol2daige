@@ -3,6 +3,7 @@ import { collideCircles, moveBody } from "../engine/physics.ts";
 import type { Player, Simulation } from "../engine/simulation.ts";
 import { World } from "../engine/world.ts";
 import { enemyBodyId, type PropHit, playerBodyId } from "../physics/adventure.ts";
+import type { PendingImpact } from "../physics/combat.ts";
 import { MATERIALS } from "../physics/materials.ts";
 import type { AreaRecipe } from "./content.ts";
 import {
@@ -14,6 +15,7 @@ import {
   TOWN_NPCS,
   townName,
 } from "./content.ts";
+import { ATTACKS, attackRecipe, HARD_MATERIALS } from "./interactions.ts";
 import { type Item, rollItem, SLOTS, starterItems } from "./loot.ts";
 import { SKILLS, type StatId, skillReason } from "./skills.ts";
 import {
@@ -25,6 +27,7 @@ import {
   type Hero,
   type HeroStats,
   type Mechanic,
+  type Projectile,
   type Tuning,
 } from "./types.ts";
 import { validateAdventure, validateArea } from "./validation.ts";
@@ -154,6 +157,9 @@ export class Adventure {
         chain: 0,
         execute: 0,
         spirit: 0,
+        force: 0,
+        shatter: 0,
+        ricochet: 0,
       };
     const powers: string[] = [];
     let weapon = 8,
@@ -162,6 +168,7 @@ export class Adventure {
     for (const skill of SKILLS) {
       const rank = hero.skills[skill.id] ?? 0;
       stats[skill.stat] += skill.value * rank;
+      if (skill.physical) stats[skill.physical.stat] += skill.physical.value * rank;
       if (rank && skill.unlock === "lance") lance = true;
       if (rank && skill.unlock === "nova") nova = true;
       if (rank && skill.power) powers.push(skill.power);
@@ -201,6 +208,9 @@ export class Adventure {
       chain: Math.min(0.9, stats.chain),
       execute: Math.min(0.35, stats.execute),
       spirit: stats.spirit,
+      force: 1 + Math.min(4, stats.force),
+      shatter: 1 + Math.min(4, stats.shatter),
+      ricochet: Math.min(8, Math.floor(stats.ricochet)),
       lance,
       nova,
       powers,
@@ -548,6 +558,23 @@ export class Adventure {
         this.enterTown(sim, 0);
         break;
       }
+      case "grab": {
+        if (!sim.physical) throw new Error("Grabbing needs the host's physical scene");
+        if (h.dead) throw new Error("The fallen cannot lift anything");
+        sim.physical.release(sim, id, false);
+        sim.physical.grab(sim, id, action.id);
+        this.emit(sim, "grab", p.x, p.y, id, action.id);
+        break;
+      }
+      case "release": {
+        if (!sim.physical) throw new Error("Grabbing needs the host's physical scene");
+        if (typeof action.throw !== "boolean")
+          throw new Error("Release needs throw: true or false");
+        const released = sim.physical.release(sim, id, action.throw);
+        if (!released) throw new Error("You are not holding anything");
+        this.emit(sim, "grab", p.x, p.y, id, `${action.throw ? "throw" : "drop"}:${released}`);
+        break;
+      }
       default:
         throw new Error("Unknown game action");
     }
@@ -650,6 +677,22 @@ export class Adventure {
     h.lastDash = sim.tick;
     h.invulnerableUntil = Math.max(h.invulnerableUntil, sim.tick + 16);
     if (stats.powers.includes("gale")) p.dashCooldown *= 0.75;
+    // Dash shoulders loose props out of the path (no damage); they stay this hero's for impacts.
+    if (sim.physical)
+      sim.physical.damageProps(sim, {
+        owner: p.id,
+        cause: "dash",
+        x: p.x + Math.cos(p.facing) * 30,
+        y: p.y + Math.sin(p.facing) * 30,
+        radius: 42,
+        damage: 0,
+        angle: p.facing,
+        arc: Math.PI,
+        impulse: ATTACKS.dash.impulse * stats.force,
+        torque: ATTACKS.dash.torque,
+        material: 0,
+        team: "party",
+      });
     if (stats.powers.includes("thunder"))
       this.state.delayed.push({
         tick: sim.tick + 9,
@@ -711,12 +754,23 @@ export class Adventure {
         stats.damage * [1, 1.15, 1.8][h.combo],
         angle,
         stats.powers.includes("cleave") && h.combo === 2 ? Math.PI : 1.1 + h.combo * 0.18,
-        "slash",
+        `slash${h.combo}`,
       );
       sim.actorImpulse(playerBodyId(p.id), Math.cos(angle) * 28, Math.sin(angle) * 28);
     } else if (ability === "lance") {
       h.lanceReady = tick + Math.round(48 * stats.cooldown);
-      this.projectile(p.x, p.y, angle, 470, stats.damage * 2.7, p.id, false, 54, 5);
+      this.projectile(
+        p.x,
+        p.y,
+        angle,
+        470,
+        stats.damage * 2.7,
+        p.id,
+        false,
+        54,
+        ATTACKS.lance.pierce,
+        stats.ricochet,
+      );
     } else {
       const radius = ability === "whorl" ? 102 : 155;
       const damage = stats.damage * (ability === "whorl" ? 2 : 3.8);
@@ -798,15 +852,32 @@ export class Adventure {
       )
         this.hit(sim, enemy, damage, owner, x, y);
     }
-    // The same authored hit reaches breakable scenery; the base enemy hit above is unchanged.
+    // The same authored hit reaches scenery through its interaction spec; the base enemy hit
+    // above is unchanged. A hero's force and shatter stats scale the physical part only.
     const physical = sim.physical;
-    if (physical)
+    if (physical) {
+      const spec = attackRecipe(cause),
+        stats = Object.hasOwn(this.state.heroes, owner) ? this.stats(owner, sim.tick) : null;
       this.propEffects(
         sim,
         owner,
         angle,
-        physical.damageProps(sim, { owner, cause, x, y, radius, damage, angle, arc }),
+        physical.damageProps(sim, {
+          owner,
+          cause,
+          x,
+          y,
+          radius,
+          damage,
+          angle,
+          arc,
+          impulse: spec.impulse * (stats?.force ?? 1),
+          torque: spec.torque,
+          material: spec.material * (stats?.shatter ?? 1),
+          team: spec.team,
+        }),
       );
+    }
   }
   /** Agent/QA strike on one prop: the attack path's material damage, rewards and feedback. */
   strikeProp(sim: Simulation, owner: string, id: string, damage: number, angle = 0): PropHit[] {
@@ -833,7 +904,8 @@ export class Adventure {
     for (const hit of hits) {
       const color = MATERIALS[hit.material].colors[1];
       if (hit.broken) {
-        if (hit.broken.reward > 0) {
+        // Scenery rewards go to the party only for a hero's own destruction.
+        if (hit.broken.reward > 0 && Object.hasOwn(s.heroes, owner)) {
           s.drops.push({
             id: s.nextId++,
             x: hit.x,
@@ -866,6 +938,130 @@ export class Adventure {
           Math.round(hit.damage * 10) / 10,
           angle,
           color,
+        );
+    }
+  }
+  /**
+   * M06 projectile-world collision. Enemy shots treat props and rooted terrain as cover; a
+   * Thornlance pierces soft scenery (wood costs a pierce, fragile material none) and stops on
+   * hard scenery unless it has ricochets left. Off in a region: base target hits only.
+   */
+  private projectileScenery(sim: Simulation, projectile: Projectile): boolean {
+    const physical = sim.physical!,
+      spec = projectile.enemy ? ATTACKS.shot : ATTACKS.lance;
+    if (!physical.policyAt(sim, projectile.px, projectile.py).effective.projectileWorld)
+      return false;
+    projectile.scenery ??= [];
+    const hero = Object.hasOwn(this.state.heroes, projectile.owner),
+      stats = hero ? this.stats(projectile.owner, sim.tick) : null;
+    let sx = projectile.px,
+      sy = projectile.py;
+    for (let n = 0; n < 6; n++) {
+      const dx = projectile.x - sx,
+        dy = projectile.y - sy;
+      if (Math.hypot(dx, dy) < 0.01) return false;
+      const hit = physical.sceneryHit(sx, sy, dx, dy, projectile.radius, projectile.scenery);
+      if (!hit) return false;
+      const hx = sx + dx * hit.fraction,
+        hy = sy + dy * hit.fraction,
+        heading = Math.atan2(projectile.vy, projectile.vx);
+      projectile.scenery.push(hit.id);
+      if (projectile.scenery.length > 64) projectile.scenery.shift();
+      if (hit.role === "prop")
+        this.propEffects(
+          sim,
+          projectile.owner,
+          heading,
+          physical.damageProps(sim, {
+            owner: projectile.owner,
+            cause: spec.kind,
+            x: hx,
+            y: hy,
+            radius: 64, // `only` names the struck prop; the contact point lies on its surface.
+            damage: projectile.damage,
+            angle: heading,
+            only: hit.id,
+            impulse: spec.impulse * (stats?.force ?? 1),
+            torque: spec.torque,
+            material: spec.material * (stats?.shatter ?? 1),
+            team: spec.team,
+          }),
+        );
+      const material = hit.material ?? "stone",
+        hard =
+          hit.role === "terrain" ||
+          hit.family === "stump" ||
+          (HARD_MATERIALS as readonly string[]).includes(material);
+      if (spec.scenery === "cover" || (hard && !(projectile.ricochet ?? 0))) {
+        projectile.x = hx;
+        projectile.y = hy;
+        this.emit(sim, "impact", hx, hy, projectile.owner, `${material}:cover`, 0, heading);
+        return true;
+      }
+      if (hard) {
+        // Reflect about the scenery's outward normal and continue with the remaining travel.
+        projectile.ricochet = (projectile.ricochet ?? 0) - 1;
+        const dot = projectile.vx * hit.nx + projectile.vy * hit.ny,
+          remaining = (1 - hit.fraction) / 60;
+        projectile.vx -= 2 * dot * hit.nx;
+        projectile.vy -= 2 * dot * hit.ny;
+        sx = hx + hit.nx;
+        sy = hy + hit.ny;
+        projectile.x = sx + projectile.vx * remaining;
+        projectile.y = sy + projectile.vy * remaining;
+        projectile.hit = [];
+        this.emit(sim, "impact", hx, hy, projectile.owner, `${material}:deflect`, 0, heading);
+        continue;
+      }
+      if (material === "wood" && hit.family !== "debris" && --projectile.pierce < 0) {
+        projectile.x = hx;
+        projectile.y = hy;
+        return true;
+      }
+      sx = hx;
+      sy = hy;
+    }
+    return false;
+  }
+  /** Launched-prop impacts: damage through the ordinary hit path with the recorded owner. */
+  private applyImpacts(sim: Simulation, impacts: PendingImpact[]): void {
+    for (const impact of impacts) {
+      if (impact.target.startsWith("enemy-")) {
+        const e = this.state.enemies.find((en) => enemyBodyId(en.id) === impact.target);
+        if (!e || e.hp <= 0 || impact.team === "enemy") continue;
+        const owner = Object.hasOwn(this.state.heroes, impact.owner) ? impact.owner : "";
+        this.emit(
+          sim,
+          "impact",
+          impact.x,
+          impact.y,
+          owner,
+          "impact:hit",
+          impact.damage,
+          impact.angle,
+        );
+        this.hit(sim, e, impact.damage, owner, impact.x, impact.y, true);
+      } else if (impact.target.startsWith("player-")) {
+        const p = sim.players.get(impact.target.slice(7));
+        if (p && impact.team === "enemy")
+          this.damageHero(sim, p, impact.damage * 0.6, impact.x, impact.y);
+      } else if (sim.physical?.world.has(impact.target))
+        this.propEffects(
+          sim,
+          impact.owner,
+          impact.angle,
+          sim.physical.damageProps(sim, {
+            owner: impact.owner,
+            cause: "impact",
+            x: impact.x,
+            y: impact.y,
+            radius: 64,
+            damage: impact.damage,
+            angle: impact.angle,
+            only: impact.target,
+            impulse: 0,
+            team: impact.team,
+          }),
         );
     }
   }
@@ -950,6 +1146,11 @@ export class Adventure {
     e.vx = e.vy = 0;
     if (e.counted) s.kills++;
     s.totalKills++;
+    if (!owner && !e.boss) {
+      // An unowned rolling object (M06) ends the fight but invents no hero credit or rewards.
+      this.emit(sim, "kill", e.x, e.y, "", "environment", 1);
+      return;
+    }
     const h = Object.hasOwn(s.heroes, owner) ? s.heroes[owner] : null,
       stats = h ? this.stats(owner, sim.tick) : null;
     if (h) h.kills++;
@@ -1164,6 +1365,7 @@ export class Adventure {
     enemy: boolean,
     ttl = 160,
     pierce = 0,
+    ricochet = 0,
   ): void {
     if (this.state.projectiles.length >= 180) return;
     this.state.projectiles.push({
@@ -1182,6 +1384,8 @@ export class Adventure {
       pierce,
       hit: [],
       theme: this.state.recipe.theme,
+      ricochet,
+      scenery: [],
     });
   }
   private enemyAttack(sim: Simulation, e: Enemy, target: Player): void {
@@ -1346,6 +1550,8 @@ export class Adventure {
   step(sim: Simulation): void {
     const s = this.state,
       tick = sim.tick;
+    // Contacts collected by the previous solve become damage at this command boundary.
+    if (sim.physical) this.applyImpacts(sim, sim.physical.combat.takeImpacts());
     for (const p of sim.players.values()) {
       const h = this.hero(p.id),
         stats = this.stats(p.id, tick);
@@ -1406,7 +1612,8 @@ export class Adventure {
               effect.owner,
               false,
               54,
-              5,
+              ATTACKS.lance.pierce,
+              Object.hasOwn(s.heroes, effect.owner) ? this.stats(effect.owner, tick).ricochet : 0,
             );
           else
             this.damageArea(
@@ -1473,6 +1680,28 @@ export class Adventure {
       } else if (e.phase === "charge") {
         intentX = Math.cos(e.facing) * (e.boss ? 280 : 240);
         intentY = Math.sin(e.facing) * (e.boss ? 280 : 240);
+        // A charge ploughs props ahead of it once each; they then belong to this enemy.
+        if (sim.physical)
+          this.propEffects(
+            sim,
+            `enemy-${e.id}`,
+            e.facing,
+            sim.physical.damageProps(sim, {
+              owner: `enemy-${e.id}`,
+              cause: "charge",
+              x: e.x + Math.cos(e.facing) * e.radius,
+              y: e.y + Math.sin(e.facing) * e.radius,
+              radius: e.radius + 8,
+              damage: e.damage,
+              angle: e.facing,
+              arc: 1.3,
+              impulse: ATTACKS.charge.impulse,
+              torque: ATTACKS.charge.torque,
+              material: ATTACKS.charge.material,
+              team: "enemy",
+              once: `charge-${e.id}-${e.attacks}`,
+            }),
+          );
         for (const p of sim.players.values())
           if (Math.hypot(e.x - p.x, e.y - p.y) < e.radius + 10)
             this.damageHero(sim, p, e.damage * 1.3, e.x, e.y);
@@ -1546,6 +1775,7 @@ export class Adventure {
       projectile.x += projectile.vx / 60;
       projectile.y += projectile.vy / 60;
       projectile.ttl--;
+      if (sim.physical && this.projectileScenery(sim, projectile)) projectile.ttl = 0;
       if (projectile.enemy) {
         for (const p of sim.players.values())
           if (Math.hypot(p.x - projectile.x, p.y - projectile.y) < 12) {

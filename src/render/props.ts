@@ -83,7 +83,7 @@ export class PropRenderer {
     if (this.seen.size > 1024)
       for (const [id, entry] of this.seen) if (this.frame - entry.frame > 300) this.seen.delete(id);
   }
-  draw(ctx: Ctx, prop: BodyPose, time: number, tick: number): void {
+  draw(ctx: Ctx, prop: BodyPose, time: number, tick: number, held = false): void {
     const blueprint = prop.blueprint,
       family = blueprint?.family ?? (prop.shape.kind === "circle" ? "wheel" : "crate"),
       material = prop.material ?? FAMILIES[family].material,
@@ -117,6 +117,15 @@ export class PropRenderer {
       ctx.rotate(prop.angle);
       this.body(ctx, look);
       this.damage(ctx, look);
+    }
+    if (held) {
+      // A held prop glows so its holder and the party can read the grab at a glance.
+      ctx.globalAlpha = fade * (0.55 + Math.sin(time * 8) * 0.2);
+      ctx.strokeStyle = "#f2e2a6";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(0, 0, extent(prop) + 4, 0, Math.PI * 2);
+      ctx.stroke();
     }
     if (prop.frozen) {
       ctx.globalAlpha = fade * 0.35;

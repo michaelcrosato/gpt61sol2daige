@@ -5,6 +5,7 @@ import { validateBlueprint } from "./blueprints.ts";
 import { rapier } from "./bootstrap.ts";
 import {
   compareIds,
+  POLICY_DEFAULTS,
   type PolicyCheckpoint,
   PolicyController,
   type PolicyTransaction,
@@ -129,9 +130,16 @@ const collisionGroups = (entry: BodyEntry) => {
   if (entry.recipe.actorKind) return actorGroups(entry);
   const role = bodyRole(entry.recipe);
   const membership = role === "terrain" ? 1 : role === "prop" ? 2 : 4;
+  // Props always meet terrain, props and physical loot (M06); actors only through prop blocking.
   const filter =
     role === "prop"
-      ? 3 | (entry.policy?.effective.propBlocking ? ACTORS : 0)
+      ? 3 |
+        INTERACTION_GROUPS.loot |
+        (entry.policy?.effective.propBlocking
+          ? entry.held
+            ? ACTORS & ~INTERACTION_GROUPS.player
+            : ACTORS
+          : 0)
       : role === "actor"
         ? 1 |
           (entry.policy?.effective.crowdContacts ? 4 : 0) |
@@ -140,7 +148,7 @@ const collisionGroups = (entry: BodyEntry) => {
   return (membership << 16) | filter;
 };
 
-// Independent membership bits, reserved now for the later loot/sensor systems.
+// Independent membership bits. Loot (M06) meets terrain and props only; sensors stay reserved.
 export const INTERACTION_GROUPS = {
   terrain: 1,
   prop: 2,
@@ -155,9 +163,9 @@ export const INTERACTION_GROUPS = {
 const ACTORS = 4 | 8 | 16 | 32 | 64;
 function actorGroups(entry: BodyEntry): number {
   const member = INTERACTION_GROUPS[entry.recipe.actorKind!];
+  if (entry.recipe.actorKind === "loot") return (member << 16) | 1 | 2;
   const optional = entry.policy!.effective;
   const actors = optional.crowdContacts && !entry.motor?.phaseActors ? ACTORS : 0;
-  // Loot and sensors are reserved interaction roles, not delivered physical loot.
   const filter = 1 | (optional.propBlocking ? 2 : 0) | actors;
   return (member << 16) | filter;
 }
@@ -172,6 +180,8 @@ export class PhysicsWorld {
   tick = 0;
   contacts = 0;
   events: ContactEvent[] = [];
+  /** Contacts that started during the most recent step, complete and in stable order. */
+  stepStarted: ContactEvent[] = [];
   private policies = new PolicyController();
   readonly scene: "lab" | "adventure";
 
@@ -305,6 +315,89 @@ export class PhysicsWorld {
       entry.recipe.areaId = areaId;
       entry.policy = undefined;
     }
+  }
+  /** Solved motion read straight from Rapier, without building a pose. */
+  motionOf(id: string) {
+    const entry = this.registry.get(id);
+    if (!entry) throw new Error(`Unknown physics body: ${id}`);
+    const body = this.body(id),
+      p = body.translation(),
+      v = body.linvel();
+    return {
+      x: p.x * UNITS,
+      y: p.y * UNITS,
+      vx: v.x * UNITS,
+      vy: v.y * UNITS,
+      angularVelocity: body.angvel(),
+      mass: entry.recipe.mass ?? 1,
+      dynamic: body.isDynamic(),
+      frozen: entry.frozen ?? false,
+    };
+  }
+  /** The body's applied policy, read-only and shared; copy before keeping it. */
+  policyOf(id: string): ResolvedPolicy {
+    const entry = this.registry.get(id);
+    if (!entry) throw new Error(`Unknown physics body: ${id}`);
+    return entry.policy!;
+  }
+  /** A held prop passes through travelers so it cannot shove its own holder around. */
+  setHeld(id: string, held: boolean): void {
+    const entry = this.registry.get(id);
+    if (!entry || bodyRole(entry.recipe) !== "prop") throw new Error("Only props can be held");
+    if (held) entry.held = true;
+    else delete entry.held;
+    this.world.getCollider(entry.collider).setCollisionGroups(collisionGroups(entry));
+  }
+  /** Adds spin to a loose prop, scaled like impulses; frozen or fixed bodies ignore it. */
+  spin(id: string, angularVelocity: number): void {
+    finite(angularVelocity, "spin", 200);
+    const entry = this.registry.get(id),
+      body = this.body(id);
+    if (!entry || bodyRole(entry.recipe) !== "prop" || !body.isDynamic()) return;
+    if (!entry.policy!.effective.dynamicProps) return;
+    body.setAngvel(body.angvel() + angularVelocity * entry.policy!.effective.impulseStrength, true);
+  }
+  /**
+   * First scenery collider a circle meets moving from (x, y) by (dx, dy): props and terrain the
+   * caller accepts. Returns the hit fraction and the scenery's outward contact normal.
+   */
+  castScenery(
+    x: number,
+    y: number,
+    dx: number,
+    dy: number,
+    radius: number,
+    accept: (id: string, role: "prop" | "terrain") => boolean,
+  ): { id: string; fraction: number; nx: number; ny: number } | null {
+    const api = rapier(),
+      length = Math.hypot(dx, dy);
+    let best: { id: string; fraction: number; nx: number; ny: number } | null = null;
+    this.world.propagateModifiedBodyPositionsToColliders();
+    for (const entry of this.entries()) {
+      const role = bodyRole(entry.recipe);
+      if ((role !== "prop" && role !== "terrain") || !accept(entry.recipe.id, role)) continue;
+      const collider = this.world.getCollider(entry.collider),
+        p = collider.translation();
+      if (Math.hypot(p.x * UNITS - x, p.y * UNITS - y) > length + radius + 64) continue;
+      const cast = collider.castShape(
+        { x: 0, y: 0 },
+        new api.Ball(radius / UNITS),
+        { x: x / UNITS, y: y / UNITS },
+        0,
+        { x: dx / UNITS, y: dy / UNITS },
+        0,
+        1,
+        true,
+      );
+      if (cast && (!best || cast.time_of_impact < best.fraction))
+        best = {
+          id: entry.recipe.id,
+          fraction: cast.time_of_impact,
+          nx: cast.normal1.x,
+          ny: cast.normal1.y,
+        };
+    }
+    return best;
   }
   obstacleFraction(id: string, dx: number, dy: number, radius: number): number {
     const entry = this.registry.get(id)!,
@@ -478,12 +571,18 @@ export class PhysicsWorld {
         entry.motor.externalY = Math.fround(velocity.y * UNITS - entry.motor.y);
       }
     this.tick++;
-    this.queue.drainCollisionEvents((a, b, started) => {
+    const started: ContactEvent[] = [];
+    this.queue.drainCollisionEvents((a, b, begun) => {
       const ids = [this.colliderIds.get(a), this.colliderIds.get(b)].sort();
       if (!ids[0] || !ids[1]) return; // Removed colliders may emit their final stopped event.
-      if (started) this.contacts++;
-      this.events.push({ tick: this.tick, a: ids[0], b: ids[1], started });
+      const event = { tick: this.tick, a: ids[0], b: ids[1], started: begun };
+      if (begun) {
+        this.contacts++;
+        started.push(event);
+      }
+      this.events.push(event);
     });
+    this.stepStarted = started.sort((x, y) => compareIds(x.a, y.a) || compareIds(x.b, y.b));
     // Stable ordering for observations and later reaction rules.
     this.events.sort(
       (a, b) =>
@@ -736,7 +835,7 @@ export class PhysicsWorld {
     if (this.scene === "lab" && bytes.length > MAX_SNAPSHOT_BYTES)
       throw new Error("Playground checkpoint exceeds its 4 MB binary bound");
     return {
-      version: 5,
+      version: 6,
       scene: this.scene,
       backend: RAPIER_VERSION,
       continuation: portable ? "rebuild" : "snapshot",
@@ -756,9 +855,13 @@ export class PhysicsWorld {
   static restore(snapshot: PhysicsSnapshot): PhysicsWorld {
     snapshot = upgradePolicySamples(snapshot);
     validatePhysicsSnapshot(snapshot);
+    // World v6 (M06) changed prop collision filters for loot; older raw bytes carry the old
+    // filters, so their semantic state is rebuilt exactly like an incompatible backend.
     if (
       snapshot.version >= 4 &&
-      (snapshot.backend !== RAPIER_VERSION || snapshot.continuation === "rebuild")
+      (snapshot.backend !== RAPIER_VERSION ||
+        snapshot.continuation === "rebuild" ||
+        snapshot.version < 6)
     )
       return PhysicsWorld.rebuild(snapshot);
     // M02 version-2 saves predate the new registered controls. Import their applied samples
@@ -984,27 +1087,33 @@ export class PhysicsWorld {
   }
 }
 
-const M05_POLICY_FIELDS = ["destruction", "materialDurability", "debrisLifetime"] as const;
-/** M03/M04 checkpoints predate M05's registered fields. Recompute each applied sample and
- * prove every older field is unchanged before accepting the added defaults. */
+/** Older checkpoints predate later registered fields (M05 destruction, M06 combat). Recompute
+ * each applied sample and prove every field it did record is unchanged before accepting the
+ * added defaults. */
 export function upgradePolicySamples(snapshot: PhysicsSnapshot): PhysicsSnapshot {
+  const missing = (values: object) =>
+    (Object.keys(POLICY_DEFAULTS) as (keyof typeof POLICY_DEFAULTS)[]).filter(
+      (key) => !(key in values),
+    );
   if (
     !snapshot ||
-    (snapshot.version !== 3 && snapshot.version !== 4) ||
+    ![3, 4, 5].includes(snapshot.version) ||
     !Array.isArray(snapshot.bodies) ||
-    !snapshot.bodies.some((b) => b?.policy?.values && !("destruction" in b.policy.values))
+    !snapshot.bodies.some((b) => b?.policy?.values && missing(b.policy.values).length)
   )
     return snapshot;
   const upgraded = structuredClone(snapshot),
     controller = new PolicyController(upgraded.policies);
   for (const entry of upgraded.bodies) {
     const saved = entry?.policy;
-    if (!saved || !entry.policySample || "destruction" in saved.values) continue;
+    if (!saved || !entry.policySample) continue;
+    const absent = missing(saved.values);
+    if (!absent.length) continue;
     const resolved = structuredClone(
       controller.resolve(saved.areaId, entry.policySample.x, entry.policySample.y, saved.regions),
     );
     const legacy = structuredClone(resolved);
-    for (const key of M05_POLICY_FIELDS) {
+    for (const key of absent) {
       delete (legacy.values as Partial<typeof legacy.values>)[key];
       delete (legacy.effective as Partial<typeof legacy.effective>)[key];
       delete (legacy.provenance as Partial<typeof legacy.provenance>)[key];
@@ -1020,7 +1129,7 @@ export function validatePhysicsSnapshot(snapshot: PhysicsSnapshot): void {
   snapshot = upgradePolicySamples(snapshot);
   if (
     !snapshot ||
-    ![1, 2, 3, 4, 5].includes(snapshot.version) ||
+    ![1, 2, 3, 4, 5, 6].includes(snapshot.version) ||
     (snapshot.version === 3 && snapshot.scene !== "adventure") ||
     (snapshot.version < 3 && snapshot.scene !== undefined) ||
     (snapshot.version >= 4 && !["adventure", "lab"].includes(snapshot.scene!)) ||
@@ -1061,6 +1170,11 @@ export function validatePhysicsSnapshot(snapshot: PhysicsSnapshot): void {
       !entry.motor
     )
       throw new Error("Missing saved actor motor");
+    if (
+      entry.held !== undefined &&
+      (entry.held !== true || bodyRole(entry.recipe) !== "prop" || snapshot.version < 6)
+    )
+      throw new Error("Invalid held prop flag");
     if (
       snapshot.version >= 2 &&
       (typeof entry.frozen !== "boolean" ||

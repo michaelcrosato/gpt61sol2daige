@@ -1,4 +1,5 @@
 import { ARCHETYPES, type AreaRecipe, areaRecipe, MECHANICS, THEMES } from "../game/content.ts";
+import { attackExport } from "../game/interactions.ts";
 import { SKILLS } from "../game/skills.ts";
 import type { AdventureAction } from "../game/types.ts";
 import { adventureAreaAt } from "../physics/adventure.ts";
@@ -37,15 +38,17 @@ export const COMMANDS = {
   },
   actors: {
     action:
-      "inspect (default), body, props, recipes, damage, configure, apply, policy, impulse, place, spawn",
+      "inspect (default), body, props, recipes, attacks, damage, configure, apply, policy, impulse, place, spawn",
     description:
       "Host/solo adventure physical world; guests inspect received bodies, props, destroyed records and policies. Shared tuning and damage are host-only.",
     values:
-      "worldReactions, dynamicProps, propBlocking, crowdContacts, ambientPhysics, sweptCollision, destruction: booleans; impulseStrength: 0..10; materialDurability: 0.05..20 (x toughness); debrisLifetime: 0..3600 s (0 = scene lifetime)",
+      "worldReactions, dynamicProps, propBlocking, crowdContacts, ambientPhysics, sweptCollision, destruction, impactDamage, projectileWorld, physicalLoot: booleans; impulseStrength, impactStrength: 0..10; materialDurability: 0.05..20 (x toughness); debrisLifetime: 0..3600 s (0 = scene lifetime)",
     id: "body/impulse/place/damage: player-<player id>, enemy-<id>, ambient-<slot>-<generation>, crate-<area>-<ordinal>, wheel-<area>, prop-<family>-<area>-<n>, <parent id>-<piece>",
     props:
       "props: every scenery body with material, blueprint {family, palette, piece?, parent?, expiresAt?} and durability %, plus destroyed-parent records",
     recipes: "recipes: reproducible material/blueprint/fracture/layout export",
+    attacks:
+      "attacks: the shared attack interaction spec (impulse, torque, material, cover/pierce/ricochet, impact and ownership rules)",
     damage:
       "damage: id, damage 0..10000, optional angle; the attack path's material resistance, stages, fracture, one-time reward and feedback",
     body: "spawn: prop BodyRecipe with id prefixed prop- and a current areaId; optional material+blueprint",
@@ -56,7 +59,7 @@ export const COMMANDS = {
   },
   adventure: {
     action:
-      "A game action: depart, advance, return, rest, respawn, skill, equip, buy, sell, sell-spares, respec, tuning or new-run",
+      "A game action: depart, advance, return, rest, respawn, skill, equip, buy, sell, sell-spares, respec, tuning, new-run, grab {id} (a loose prop within 72 units, mass up to 8) or release {throw: boolean} (throw along the traveler's aim)",
     description: "Omit action to observe the run and local build",
   },
   encounter: {
@@ -177,6 +180,7 @@ export class AgentRuntime {
           if (action === "props")
             return { props: this.sim.physicalProps(), destroyed: snapshot.destroyed ?? [] };
           if (action === "recipes") return blueprintExport();
+          if (action === "attacks") return attackExport();
           if (action === "body") {
             const entry = snapshot.world.bodies.find((b) => b.recipe.id === command.id);
             if (!entry) throw new Error("Unknown physical body");
@@ -199,6 +203,7 @@ export class AgentRuntime {
         if (action === "props")
           return { props: physical.props(), destroyed: physical.destroyedRecords() };
         if (action === "recipes") return blueprintExport();
+        if (action === "attacks") return attackExport();
         if (action === "body") {
           if (typeof command.id !== "string") throw new Error("Body id required");
           return world.pose(command.id);

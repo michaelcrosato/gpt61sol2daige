@@ -60,6 +60,12 @@ const AFFIXES: { stat: StatId; base: number }[] = [
   { stat: "burn", base: 0.06 },
   { stat: "critPower", base: 0.08 },
 ];
+/** Physical modifiers: harder shoves, stronger shattering, Thornlance ricochets (weapons). */
+const PHYSICAL_AFFIXES: { stat: StatId; base: number }[] = [
+  { stat: "force", base: 0.08 },
+  { stat: "shatter", base: 0.1 },
+  { stat: "ricochet", base: 1 },
+];
 export function rollItem(
   seed: number,
   ordinal: number,
@@ -88,6 +94,23 @@ export function rollItem(
       value:
         Math.round(affix.base * strength * (0.85 + random(ordinal, i + 50, seed) * 0.5) * 1000) /
         1000,
+    });
+  }
+  // M06 physical affix, appended so existing rolls keep their affixes, names and values.
+  if (rarityIndex >= 1 && hash(ordinal, 120, seed) % 3 === 0) {
+    const kind = PHYSICAL_AFFIXES[hash(ordinal, 121, seed) % PHYSICAL_AFFIXES.length];
+    const stat = kind.stat === "ricochet" && gearSlot !== "weapon" ? "force" : kind.stat;
+    affixes.push({
+      stat,
+      value:
+        stat === "ricochet"
+          ? 1
+          : Math.round(
+              PHYSICAL_AFFIXES.find((a) => a.stat === stat)!.base *
+                strength *
+                (0.85 + random(ordinal, 122, seed) * 0.5) *
+                1000,
+            ) / 1000,
     });
   }
   const power = Math.round(

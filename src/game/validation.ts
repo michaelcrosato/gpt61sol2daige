@@ -288,6 +288,14 @@ export function validateAdventure(s: AdventureState): void {
       p.hit.every((v) => integer(v)),
       "hit ids",
     );
+    check(p.ricochet === undefined || integer(p.ricochet, 0, 16), "projectile ricochet");
+    if (p.scenery !== undefined) {
+      list(p.scenery, 64);
+      check(
+        p.scenery.every((v) => text(v, 160)),
+        "projectile scenery",
+      );
+    }
   }
   list(s.mechanics, 32);
   for (const m of s.mechanics)
@@ -347,6 +355,7 @@ export function validateAdventure(s: AdventureState): void {
           "boss",
           "impact",
           "break",
+          "grab",
         ].includes(e.type),
       "event",
     );

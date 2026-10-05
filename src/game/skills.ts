@@ -16,7 +16,10 @@ export type StatId =
   | "burn"
   | "chain"
   | "execute"
-  | "spirit";
+  | "spirit"
+  | "force"
+  | "shatter"
+  | "ricochet";
 export type PathId = "blade" | "ember" | "root" | "gale";
 export interface SkillNode {
   id: string;
@@ -30,8 +33,16 @@ export interface SkillNode {
   value: number;
   unlock?: "lance" | "nova";
   power?: "cleave" | "inferno" | "bloom" | "thunder";
+  /** M06: a physical side effect carried by an existing node, per rank. */
+  physical?: { stat: "force" | "shatter" | "ricochet"; value: number };
   requires: string | null;
 }
+/** M06 physical modifiers ride on existing nodes; the 48-node tree is unchanged in shape. */
+const PHYSICAL: Record<string, NonNullable<SkillNode["physical"]>> = {
+  "blade-6": { stat: "shatter", value: 0.15 },
+  "root-7": { stat: "force", value: 0.2 },
+  "gale-4": { stat: "ricochet", value: 1 },
+};
 export const PATHS = [
   {
     id: "blade",
@@ -76,7 +87,12 @@ const definitions: Record<PathId, SeedNode[]> = {
       0.04,
       "Slashes execute enemies below an additional 4% health per rank.",
     ],
-    ["Edgecraft", "damage", 0.11, "+11% attack damage per rank."],
+    [
+      "Edgecraft",
+      "damage",
+      0.11,
+      "+11% attack damage and +15% shatter strength against scenery per rank.",
+    ],
     ["Red Harvest", "leech", 0.8, "Recover 0.8 life per enemy hit, per rank."],
     ["Spoils of War", "gold", 0.1, "+10% gold from kills per rank."],
     ["Endless Cleave", "reach", 8, "Keystone: the third combo hit becomes a full-circle cleave."],
@@ -110,7 +126,7 @@ const definitions: Record<PathId, SeedNode[]> = {
     ["Steady Hands", "crit", 0.02, "+2% critical chance per rank."],
     ["Patient Hunter", "xp", 0.08, "+8% experience per rank."],
     ["Old Growth", "life", 25, "+25 maximum life per rank."],
-    ["Ironwood", "armor", 14, "+14 armor per rank."],
+    ["Ironwood", "armor", 14, "+14 armor and +20% physical force per rank."],
     ["Rootwell", "spirit", 2, "+2 spirit regeneration per second, per rank."],
     [
       "Living Bastion",
@@ -126,7 +142,12 @@ const definitions: Record<PathId, SeedNode[]> = {
     ["Quickening", "haste", 0.06, "+6% attack speed per rank."],
     ["Clear Skies", "spirit", 2, "+2 spirit regeneration per second, per rank."],
     ["Thornlance", "damage", 0.05, "Unlock Thornlance (R / 3): a fast piercing projectile."],
-    ["Static Charge", "chain", 0.15, "Hits have +15% chance per rank to arc to a second enemy."],
+    [
+      "Static Charge",
+      "chain",
+      0.15,
+      "Hits have +15% chance per rank to arc to a second enemy; Thornlance ricochets once more off hard scenery per rank.",
+    ],
     ["Tailwind", "cooldown", 0.05, "Abilities recover 5% faster per rank."],
     ["Lightning Steps", "speed", 0.06, "+6% movement speed per rank."],
     ["Fortune's Favor", "luck", 0.05, "+5% chance per rank to improve loot rarity."],
@@ -157,6 +178,7 @@ export const SKILLS: SkillNode[] = PATHS.flatMap((path) =>
           : path.id === "ember" && index === 3
             ? "nova"
             : undefined,
+      ...(PHYSICAL[`${path.id}-${index}`] ? { physical: PHYSICAL[`${path.id}-${index}`] } : {}),
       power:
         index === 9
           ? ({ blade: "cleave", ember: "inferno", root: "bloom", gale: "thunder" } as const)[
@@ -206,6 +228,9 @@ export const STAT_LABELS: Record<StatId, string> = {
   chain: "chain chance",
   execute: "execute threshold",
   spirit: "spirit / second",
+  force: "physical force",
+  shatter: "shatter strength",
+  ricochet: "Thornlance ricochet",
 };
 export const PERCENT_STATS: readonly StatId[] = [
   "damage",
@@ -220,4 +245,6 @@ export const PERCENT_STATS: readonly StatId[] = [
   "burn",
   "chain",
   "execute",
+  "force",
+  "shatter",
 ];

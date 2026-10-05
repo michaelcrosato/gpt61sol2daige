@@ -58,6 +58,10 @@ export class Renderer {
   drawDistance = 4096;
   entityLimit = 8192;
   waypoint: { x: number; y: number } | null = null;
+  /** Local prompt for the grab interaction (presentation only). */
+  grabHint: { x: number; y: number; text: string } | null = null;
+  /** Prop the local traveler holds, outlined in the world. */
+  heldProp: string | null = null;
   metrics = { drawn: 0, candidates: 0, limited: 0, renderMs: 0, terrainCanvases: 0, lod: "detail" };
   private readonly visible = new EntityVisibility(MAX_NPCS);
   private readonly terrainCache = new Map<string, HTMLCanvasElement>();
@@ -443,6 +447,12 @@ export class Renderer {
         player: p,
       });
     this.props.beginFrame();
+    const held = new Set(
+      (sim.physical
+        ? sim.physical.combat.holdList()
+        : (sim.replicaPhysics?.combat?.holds ?? [])
+      ).map((hold) => hold.id),
+    );
     for (const prop of sim.physicalProps(alpha))
       if (prop.x > left - 40 && prop.x < right + 40 && prop.y > top - 40 && prop.y < bottom + 70)
         items.push({ kind: "physical", x: prop.x, y: prop.y, type: 0, variant: 0, physical: prop });
@@ -450,7 +460,8 @@ export class Renderer {
     const frame = Math.floor(time * 9);
     for (const item of items) {
       if (item.kind === "decor") this.drawDecor(item, player, time);
-      else if (item.kind === "physical") this.props.draw(ctx, item.physical!, time, sim.tick);
+      else if (item.kind === "physical")
+        this.props.draw(ctx, item.physical!, time, sim.tick, held.has(item.physical!.id));
       else if (item.kind === "adventure")
         this.combat.actor(ctx, item.adventure!, sim, alpha, time, this.zoom);
       else if (item.kind === "landmark") this.drawLandmark(item, sim, time);
@@ -513,6 +524,16 @@ export class Renderer {
       }
     }
     this.combat.effects(ctx, sim, localId, this.zoom);
+    if (this.grabHint && this.zoom > 0.8) {
+      const { x, y, text } = this.grabHint;
+      ctx.font = "7px monospace";
+      ctx.textAlign = "center";
+      const width = ctx.measureText(text).width + 12;
+      ctx.fillStyle = "#182a21e8";
+      ctx.fillRect(x - width / 2, y - 40, width, 14);
+      ctx.fillStyle = "#e8dcae";
+      ctx.fillText(text, x, y - 30);
+    }
     for (const event of sim.events) {
       const age = (sim.tick - event.tick) / 60;
       if (event.type === "pulse" && age < 0.65) {

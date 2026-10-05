@@ -3,6 +3,7 @@ import { MAX_NPCS } from "../engine/limits.ts";
 export const icon = (name: string, size = 18): string => {
   const paths: Record<string, string> = {
     arrow: '<path d="M5 12h14M13 6l6 6-6 6"/>',
+    hand: '<path d="M8 13V6.5a1.5 1.5 0 0 1 3 0V11m0-5.5a1.5 1.5 0 0 1 3 0V11m0-4a1.5 1.5 0 0 1 3 0v6c0 4-2.6 7-6.2 7-2.6 0-4.4-1.6-5.7-3.8L3.3 13a1.5 1.5 0 0 1 2.4-1.8L8 13.5"/>',
     diagonal: '<path d="M6 18 18 6M6 6h12v12"/>',
     compass: '<circle cx="12" cy="12" r="9"/><path d="m16 8-3 5-5 3 3-5 5-3Z"/>',
     leaf: '<path d="M5 20 18 4M8 16C1 16 2 9 8 11l3 3m2-6C7 8 8 2 13 4l3 2m-2 8c1-6 8-6 7-2s-5 5-10 5"/>',

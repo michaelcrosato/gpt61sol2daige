@@ -53,6 +53,8 @@ export interface BodyEntry {
   frozen?: boolean;
   reactivationBlocked?: boolean;
   drive?: { x: number; y: number };
+  /** M06: a prop held by a traveler passes through travelers (it still meets monsters). */
+  held?: boolean;
   motor?: MotorState;
   state?: BodyPose;
 }
@@ -75,7 +77,7 @@ export interface ContactEvent {
   started: boolean;
 }
 export interface PhysicsSnapshot {
-  version: 1 | 2 | 3 | 4 | 5;
+  version: 1 | 2 | 3 | 4 | 5 | 6;
   scene?: "adventure" | "lab";
   backend: string;
   continuation?: "snapshot" | "rebuild";
