@@ -162,4 +162,6 @@ On 2026-10-05, `npm run check` passed **86 headless tests**, `npm run build` pro
 | Readable silhouettes and recipe export | [Verdant](evidence/physics-m05-verdant.png), [broken](evidence/physics-m05-broken.png), [Cinderwild](evidence/physics-m05-cinderwild.png), [Pale Orchard](evidence/physics-m05-orchard.png); `actors/recipes` is byte-identical across calls (SHA-256 in the receipt) |
 | M04 migration | Real M04 checkpoints from `main` 9bd16f0 (raw and portable, with an archived land) restore with exact legacy crate/wheel bodies and gain M05 scenery once (20 → 84 props per land) |
 
+The first full browser run exposed a regression: with 2,400 creatures the adventure loop ran at 5 FPS and its area could not clear. A pre-existing per-tick pose validation deep-cloned every body, and M05 multiplied the bodies. After the fix, the combat tick median is 16.6 ms against main's 19.5 ms and the pre-fix 32.8 ms; an idle tick takes 2.1 ms against 3.3 and 12.9 ms ([tick evidence](evidence/physics-m05-tick.json)).
+
 Scenery rewards raise route gold (area 9: 3,047 against M04's recorded 2,424; level 19 against 18); combat tuning is unchanged. These are mechanics observations, not performance claims.

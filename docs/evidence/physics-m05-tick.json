@@ -1,0 +1,20 @@
+{
+  "purpose": "Per-tick cost of the M05 scene before and after removing per-tick deep clones; informational, no FPS gate",
+  "machine": "implementation container, 4 vCPU, Node 22.22.0, Rapier 0.21.0; one run each, ordinary run-to-run variance about +/-15%",
+  "workload": {
+    "combat": "seed 142, 2,400 ambient creatures, area 1, controller attacks/pulses toward the nearest enemy, 400 ticks",
+    "idle": "seed 142, no creatures, area 1 cleared, 300 settling ticks then 200 measured ticks"
+  },
+  "results": [
+    { "build": "main 9bd16f0 (M04 + PR #9)", "bodies": 91, "combatMedianMs": 19.51, "combatP90Ms": 29.66, "idleTickMs": 3.34 },
+    { "build": "M05 before fix (4e41430)", "bodies": 367, "combatMedianMs": 32.81, "combatP90Ms": 49.74, "idleTickMs": 12.87 },
+    { "build": "M05 final", "bodies": 229, "combatMedianMs": 16.6, "combatP90Ms": 28.65, "idleTickMs": 2.09 }
+  ],
+  "diagnosis": "After every step PhysicsWorld built complete poses for every body (two structuredClone calls each) only to check finite values, and pose() deep-cloned recipes and memoized policies. M05's 84 props plus the terrain chunks they occupied multiplied that work; the browser adventure loop fell below real time (5 FPS) and its area could not clear in time.",
+  "fix": [
+    "finite-state check reads Rapier values directly",
+    "pose() copies the recipe structurally and shares frozen memoized policies (body-owned policies are still cloned)",
+    "only movable props occupy terrain chunks; fixed scenery never meets terrain colliders"
+  ],
+  "equivalence": "npm run check passes 86/86 including save/replay/state-hash tests; terrain occupancy now differs by design, so pre-fix and final hashes are not comparable"
+}

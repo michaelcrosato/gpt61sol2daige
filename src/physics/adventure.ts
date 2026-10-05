@@ -486,7 +486,9 @@ export class AdventurePhysics {
     const points = [...sim.players.values()].map((p) => ({ x: p.x, y: p.y, radius: 80 }));
     for (const e of sim.adventure.state.enemies)
       if (e.hp > 0) points.push({ x: e.x, y: e.y, radius: 80 });
-    for (const p of this.props()) points.push({ x: p.x, y: p.y, radius: 40 });
+    // Fixed scenery never meets terrain; only movable props need their surroundings solid.
+    for (const p of this.props())
+      if (p.motion === "dynamic") points.push({ x: p.x, y: p.y, radius: 40 });
     for (const sample of this.ambient.values())
       if (sample.owner === "rapier")
         points.push({ x: sim.x[sample.slot], y: sim.y[sample.slot], radius: 32 });

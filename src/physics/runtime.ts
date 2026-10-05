@@ -9,6 +9,7 @@ import {
   PolicyController,
   type PolicyTransaction,
   policyId,
+  type ResolvedPolicy,
 } from "./policies.ts";
 import {
   type BodyEntry,
@@ -91,6 +92,17 @@ export function validateBody(recipe: BodyRecipe, adventure = false): void {
   }
   validateBlueprint(recipe);
 }
+/** Recipes hold primitives plus three small records; a direct copy keeps key order and is far
+ * cheaper than structuredClone for the per-tick pose reads of every body. */
+function cloneRecipe(recipe: BodyRecipe): BodyRecipe {
+  const copy = { ...recipe, shape: { ...recipe.shape } };
+  if (recipe.consequences) copy.consequences = { ...recipe.consequences };
+  if (recipe.blueprint) copy.blueprint = { ...recipe.blueprint };
+  return copy;
+}
+/** Memoized policies are deeply frozen and shareable; others belong to a body and are copied. */
+const clonePolicy = (policy: ResolvedPolicy): ResolvedPolicy =>
+  Object.isFrozen(policy) ? policy : structuredClone(policy);
 export const bodyRole = (recipe: BodyRecipe) =>
   recipe.role ?? (recipe.motion === "fixed" ? "terrain" : "prop");
 const collisionGroups = (entry: BodyEntry) => {
@@ -209,7 +221,7 @@ export class PhysicsWorld {
       p = body.translation(),
       v = body.linvel();
     return {
-      ...structuredClone(entry.recipe),
+      ...cloneRecipe(entry.recipe),
       x: p.x * UNITS,
       y: p.y * UNITS,
       angle: body.rotation(),
@@ -220,7 +232,7 @@ export class PhysicsWorld {
       frozen: entry.frozen ?? false,
       reactivationBlocked: entry.reactivationBlocked ?? false,
       ccdEnabled: body.isCcdEnabled(),
-      policy: structuredClone(entry.policy!),
+      policy: clonePolicy(entry.policy!),
     };
   }
   motor(
@@ -461,7 +473,14 @@ export class PhysicsWorld {
         Number(a.started) - Number(b.started),
     );
     this.events = this.events.slice(-64);
-    for (const pose of this.poses()) this.validatePose(pose);
+    // Read solved values directly: building complete poses here cloned every body each tick.
+    for (const { handle } of this.registry.values()) {
+      const body = this.world.getRigidBody(handle),
+        p = body.translation(),
+        v = body.linvel();
+      for (const value of [p.x, p.y, body.rotation(), v.x, v.y, body.angvel()])
+        if (!Number.isFinite(value)) throw new Error("Nonfinite physical state");
+    }
   }
   private validatePose(pose: BodyPose): void {
     for (const value of [pose.x, pose.y, pose.angle, pose.vx, pose.vy, pose.angularVelocity])
@@ -476,7 +495,7 @@ export class PhysicsWorld {
           position = body.translation(),
           velocity = body.linvel();
         return {
-          ...structuredClone(recipe),
+          ...cloneRecipe(recipe),
           x: position.x * UNITS,
           y: position.y * UNITS,
           angle: body.rotation(),
@@ -487,7 +506,7 @@ export class PhysicsWorld {
           frozen: frozen ?? false,
           reactivationBlocked: reactivationBlocked ?? false,
           ccdEnabled: body.isCcdEnabled(),
-          policy: structuredClone(policy!),
+          policy: clonePolicy(policy!),
         };
       });
   }
