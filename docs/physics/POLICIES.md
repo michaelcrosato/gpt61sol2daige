@@ -51,6 +51,16 @@ M05 registers three more adventure values, accepted at every scope, in presets a
 
 All four are gated by world reactions, and master-off is absolute. Off never removes a pending impact's earlier effects or an earned reward. Grabbing follows `dynamicProps`: a frozen prop cannot be grabbed, and freezing a held prop ends the hold where it stands. Throws scale with `impulseStrength` like every commanded impulse. Presets: Quiet turns all three switches off; Sanctuary turns impact damage off; Wild doubles impact strength. Field forces (wind, suction) remain M08.
 
+## M07 delivered controls
+
+| Value | Meaning | Off / zero |
+| --- | --- | --- |
+| `mechanisms` (boolean, default on) | Jointed parts (gates, chains, vines, launchers, vanes, causeways) swing, pull, spring and turn. | Every connected part with at least one intact joint freezes where it stands: no motion, no motors, impulses ignored. Broken links stay broken; a part already cut free is a loose prop and keeps moving. Re-enabling wakes each part as a whole with zero velocity, or keeps it frozen (reactivation blocked) while any member overlaps something outside the part. |
+| `jointBreakage` (boolean, default on) | Strain (a part's momentum away from a joint) and cut damage from attacks can sever joints. | No new snaps and no cuts: overloads and blows are absorbed. Existing breaks are preserved. |
+| `jointStrength` (0.05–20, default 1) | Multiplies every joint's break load and cut toughness. | — (Wild uses 0.5: easier breaks.) |
+
+Both switches are gated by world reactions; master-off is absolute. A connected part resolves its policy once, at its root (the declared anchor, or the first listed member of a part cut loose), so a region boundary never leaves half a chain frozen. `mechanisms` off with `jointBreakage` on still lets a blow cut a frozen joint; the freed part starts moving when mechanisms resume. Presets: Quiet turns both off; Sanctuary turns breakage off; Wild halves joint strength. A frozen anchored causeway still carries travelers over the creek.
+
 ## Scope and precedence
 
 Resolve values in this order: engine defaults, land profile, area profile, containing named region, then applicable live debug overrides. A more specific live override wins over a broader live override; the session-wide master `worldReactions = false` is an absolute off switch. Within one specificity, use declared priority and stable region ID to break ties. Show the effective value and the source that supplied it.

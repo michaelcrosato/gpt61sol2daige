@@ -335,3 +335,26 @@ Policy values add `destruction` (boolean), `materialDurability` (0.05–20, divi
 ```
 
 Combat events add `impact` texts `impact:hit` (a launched prop struck a monster), `<material>:cover` and `<material>:deflect`, and `grab` events (`<id>`, `throw:<id>`, `drop:<id>`). An environmental kill emits `kill` with owner `""` and text `environment`. New policy values: `impactDamage`, `projectileWorld`, `physicalLoot` (booleans) and `impactStrength` (0–10). Item affixes and `HeroStats` add `force`, `shatter` and `ricochet`. Saves write adventure envelope 4 / world 6; rooms use protocol 7. See [the M06 contract](ARCHITECTURE.md#m06-combat-forces-projectiles-and-physical-loot).
+
+## M07 jointed mechanisms
+
+| Command | Fields and behavior |
+| --- | --- |
+| `{"op":"actors","action":"mechanisms"}` | The registry (kinds, joint types, strain/cut/motor/policy rules, launch speed) plus every assembly, joint (intact or broken, load, peak, damage, motor), drawable link with strain, and gate/launcher/causeway state. Works on guests (read-only). |
+| `{"op":"actors","action":"cut","id":"chain-1:anchor"}` | Cut damage to one joint (default: enough to sever) through the joint-breakage policy; returns `{damage, threshold, broken, protectedByPolicy}`. Host only. |
+| `{"op":"actors","action":"motor","id":"vane-1:pivot","motor":{"mode":"velocity","target":-2,"stiffness":0,"damping":1.5}}` | Change or stop (`null`) a hinge or slider motor; the state is saved. |
+| `{"op":"actors","action":"transport","id":"prop-chain-1-ball","dx":300,"dy":40}` | Move a member's whole connected part with its motion; refused while it is anchored to a post. |
+| `{"op":"physics","action":"assembly","recipe":{…},"joints":[…]}` | Lab: attach an assembly to spawned bodies whose recipes name it; lab `cut` and `motor` as above. |
+
+Joint ids are `<assembly>:<name>`: `gate-N:hinge`, `chain-N:anchor|link1..3|ball`, `vine-N:root|seg1..5|pod`, `launcher-N:slider|spring`, `vane-N:pivot`, `bridge-N:south|deck1..3|north`. Parts are `prop-gate-N-leaf`, `prop-chain-N-ball`, `prop-vine-N-pod`, `prop-launcher-N-sled`, `prop-vane-N-rotor` and `prop-bridge-N-plank0..3`, plus posts. `place` on a jointed member moves its part as a unit. Grabbing works on loose members (gate leaf, chain links and ball, vine, pod, sled), never planks or vanes.
+
+```json
+{"op":"encounter","index":1}
+{"op":"actors","action":"impulse","id":"prop-chain-1-ball","x":0,"y":1500}
+{"op":"step","ticks":6}
+{"op":"actors","action":"cut","id":"chain-1:anchor"}
+{"op":"step","ticks":30}
+{"op":"actors","action":"mechanisms"}
+```
+
+Mechanism changes appear as `assembly` events (`gate:latched`, `gate:closed`, `launcher:cocked`, `launcher:fired`, `bridge:span-lost`, `<kind>:<joint>:snapped|cut`) with the responsible traveler as owner. New policy values: `mechanisms`, `jointBreakage` (booleans) and `jointStrength` (0.05–20). Saves write adventure envelope 5 / world 7; rooms use protocol 8. See [the M07 contract](ARCHITECTURE.md#m07-jointed-mechanisms-and-assemblies).
