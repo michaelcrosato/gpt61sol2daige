@@ -12,6 +12,7 @@ import {
 } from "../physics/adventure.ts";
 import { rapier } from "../physics/bootstrap.ts";
 import { type LinkView, linkViews, onDeck, replicaDeckPlanks } from "../physics/mechanisms.ts";
+import { type ReactionView, reactionView } from "../physics/reactions.ts";
 import { PhysicsWorld, validatePhysicsSnapshot } from "../physics/runtime.ts";
 import type { PhysicsSnapshot } from "../physics/types.ts";
 import { MAX_NPCS } from "./limits.ts";
@@ -145,7 +146,8 @@ export class Simulation {
     this.physical = new AdventurePhysics(this);
   }
   physicalProps(alpha = 1) {
-    if (this.physical) return this.physical.props();
+    // Presentation path: read-only views, not cloned poses (agents use physical.props()).
+    if (this.physical) return this.physical.views();
     return (this.replicaPhysics?.world.bodies ?? [])
       .filter((entry) => entry.state?.role === "prop")
       .map((entry) => {
@@ -170,6 +172,12 @@ export class Simulation {
     if (!joints?.length) return [];
     const props = new Map(this.physicalProps(alpha).map((p) => [p.id, p]));
     return linkViews(joints, (id) => props.get(id));
+  }
+  /** M08 statuses, surfaces and fields from the live world or, on guests, the received scene. */
+  physicalReactions(): ReactionView {
+    return this.physical
+      ? this.physical.reactions.view()
+      : reactionView(this.replicaPhysics?.reactions);
   }
   ownsPhysicalAmbient(slot: number): boolean {
     return this.physical?.ownsAmbient(slot) ?? this.replicaAmbient.has(slot);

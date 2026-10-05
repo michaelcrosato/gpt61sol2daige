@@ -32,6 +32,14 @@ export const PROP_FAMILIES = [
   "sled",
   "vane",
   "chest",
+  // M08 reaction scenery: heat and shock sources, conductors, containers, fuse brush and fans.
+  "brazier",
+  "coil",
+  "rod",
+  "cask",
+  "jar",
+  "brush",
+  "fan",
 ] as const;
 export type PropFamily = (typeof PROP_FAMILIES)[number];
 export const PALETTES = 5;
@@ -70,7 +78,11 @@ export interface FamilyRecipe {
   reward: number;
   pieces: readonly PieceRecipe[];
   /** Gameplay role summary for inspection and documentation. */
-  solid: "gameplay solid" | "deck: travelers walk over it" | "raised: travelers pass under it";
+  solid:
+    | "gameplay solid"
+    | "deck: travelers walk over it"
+    | "raised: travelers pass under it"
+    | "low: travelers walk through it";
   /** M07: false for parts that never meet actors (deck planks, raised vanes). */
   actors?: false;
   /** M07: raised parts (vanes) meet nothing; only attacks and holds move them. */
@@ -475,6 +487,88 @@ export const FAMILIES: Record<PropFamily, FamilyRecipe> = {
     ],
     solid: "gameplay solid",
   },
+  // M08: the fixed sources never break; containers and brush do (their contents spill or burn).
+  brazier: part(
+    "Brazier",
+    ["Moss brazier", "Cinder brazier", "Driftwood brazier", "Dusk brazier", "Frost brazier"],
+    "metal",
+    circle(8),
+    1,
+    { motion: "fixed", trim: "stone" },
+  ),
+  coil: part(
+    "Storm coil",
+    ["Copper coil", "Soot coil", "Brine coil", "Dusk coil", "Rime coil"],
+    "metal",
+    circle(7),
+    1,
+    { motion: "fixed", trim: "glass" },
+  ),
+  rod: part(
+    "Conductor rod",
+    ["Copper rod", "Iron spike", "Brine rod", "Dusk rod", "Rime rod"],
+    "metal",
+    circle(3.5),
+    1,
+    { motion: "fixed" },
+  ),
+  cask: {
+    name: "Water cask",
+    variants: ["Rain cask", "Quench cask", "Brine cask", "Dew cask", "Meltwater cask"],
+    material: "wood",
+    trim: "metal",
+    motion: "dynamic",
+    shape: circle(8.5),
+    massScale: 1.6,
+    toughness: 40,
+    reward: 0,
+    pieces: [
+      ...[-4.5, 0, 4.5].map((y, k) => plank(k, 13, 3.5, 0, y)),
+      {
+        kind: "hoop",
+        family: "debris",
+        material: "metal",
+        shape: box(9, 2),
+        x: 0,
+        y: 7.5,
+        angle: 0,
+      },
+    ],
+    solid: "gameplay solid",
+  },
+  jar: {
+    name: "Oil jar",
+    variants: ["Lamp-oil jar", "Pitch jar", "Whale-oil jar", "Nightshade oil jar", "Tallow jar"],
+    material: "ceramic",
+    motion: "dynamic",
+    shape: circle(6.5),
+    massScale: 1.2,
+    toughness: 20,
+    reward: 0,
+    pieces: ring("shard", 4, box(4, 3), 4.5),
+    solid: "gameplay solid",
+  },
+  brush: {
+    name: "Dry brush",
+    variants: ["Tinder grass", "Ember bracken", "Dry kelp", "Dusk thistle", "Frost reeds"],
+    material: "vegetation",
+    motion: "fixed",
+    shape: box(16, 7),
+    massScale: 1,
+    toughness: 25,
+    reward: 0,
+    pieces: [],
+    solid: "low: travelers walk through it",
+    actors: false,
+  },
+  fan: part(
+    "Wind fan",
+    ["Mill fan", "Bellows fan", "Gull fan", "Dusk fan", "Frost fan"],
+    "metal",
+    circle(9),
+    1,
+    { motion: "fixed", trim: "cloth" },
+  ),
 };
 const area = (shape: ShapeRecipe) =>
   shape.kind === "circle" ? Math.PI * shape.radius ** 2 : shape.width * shape.height;

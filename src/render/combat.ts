@@ -12,6 +12,7 @@ import {
 import { RARITY_COLORS } from "../game/loot.ts";
 import type { Drop, Enemy } from "../game/types.ts";
 import { drawMaterialEvent } from "./props.ts";
+import { drawReactionEvent } from "./reactions.ts";
 import { monsterPixels, type RigPose } from "./rigs.ts";
 import { spritePixels } from "./sprites.ts";
 
@@ -710,6 +711,7 @@ export class CombatRenderer {
         this.light(ctx, e.x, e.y, radius * 0.9, e.color, (1 - age / duration) * 0.16);
       }
       if (e.type === "impact" || e.type === "break") drawMaterialEvent(ctx, e, age, zoom);
+      if (e.type === "reaction") drawReactionEvent(ctx, e, age, zoom);
       if (e.type === "assembly" && zoom > 0.6 && age < 1.1) {
         // Mechanism feedback: a short floating label where the change happened.
         const label =

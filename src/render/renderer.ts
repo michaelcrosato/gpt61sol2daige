@@ -16,6 +16,7 @@ import { THEMES, themeOf } from "../game/content.ts";
 import type { BodyPose } from "../physics/types.ts";
 import { type AdventureActor, CombatRenderer } from "./combat.ts";
 import { PropRenderer } from "./props.ts";
+import { drawFields, drawStatus, drawSurfaces } from "./reactions.ts";
 import { PALETTE, type SpriteRecipe, spritePixels } from "./sprites.ts";
 
 const GROUND = ["#304f39", "#486747", "#818164", "#34666a", "#294f59", "#8a8766", "#6a7662"];
@@ -447,6 +448,22 @@ export class Renderer {
         player: p,
       });
     this.props.beginFrame();
+    const reactions = sim.physicalReactions();
+    this.props.activeFans = new Set(
+      reactions.fields.filter((f) => f.id.startsWith("fan:")).map((f) => f.source),
+    );
+    // Puddles and slicks lie under props and actors.
+    drawSurfaces(
+      ctx,
+      reactions.surfaces.filter(
+        (s) =>
+          s.x > left - s.radius &&
+          s.x < right + s.radius &&
+          s.y > top - s.radius &&
+          s.y < bottom + s.radius,
+      ),
+      time,
+    );
     const held = new Set(
       (sim.physical
         ? sim.physical.combat.holdList()
@@ -470,7 +487,14 @@ export class Renderer {
     for (const item of items) {
       if (item.kind === "decor") this.drawDecor(item, player, time);
       else if (item.kind === "physical")
-        this.props.draw(ctx, item.physical!, time, sim.tick, held.has(item.physical!.id));
+        this.props.draw(
+          ctx,
+          item.physical!,
+          time,
+          sim.tick,
+          held.has(item.physical!.id),
+          reactions.statuses.get(item.physical!.id),
+        );
       else if (item.kind === "adventure")
         this.combat.actor(ctx, item.adventure!, sim, alpha, time, this.zoom);
       else if (item.kind === "landmark") this.drawLandmark(item, sim, time);
@@ -533,6 +557,24 @@ export class Renderer {
       }
     }
     this.props.links(ctx, links, time);
+    // Monster statuses (burning, soaked, oiled, charged) over the actors.
+    if (reactions.statuses.size)
+      for (const e of sim.adventure.state.enemies) {
+        const status = reactions.statuses.get(`enemy-${e.id}`);
+        if (status && e.hp > 0) drawStatus(ctx, e.x, e.y - e.radius * 0.6, e.radius, status, time);
+      }
+    drawFields(
+      ctx,
+      reactions.fields.filter((f) =>
+        f.shape.kind === "lane"
+          ? true
+          : f.shape.x > left - f.shape.radius &&
+            f.shape.x < right + f.shape.radius &&
+            f.shape.y > top - f.shape.radius &&
+            f.shape.y < bottom + f.shape.radius,
+      ),
+      time,
+    );
     this.combat.effects(ctx, sim, localId, this.zoom);
     if (this.grabHint && this.zoom > 0.8) {
       const { x, y, text } = this.grabHint;

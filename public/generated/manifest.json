@@ -134,6 +134,12 @@
     "vegetation.wav",
     "ceramic.wav",
     "volatile.wav",
-    "crumble.wav"
+    "crumble.wav",
+    "ignite.wav",
+    "hiss.wav",
+    "zap.wav",
+    "boom.wav",
+    "splash.wav",
+    "gust.wav"
   ]
 }

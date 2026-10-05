@@ -6,6 +6,7 @@ import { enemyBodyId, type PropHit, playerBodyId } from "../physics/adventure.ts
 import { LOOT_SETTLE_TICKS, type PendingImpact } from "../physics/combat.ts";
 import { MATERIALS } from "../physics/materials.ts";
 import { insidePen } from "../physics/mechanisms.ts";
+import { type FieldRecipe, REACTION_COLORS } from "../physics/reactions.ts";
 import type { AreaRecipe } from "./content.ts";
 import {
   ARCHETYPES,
@@ -876,6 +877,8 @@ export class Adventure {
           torque: spec.torque,
           material: spec.material * (stats?.shatter ?? 1),
           team: spec.team,
+          // M08: burning strikes (Cinderwake, burn skills) set flammable scenery alight.
+          ...(stats && stats.burn > 0 ? { element: "fire" as const } : {}),
         }),
       );
     }
@@ -899,7 +902,13 @@ export class Adventure {
     return hits;
   }
   /** Gameplay-owned consequences of scenery hits: one-time party gold and readable feedback. */
-  private propEffects(sim: Simulation, owner: string, angle: number, hits: PropHit[]): void {
+  private propEffects(
+    sim: Simulation,
+    owner: string,
+    angle: number,
+    hits: PropHit[],
+    quiet = false,
+  ): void {
     const s = this.state;
     let shown = 0;
     for (const hit of hits) {
@@ -928,7 +937,7 @@ export class Adventure {
           angle,
           color,
         );
-      } else if (shown++ < 6)
+      } else if (!quiet && shown++ < 6)
         this.emit(
           sim,
           "impact",
@@ -986,6 +995,7 @@ export class Adventure {
             torque: spec.torque,
             material: spec.material * (stats?.shatter ?? 1),
             team: spec.team,
+            ...(stats && stats.burn > 0 ? { element: "fire" as const } : {}),
           }),
         );
       const material = hit.material ?? "stone",
@@ -1023,6 +1033,69 @@ export class Adventure {
       sy = hy;
     }
     return false;
+  }
+  /**
+   * M08 reaction damage and events from the previous solve: fire, shock and blasts reach
+   * monsters through the ordinary hit path (credited to the chain's owner) and scenery through
+   * the same material damage, rewards and feedback as an attack.
+   */
+  private applyReactions(sim: Simulation): void {
+    const physical = sim.physical!;
+    for (const d of physical.reactions.takeDamage()) {
+      const owner = Object.hasOwn(this.state.heroes, d.owner) ? d.owner : "";
+      if (d.kind === "creature") {
+        if (d.team === "enemy") continue;
+        const e = this.state.enemies.find((en) => enemyBodyId(en.id) === d.target);
+        if (!e || e.hp <= 0) continue;
+        this.hit(
+          sim,
+          e,
+          d.damage,
+          owner,
+          e.x - Math.cos(d.angle) * 20,
+          e.y - Math.sin(d.angle) * 20,
+          true,
+        );
+      } else if (d.kind === "area" || physical.world.has(d.target))
+        this.propEffects(
+          sim,
+          d.owner,
+          d.angle,
+          physical.damageProps(sim, {
+            owner: d.owner,
+            cause: d.cause,
+            x: d.x,
+            y: d.y,
+            radius: d.kind === "area" ? d.radius : 64,
+            damage: d.damage,
+            angle: d.angle,
+            ...(d.kind === "prop" ? { only: d.target } : d.target ? { except: d.target } : {}),
+            impulse: 0,
+            material: 1,
+            team: d.team,
+            chain: d.chain,
+          }),
+          // Fire pulses read through the flames; only a resulting break gets its own effect.
+          d.cause === "fire",
+        );
+    }
+    for (const e of physical.reactions.take()) {
+      // Soaking and oiling show on the bodies themselves; they stay in the reaction history.
+      if (e.rule === "soak" || e.rule === "coat") continue;
+      const length = Math.hypot(e.x - e.fromX, e.y - e.fromY),
+        color = REACTION_COLORS[e.rule] ?? "#e9d9a8";
+      this.emit(
+        sim,
+        "reaction",
+        length > 1 ? e.fromX : e.x,
+        length > 1 ? e.fromY : e.y,
+        e.owner,
+        e.text,
+        Math.round(length * 10) / 10,
+        length > 1 ? Math.atan2(e.y - e.fromY, e.x - e.fromX) : 0,
+        color,
+      );
+    }
   }
   /** Launched-prop impacts: damage through the ordinary hit path with the recorded owner. */
   private applyImpacts(sim: Simulation, impacts: PendingImpact[]): void {
@@ -1500,8 +1573,17 @@ export class Adventure {
         );
         this.hit(sim, e, stats.damage * 2.7, owner, x, y);
       }
+      // M08: the struck pylon's charge also runs through wet and metal scenery around it.
+      sim.physical?.stimulate(sim, "shock", {
+        x,
+        y,
+        radius: 40,
+        owner,
+        team: "party",
+        cause: "stormglass",
+      });
     }
-    if (kind === "gravity")
+    if (kind === "gravity") {
       for (const e of s.enemies) {
         const d = Math.hypot(e.x - x, e.y - y);
         if (d < 170 && !e.boss) {
@@ -1509,7 +1591,12 @@ export class Adventure {
           e.rootUntil = sim.tick + 40;
         }
       }
+      // M08: the knot's field also gathers loose props, debris and loot (monsters, above).
+      this.field(sim, mechanic, "attract", { x, y, radius: 170 }, 340, 80, false, owner);
+    }
     if (kind === "wind") {
+      // M08: crossing a lane whirls the air around it for the activation's duration.
+      this.field(sim, mechanic, "vortex", { x, y, radius: 90 }, 360, 80, true, owner);
       h.hasteUntil = sim.tick + 180;
       p.energy = Math.min(100, p.energy + 30);
       p.dashCooldown = Math.min(p.dashCooldown, 0.1);
@@ -1535,6 +1622,17 @@ export class Adventure {
         // An unanchored held part rides along through the rift as one unit.
         sim.physical?.carry(sim, p.id, other.x - p.x, other.y - p.y);
         this.place(p, other.x, other.y, sim);
+        // M08: the arrival shockwave is a short repelling field around the partner arch.
+        this.field(
+          sim,
+          other,
+          "repel",
+          { x: other.x, y: other.y, radius: 115 },
+          1400,
+          8,
+          true,
+          owner,
+        );
         h.invulnerableUntil = sim.tick + 20;
         other.readyAt = Math.max(other.readyAt, sim.tick + 60);
         this.damageArea(sim, owner, other.x, other.y, 115, stats.damage * 2.2, 0, Math.PI, "rift");
@@ -1551,6 +1649,33 @@ export class Adventure {
         kind: s.recipe.combination.into,
       });
   }
+  /** An area mechanic's physical field (M08), owned by the hero who used it. */
+  private field(
+    sim: Simulation,
+    mechanic: Mechanic,
+    kind: FieldRecipe["kind"],
+    at: { x: number; y: number; radius: number },
+    strength: number,
+    ticks: number,
+    actors: boolean,
+    owner: string,
+  ): void {
+    const physical = sim.physical;
+    if (!physical) return;
+    physical.reactions.addField({
+      id: `mechanic:${mechanic.id}`,
+      kind,
+      areaId: physical.areaAt(sim, at.x, at.y),
+      shape: { kind: "circle", x: at.x, y: at.y, radius: at.radius },
+      strength,
+      ticks,
+      gust: 0,
+      actors,
+      owner,
+      team: "party",
+      source: `mechanic:${mechanic.kind}`,
+    });
+  }
   step(sim: Simulation): void {
     const s = this.state,
       tick = sim.tick;
@@ -1560,6 +1685,7 @@ export class Adventure {
       // Mechanism changes (latches, launches, snapped or cut links) from the previous solve.
       for (const e of sim.physical.mechanisms.take())
         this.emit(sim, "assembly", e.x, e.y, e.owner, e.text, 0, 0, "#e7d7a1");
+      this.applyReactions(sim);
     }
     for (const p of sim.players.values()) {
       const h = this.hero(p.id),
