@@ -903,7 +903,79 @@ and <code>&lt;material&gt;:deflect</code>, and <code>grab</code> events
 <code>ricochet</code>. Saves write adventure envelope 4 / world 6; rooms
 use protocol 7. See <a
 href="ARCHITECTURE.md#m06-combat-forces-projectiles-and-physical-loot">the
-M06 contract</a>.</p></main>
+M06 contract</a>.</p>
+<h2 id="m07-jointed-mechanisms">M07 jointed mechanisms</h2>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr>
+<th>Command</th>
+<th>Fields and behavior</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>{"op":"actors","action":"mechanisms"}</code></td>
+<td>The registry (kinds, joint types, strain/cut/motor/policy rules,
+launch speed) plus every assembly, joint (intact or broken, load, peak,
+damage, motor), drawable link with strain, and gate/launcher/causeway
+state. Works on guests (read-only).</td>
+</tr>
+<tr>
+<td><code>{"op":"actors","action":"cut","id":"chain-1:anchor"}</code></td>
+<td>Cut damage to one joint (default: enough to sever) through the
+joint-breakage policy; returns
+<code>{damage, threshold, broken, protectedByPolicy}</code>. Host
+only.</td>
+</tr>
+<tr>
+<td><code>{"op":"actors","action":"motor","id":"vane-1:pivot","motor":{"mode":"velocity","target":-2,"stiffness":0,"damping":1.5}}</code></td>
+<td>Change or stop (<code>null</code>) a hinge or slider motor; the
+state is saved.</td>
+</tr>
+<tr>
+<td><code>{"op":"actors","action":"transport","id":"prop-chain-1-ball","dx":300,"dy":40}</code></td>
+<td>Move a member’s whole connected part with its motion; refused while
+it is anchored to a post.</td>
+</tr>
+<tr>
+<td><code>{"op":"physics","action":"assembly","recipe":{…},"joints":[…]}</code></td>
+<td>Lab: attach an assembly to spawned bodies whose recipes name it; lab
+<code>cut</code> and <code>motor</code> as above.</td>
+</tr>
+</tbody>
+</table>
+<p>Joint ids are <code>&lt;assembly&gt;:&lt;name&gt;</code>:
+<code>gate-N:hinge</code>, <code>chain-N:anchor|link1..3|ball</code>,
+<code>vine-N:root|seg1..5|pod</code>,
+<code>launcher-N:slider|spring</code>, <code>vane-N:pivot</code>,
+<code>bridge-N:south|deck1..3|north</code>. Parts are
+<code>prop-gate-N-leaf</code>, <code>prop-chain-N-ball</code>,
+<code>prop-vine-N-pod</code>, <code>prop-launcher-N-sled</code>,
+<code>prop-vane-N-rotor</code> and <code>prop-bridge-N-plank0..3</code>,
+plus posts. <code>place</code> on a jointed member moves its part as a
+unit. Grabbing works on loose members (gate leaf, chain links and ball,
+vine, pod, sled), never planks or vanes.</p>
+<pre class="json"><code>{&quot;op&quot;:&quot;encounter&quot;,&quot;index&quot;:1}
+{&quot;op&quot;:&quot;actors&quot;,&quot;action&quot;:&quot;impulse&quot;,&quot;id&quot;:&quot;prop-chain-1-ball&quot;,&quot;x&quot;:0,&quot;y&quot;:1500}
+{&quot;op&quot;:&quot;step&quot;,&quot;ticks&quot;:6}
+{&quot;op&quot;:&quot;actors&quot;,&quot;action&quot;:&quot;cut&quot;,&quot;id&quot;:&quot;chain-1:anchor&quot;}
+{&quot;op&quot;:&quot;step&quot;,&quot;ticks&quot;:30}
+{&quot;op&quot;:&quot;actors&quot;,&quot;action&quot;:&quot;mechanisms&quot;}</code></pre>
+<p>Mechanism changes appear as <code>assembly</code> events
+(<code>gate:latched</code>, <code>gate:closed</code>,
+<code>launcher:cocked</code>, <code>launcher:fired</code>,
+<code>bridge:span-lost</code>,
+<code>&lt;kind&gt;:&lt;joint&gt;:snapped|cut</code>) with the
+responsible traveler as owner. New policy values:
+<code>mechanisms</code>, <code>jointBreakage</code> (booleans) and
+<code>jointStrength</code> (0.05–20). Saves write adventure envelope 5 /
+world 7; rooms use protocol 8. See <a
+href="ARCHITECTURE.md#m07-jointed-mechanisms-and-assemblies">the M07
+contract</a>.</p></main>
 <footer>Fern · A world engine built for agents · <a href="https://github.com/michaelcrosato/gpt61sol2daige">Source on GitHub</a></footer>
 </body>
 </html>

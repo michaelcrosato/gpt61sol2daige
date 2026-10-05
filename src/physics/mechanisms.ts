@@ -176,7 +176,7 @@ export function areaMechanisms(
           anchorB: { x: -19.5, y: 0 },
           limits: [-1.9, 1.9],
           motor: { mode: "position", target: 0, ...GATE_MOTOR },
-          // A traveler walking off with the leaf loads it to about 1060: only blows rip it.
+          // A traveler walking off with the leaf loads it to about 1200: only blows rip it.
           breakLoad: 1400,
           toughness: 45,
         },
