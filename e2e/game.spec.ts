@@ -191,7 +191,9 @@ test("real WebRTC joins eight clients, syncs builds, combat and world, rejects n
   browser,
   baseURL,
 }) => {
-  test.setTimeout(150000);
+  // Complete physical baselines retain every selected slot; slower CI must finish
+  // the whole transfer/admission/combat story without imposing an FPS gate.
+  test.setTimeout(300000);
   const participants: { context: BrowserContext; page: Page }[] = [];
   try {
     const host = await traveler(browser, baseURL!);

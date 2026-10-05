@@ -1,5 +1,5 @@
 import { checksum } from "../engine/math.ts";
-import { type SaveState, validateSave } from "../engine/simulation.ts";
+import type { SaveState } from "../engine/simulation.ts";
 
 export const PHYSICAL_WIRE_VERSION = 2;
 export const BASELINE_CHUNK_BYTES = 48_000;
@@ -200,7 +200,8 @@ export class BaselineReceiver {
       frame.state.actorPhysics.world.continuation !== "rebuild"
     )
       throw new Error("Invalid physical frame");
-    validateSave(frame.state);
+    // Simulation.applyReplica validates semantics before publication. Do not run that
+    // full policy/ownership pass twice for every received population-sized frame.
     this.completed = frame.sequence;
     this.active = undefined;
     return frame;
