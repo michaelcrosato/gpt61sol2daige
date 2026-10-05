@@ -975,7 +975,79 @@ responsible traveler as owner. New policy values:
 <code>jointStrength</code> (0.05–20). Saves write adventure envelope 5 /
 world 7; rooms use protocol 8. See <a
 href="ARCHITECTURE.md#m07-jointed-mechanisms-and-assemblies">the M07
-contract</a>.</p></main>
+contract</a>.</p>
+<h2 id="m08-material-reactions-and-fields">M08 material reactions and
+fields</h2>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr>
+<th>Command</th>
+<th>Fields and behavior</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>{"op":"actors","action":"reactions"}</code></td>
+<td>The registry (stimuli, every rule with its parameters, material
+fuel/windage/flammable/conductive, containers, releases, field kinds,
+yard layout, chain and policy rules) plus the state: statuses, surfaces,
+fields, delayed reactions, chains (owner, origin, rules fired, visited
+<code>rule|target</code> keys, depth) and recent events. Works on guests
+(read-only).</td>
+</tr>
+<tr>
+<td><code>{"op":"actors","action":"stimulate","stimulus":"fire","id":"prop-brush-1-0"}</code></td>
+<td>Apply <code>fire</code>, <code>water</code>, <code>oil</code>,
+<code>shock</code> or <code>blast</code> to one body (<code>id</code>, a
+prop or <code>enemy-&lt;id&gt;</code>) or everything within
+<code>radius</code> (0–400) of <code>x,y</code>, with optional
+<code>strength</code> (0.1–4). Starts a chain owned by the caller and
+returns it. Honors the material and chain policies. Host only.</td>
+</tr>
+<tr>
+<td><code>{"op":"actors","action":"field","field":{"kind":"wind","shape":{"kind":"lane","x":900,"y":120,"angle":0,"length":200,"width":80},"strength":300,"ticks":600}}</code></td>
+<td>Add a field (<code>wind</code>, <code>pressure</code>,
+<code>attract</code>, <code>repel</code>, <code>vortex</code>;
+<code>circle {x,y,radius}</code> or
+<code>lane {x,y,angle,length,width}</code>; strength 0–20,000 units/s²;
+ticks, −1 permanent; optional <code>id</code>, <code>gust</code> 0–1,
+<code>actors</code>). <code>{"remove":"&lt;id&gt;"}</code> removes one.
+Host only.</td>
+</tr>
+<tr>
+<td><code>{"op":"actors","action":"body","id":"crate-1-0"}</code></td>
+<td>Now includes <code>reaction</code>, the body’s status or
+<code>null</code>.</td>
+</tr>
+</tbody>
+</table>
+<p>Yard ids per area N: <code>prop-brazier-N-0</code>,
+<code>prop-jar-N-0..1</code> (oil), <code>prop-brush-N-0..4</code>
+(fuse), <code>prop-barrel-N-2</code> (powder keg),
+<code>prop-cask-N-0..1</code> (water), <code>prop-rod-N-0..1</code>,
+<code>prop-coil-N-0</code> and <code>prop-fan-N-0</code>. Authored wind
+lanes are <code>wind-N</code>. A struck fan’s field is
+<code>fan:&lt;fan id&gt;</code>, a mechanic’s is
+<code>mechanic:&lt;id&gt;</code> and an explosion’s is
+<code>blast:&lt;chain&gt;:&lt;source&gt;</code>.</p>
+<pre class="json"><code>{&quot;op&quot;:&quot;encounter&quot;,&quot;index&quot;:1}
+{&quot;op&quot;:&quot;actors&quot;,&quot;action&quot;:&quot;stimulate&quot;,&quot;stimulus&quot;:&quot;fire&quot;,&quot;id&quot;:&quot;prop-brush-1-0&quot;}
+{&quot;op&quot;:&quot;step&quot;,&quot;ticks&quot;:200}
+{&quot;op&quot;:&quot;actors&quot;,&quot;action&quot;:&quot;reactions&quot;}</code></pre>
+<p>That reproduces the fuse chain: the brush burns segment by segment,
+lights the keg’s fuse, and the explosion breaks the water casks, which
+spill and steam the debris. Reaction changes appear as
+<code>reaction</code> events with the chain owner. New policy values:
+<code>materialReactions</code>, <code>chainReactions</code>,
+<code>environmentalForces</code> (booleans) and
+<code>fieldStrength</code> (0–10). Saves write adventure envelope 6 /
+world 8; rooms use protocol 9. See <a
+href="ARCHITECTURE.md#m08-material-reactions-and-environmental-fields">the
+M08 contract</a>.</p></main>
 <footer>Fern · A world engine built for agents · <a href="https://github.com/michaelcrosato/gpt61sol2daige">Source on GitHub</a></footer>
 </body>
 </html>
