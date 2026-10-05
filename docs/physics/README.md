@@ -9,11 +9,12 @@ The plan was prepared on 2026-10-04 against Fern 2.0 at `c47cb119d6f57c70ddf79a4
 1. Make the world react richly and visibly. Prefer an ambitious, complete interaction over a placeholder or a reduced demonstration.
 2. Provide working switches and tuning for physical features, including different behavior in different regions. A control must change the simulation, not merely its graphics.
 3. Performance optimization, FPS thresholds and hardware parity are not acceptance gates. Record useful telemetry without trimming features to meet the previous benchmarks. Do not silently disable physics based on FPS or distance from a camera.
-4. Prioritize enjoyable, legible motion over scientific accuracy or bit-identical results across devices. Keep saves, ordinary debugging and host-authoritative co-op reliable.
-5. Preserve the familiar wayfarer, fast hack-and-slash controls, outward journey, skills, equipment and optional mechanics. Physics expands that game.
-6. Implement one milestone per fresh context. Persist decisions and evidence before the reset. After every commit, push and merge; do not leave milestone commits stranded on a branch.
+4. Prioritize enjoyable, legible motion over scientific accuracy or bit-identical results across devices. Keep saves and ordinary debugging reliable.
+5. Single player comes first. Co-op is planned but experimental and will change as the game does; it adapts to single-player needs, never the reverse. Keep host-authoritative co-op working at a functional level, but do not benchmark, tune or gate its performance, and do not cut or reshape a single-player feature to fit it ([D53](DECISIONS.md)).
+6. Preserve the familiar wayfarer, fast hack-and-slash controls, outward journey, skills, equipment and optional mechanics. Physics expands that game.
+7. Implement one milestone per fresh context. Persist decisions and evidence before the reset. After every commit, push and merge; do not leave milestone commits stranded on a branch.
 
-These instructions supersede earlier performance-first recommendations and the repository's original restriction against imported physics libraries. They do not waive valid-state checks, preventable crashes, working saves or actual multiplayer verification.
+These instructions supersede earlier performance-first recommendations and the repository's original restriction against imported physics libraries. They do not waive valid-state checks, preventable crashes or working saves. Multiplayer verification is functional, not a performance gate (priority 5).
 
 ## What the finished game should feel like
 
@@ -51,15 +52,15 @@ Each row is a required deliverable with a playable or inspectable result. Cards 
 | [M09](milestones/M09.md) | Physical monster rigs and expressive reactions | All six rigs react to hits and transition into coherent death motion |
 | [M10](milestones/M10.md) | Towns and all eight authored areas showcase physics | Complete the original outward route with physical advantages enabled and disabled |
 | [M11](milestones/M11.md) | Generated physical encounters and modular boss interactions | Seeded encounters beyond area eight compose mechanisms, materials and bosses |
-| [M12](milestones/M12.md) | Finished controls, showcase and verified release | Full run, regional switch matrix, real co-op and public deployment all work |
+| [M12](milestones/M12.md) | Finished controls, showcase and verified release | Full run, regional switch matrix, a co-op smoke check and public deployment all work |
 
-The dependency order is intentional: save/network ownership is settled before rich destruction and assemblies proliferate. Every feature milestone also extends persistence, network behavior, tools and validation for its own new state; M04 is not a substitute for those later checks.
+The dependency order is intentional: save/network ownership is settled before rich destruction and assemblies proliferate. Every feature milestone also extends persistence, tools and validation for its own new state and carries it through the existing replication path; M04 is not a substitute for those later checks.
 
 ## Definition of complete
 
 - The milestone's stated experience is reachable through the game or its deliberate physics playground. Intermediate tooling is clearly identified; final features are integrated into the run.
 - Behavior has inspectable state, actual visible consequences and the relevant audio/animation feedback. Menu entries and particles alone do not count as physical implementation.
-- On/off transitions, region crossings, save/load and co-op have defined behavior. Each new feature supplies its own representative verification.
+- On/off transitions, region crossings, save/load and co-op have defined behavior. Each new feature supplies its own representative single-player verification. For co-op, a headless replication/late-join check and the existing WebRTC browser scenarios still passing are enough; a new multi-client browser scenario or co-op performance measurement is not required.
 - The repository checks and applicable browser scenarios pass. Physics checks assert useful outcomes with justified tolerances; other established correctness assertions remain meaningful.
 - No FPS threshold, old population throughput target or cross-device numerical identity blocks completion. Finite state, absence of runaway event loops and reachable gameplay do.
 - The milestone has a committed handoff, immediately pushed commits, a merged PR, and release evidence. A fresh session verifies the merge before proceeding.

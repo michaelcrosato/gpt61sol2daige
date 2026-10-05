@@ -71,7 +71,7 @@ Existing version-1 saves migrate by retaining progression/terrain and assigning 
 
 ## Multiplayer
 
-Retain the host-authoritative PeerJS architecture. Only the host resolves physics and reaction causality. Guests send movement/combat and authorized interaction requests; the host validates identity, target existence, distance where appropriate and room authority. Shared policy changes are host-only. Cosmetic debug overlays can be local.
+Co-op follows the single-player game ([D53](DECISIONS.md)): it is planned but experimental, keeps working at a functional level, and its transfer budgets adapt to single-player needs rather than limiting them. Retain the host-authoritative PeerJS architecture. Only the host resolves physics and reaction causality. Guests send movement/combat and authorized interaction requests; the host validates identity, target existence, distance where appropriate and room authority. Shared policy changes are host-only. Cosmetic debug overlays can be local.
 
 Replicate stable IDs, transforms including angle, body state, spawn/destroy events, assemblies, statuses and policy revisions. Guests interpolate dynamic transforms and snap across portal/reset revisions. Spawn/remove and irreversible changes use reliable lifecycle delivery; ordinary motion can use the existing periodic snapshot cadence. Late join must receive a complete consistent baseline before accepting interaction.
 
@@ -101,6 +101,6 @@ Proposed additions are `src/physics/{runtime,types,policies,blueprints,materials
 
 Keep exact assertions for IDs, rewards, policy values, generated recipes and authorization. Use meaningful tolerances for physical trajectories. Assert outcome and causality: a struck crate moves away, a broken joint disconnects, an extinguished barrel does not explode, a fallen tree stays fallen after load, and a disabled region suppresses its configured reaction.
 
-Retain the actual eight-client browser test. Expand it with late-join physical state and representative interactions. Extend the headless controller only where needed to navigate the new world, not to bypass combat or manufacture a clear. An explicit recorded test tuning preset remains acceptable; label it.
+Keep the existing WebRTC browser scenarios as functional smoke checks over actual connections; they are not performance tests and may be adapted or slimmed as co-op changes. New physical state needs a headless replication/late-join check rather than a new multi-client browser scenario. Extend the headless controller only where needed to navigate the new world, not to bypass combat or manufacture a clear. An explicit recorded test tuning preset remains acceptable; label it.
 
 Keep telemetry and existing benchmark commands available to the user. Remove or relocate the existing browser FPS pass/fail assertion when implementation starts; do not respond to a slow measurement by cutting planned reactions. No new performance test gate is part of this work.
