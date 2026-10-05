@@ -21,6 +21,17 @@ export const PROP_FAMILIES = [
   "tree",
   "stump",
   "debris",
+  // M07 mechanism parts and the gate pen's reward cache.
+  "post",
+  "gate",
+  "link",
+  "ball",
+  "vine",
+  "pod",
+  "plank",
+  "sled",
+  "vane",
+  "chest",
 ] as const;
 export type PropFamily = (typeof PROP_FAMILIES)[number];
 export const PALETTES = 5;
@@ -59,7 +70,11 @@ export interface FamilyRecipe {
   reward: number;
   pieces: readonly PieceRecipe[];
   /** Gameplay role summary for inspection and documentation. */
-  solid: "gameplay solid";
+  solid: "gameplay solid" | "deck: travelers walk over it" | "raised: travelers pass under it";
+  /** M07: false for parts that never meet actors (deck planks, raised vanes). */
+  actors?: false;
+  /** M07: raised parts (vanes) meet nothing; only attacks and holds move them. */
+  raised?: true;
 }
 const box = (width: number, height: number): ShapeRecipe => ({ kind: "box", width, height });
 const circle = (radius: number): ShapeRecipe => ({ kind: "circle", radius });
@@ -85,6 +100,26 @@ const ring = (prefix: string, n: number, shape: ShapeRecipe, distance: number, s
       angle: Math.round((a + Math.PI / 2) * 1000) / 1000,
     };
   });
+const part = (
+  name: string,
+  variants: FamilyRecipe["variants"],
+  material: MaterialId,
+  shape: ShapeRecipe,
+  massScale: number,
+  extra: Partial<FamilyRecipe> = {},
+): FamilyRecipe => ({
+  name,
+  variants,
+  material,
+  motion: "dynamic",
+  shape,
+  massScale,
+  toughness: 0,
+  reward: 0,
+  pieces: [],
+  solid: "gameplay solid",
+  ...extra,
+});
 export const FAMILIES: Record<PropFamily, FamilyRecipe> = {
   crate: {
     name: "Crate",
@@ -343,6 +378,101 @@ export const FAMILIES: Record<PropFamily, FamilyRecipe> = {
     toughness: 0,
     reward: 0,
     pieces: [],
+    solid: "gameplay solid",
+  },
+  // Mechanism parts are never destroyed: attacks cut their joints instead (M07).
+  post: part(
+    "Post",
+    ["Hitching post", "Iron-capped post", "Driftwood piling", "Dusk stake", "Frost post"],
+    "wood",
+    circle(4),
+    1,
+    { motion: "fixed", trim: "metal" },
+  ),
+  gate: part(
+    "Gate",
+    ["Wattle gate", "Ember gate", "Driftwood gate", "Thorn gate", "Birch gate"],
+    "wood",
+    box(34, 5),
+    4.5,
+    { trim: "metal" },
+  ),
+  link: part(
+    "Chain link",
+    ["Iron link", "Soot link", "Brine link", "Dusk link", "Rime link"],
+    "metal",
+    box(10, 4),
+    1,
+  ),
+  ball: part(
+    "Spiked ball",
+    ["Iron morningstar", "Cinder flail", "Anchor weight", "Dusk mace", "Frost flail"],
+    "metal",
+    circle(9),
+    2,
+  ),
+  vine: part(
+    "Vine",
+    ["Ivy vine", "Ember creeper", "Kelp rope", "Night vine", "Frost ivy"],
+    "vegetation",
+    box(9, 3),
+    3,
+  ),
+  pod: part(
+    "Seed pod",
+    ["Moss pod", "Ember gourd", "Kelp bulb", "Dusk pod", "Frost pod"],
+    "vegetation",
+    circle(5),
+    4,
+  ),
+  plank: part(
+    "Causeway plank",
+    ["Oak plank", "Char plank", "Driftwood plank", "Plum plank", "Birch plank"],
+    "wood",
+    box(22, 14),
+    1.2,
+    { actors: false, solid: "deck: travelers walk over it" },
+  ),
+  sled: part(
+    "Launcher sled",
+    ["Spring sled", "Ember ram", "Tide ram", "Dusk ram", "Frost ram"],
+    "wood",
+    box(8, 16),
+    4,
+    { trim: "metal" },
+  ),
+  vane: part(
+    "Wind vane",
+    ["Mill vane", "Cinder vane", "Gull vane", "Dusk vane", "Frost vane"],
+    "wood",
+    box(34, 4),
+    3,
+    { trim: "cloth", actors: false, raised: true, solid: "raised: travelers pass under it" },
+  ),
+  chest: {
+    name: "Cache chest",
+    variants: ["Moss chest", "Ember strongbox", "Salt chest", "Dusk coffer", "Frost chest"],
+    material: "wood",
+    trim: "metal",
+    motion: "dynamic",
+    shape: box(18, 13),
+    massScale: 3,
+    toughness: 60,
+    reward: 18,
+    pieces: [
+      plank(0, 16, 3.5, 0, -4.5),
+      plank(1, 16, 3.5, 0, 0),
+      plank(2, 9, 3, 4, 4.5),
+      {
+        kind: "lock",
+        family: "debris",
+        material: "metal",
+        shape: box(5, 3),
+        x: -5,
+        y: 4.5,
+        angle: 0,
+      },
+    ],
     solid: "gameplay solid",
   },
 };

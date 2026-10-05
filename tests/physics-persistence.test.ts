@@ -57,8 +57,8 @@ test("v2 saves retain moving crate, actor knockback, disabled region, queue and 
   const restored = Simulation.restore(structuredClone(state));
   try {
     assert.equal(state.version, 2);
-    assert.equal(state.actorPhysics!.version, 4);
-    assert.equal(state.actorPhysics!.world.version, 6);
+    assert.equal(state.actorPhysics!.version, 5);
+    assert.equal(state.actorPhysics!.world.version, 7);
     assert.ok(world.pose("crate-1-0").vx > 0);
     assert.ok(
       state.actorPhysics!.world.bodies.find((e) => e.recipe.id === "player-local")!.motor!
@@ -272,7 +272,11 @@ test("guest recovery retains own build, all selected ambient creatures, scene an
   try {
     assert.equal(recovered.count, 128);
     assert.deepEqual(recovered.adventure.hero("local"), guest);
-    assert.deepEqual(recovered.physical!.props(), sim.physical!.props());
+    // A portable rebuild re-enters each angle through Rapier's single-precision rotation: a
+    // turning wind vane can differ in its last bits (no cross-build bit identity is promised).
+    const settle = (props: ReturnType<NonNullable<typeof sim.physical>["props"]>) =>
+      props.map((p) => ({ ...p, angle: Math.round(p.angle * 1e6) / 1e6 }));
+    assert.deepEqual(settle(recovered.physical!.props()), settle(sim.physical!.props()));
     assert.ok(recovered.physical!.world.has("player-local"));
     assert.ok(!recovered.physical!.world.has("player-guest"));
     assert.equal(recovered.players.size, 1);

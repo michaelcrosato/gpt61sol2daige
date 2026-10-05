@@ -18,15 +18,25 @@ import {
 import { CombatPhysics, type CombatPhysicsState, isPropId, lootBodyId } from "./combat.ts";
 import { isMaterial, MATERIALS, type MaterialId, materialDamage } from "./materials.ts";
 import {
+  areaMechanisms,
+  MechanismPhysics,
+  type MechanismState,
+  onDeck,
+  validateMechanisms,
+} from "./mechanisms.ts";
+import {
   type PolicyCheckpoint,
   PolicyController,
   type PolicyLayout,
   type PolicyTransaction,
 } from "./policies.ts";
 import {
+  jointAnchors,
   PhysicsWorld,
   upgradePolicySamples,
+  validateAssembly,
   validateBody,
+  validateJointEntry,
   validatePhysicsSnapshot,
 } from "./runtime.ts";
 import {
@@ -36,7 +46,14 @@ import {
   TerrainRegistry,
   terrainRecipe,
 } from "./terrain.ts";
-import { type BodyPose, type BodyRecipe, type PhysicsSnapshot, RAPIER_VERSION } from "./types.ts";
+import {
+  type AssemblyRecipe,
+  type BodyPose,
+  type BodyRecipe,
+  type JointEntry,
+  type PhysicsSnapshot,
+  RAPIER_VERSION,
+} from "./types.ts";
 
 export const playerBodyId = (id: string) => `player-${id}`;
 export const enemyBodyId = (id: number) => `enemy-${id}`;
@@ -70,6 +87,10 @@ interface LandArchive {
   patches: TerrainPatch[];
   /** M05: destroyed parents never respawn when the land is restored. */
   destroyed: DestroyedRecord[];
+  /** M07 (envelope 5): assemblies, every joint's state and mechanism state of the land. */
+  assemblies?: AssemblyRecipe[];
+  joints?: JointEntry[];
+  mechanisms?: MechanismState;
 }
 /** Persistent destruction fact. The parent body is gone; its pieces are ordinary props. */
 export interface DestroyedRecord {
@@ -131,7 +152,7 @@ interface NavigationState {
   turn: number;
 }
 export interface AdventurePhysicsSnapshot {
-  version: 1 | 2 | 3 | 4;
+  version: 1 | 2 | 3 | 4 | 5;
   backend: string;
   landId: string;
   run: number;
@@ -147,6 +168,8 @@ export interface AdventurePhysicsSnapshot {
   destroyed?: DestroyedRecord[];
   /** Version 4 (M06): instigators, pending impacts, hit suppression, holds, settled loot. */
   combat?: CombatPhysicsState;
+  /** Version 5 (M07): gate latches, cocked launchers, causeway spans and pending events. */
+  mechanisms?: MechanismState;
 }
 function layout(sim: Simulation): PolicyLayout {
   const s = sim.adventure.state,
@@ -268,6 +291,8 @@ export class AdventurePhysics {
   private destroyed = new Map<string, DestroyedRecord>();
   /** M06 ownership, impacts, holds and loot settling. */
   readonly combat = new CombatPhysics();
+  /** M07 authored mechanism behavior on top of the joints. */
+  readonly mechanisms = new MechanismPhysics();
   /** Debris with an explicit lifetime: id -> cleanup tick. Derived from recipes on restore. */
   private expiring = new Map<string, number>();
   private actors = new Set<string>();
@@ -285,14 +310,25 @@ export class AdventurePhysics {
   areaAt(sim: Simulation, x: number, y: number): string {
     return adventureAreaAt(sim.adventure.state, x, y);
   }
-  private spawnProps(sim: Simulation, archived?: BodyPose[]): void {
+  private spawnProps(sim: Simulation, archive?: LandArchive): void {
     this.expiring.clear();
-    if (archived) {
-      for (const pose of archived) {
+    if (archive) {
+      for (const pose of archive.props) {
         this.world.spawn(pose);
         if (!pose.frozen) this.world.motion(pose.id, pose.vx, pose.vy, pose.angularVelocity);
         this.track(pose);
       }
+      // Archived assemblies keep their broken links, cut damage and motors.
+      for (const assembly of archive.assemblies ?? []) {
+        const joints = (archive.joints ?? []).filter((j) => j.recipe.assembly === assembly.id);
+        this.world.addAssembly(
+          assembly,
+          joints.map((j) => j.recipe),
+          joints,
+        );
+        this.mechanisms.track(assembly);
+      }
+      this.ensureMechanisms(sim);
       return;
     }
     const palette = sim.adventure.state.townLand % PALETTES,
@@ -330,6 +366,31 @@ export class AdventurePhysics {
       });
       for (const recipe of clearingProps(r, palette, blocked)) this.world.spawn(recipe);
     }
+    this.ensureMechanisms(sim);
+  }
+  /**
+   * M07 mechanisms and their companion scenery for every area of this land. Only content that
+   * never existed is added (a fresh land, or a checkpoint/archive from before M07): an existing
+   * assembly is never rebuilt, and destroyed companions (a looted chest) never return.
+   */
+  private ensureMechanisms(sim: Simulation): void {
+    const s = sim.adventure.state,
+      palette = s.townLand % PALETTES,
+      present = new Set(this.world.assemblyList().map((a) => a.id));
+    for (let i = 0; i < 4; i++) {
+      const { mechanisms, extras } = areaMechanisms(
+        areaRecipe(s.seed, s.townLand * 4 + i + 1),
+        palette,
+      );
+      for (const m of mechanisms) {
+        if (present.has(m.recipe.id)) continue;
+        for (const body of m.bodies) this.world.spawn(body);
+        this.world.addAssembly(m.recipe, m.joints);
+        this.mechanisms.track(m.recipe);
+      }
+      for (const body of extras)
+        if (!this.world.has(body.id) && !this.destroyed.has(body.id)) this.world.spawn(body);
+    }
   }
   private track(recipe: BodyRecipe): void {
     if (recipe.blueprint?.expiresAt !== undefined)
@@ -348,6 +409,9 @@ export class AdventurePhysics {
         props,
         patches: [...this.sourceWorld.patches.values()].map((p) => [...p]),
         destroyed: [...this.destroyed.values()],
+        assemblies: this.world.assemblyList(),
+        joints: this.world.jointList(),
+        mechanisms: this.mechanisms.save(),
       });
     else this.archives.clear();
     const archive = this.archives.get(id);
@@ -372,7 +436,8 @@ export class AdventurePhysics {
     this.navigation.clear();
     this.destroyed = new Map((archive?.destroyed ?? []).map((d) => [d.id, d]));
     this.combat.clear();
-    this.spawnProps(sim, archive?.props);
+    this.mechanisms.restore(archive?.mechanisms);
+    this.spawnProps(sim, archive);
   }
   private actor(
     id: string,
@@ -661,6 +726,7 @@ export class AdventurePhysics {
     this.world.step(true);
     sim.metrics.contacts += this.world.contacts - contacts;
     this.combat.afterStep(sim, this.world);
+    this.mechanisms.update(sim.tick, this.world, this.combat);
     this.combat.afterLoot(sim, this.world, solid);
     for (const p of sim.players.values())
       if (this.world.has(playerBodyId(p.id))) {
@@ -812,6 +878,9 @@ export class AdventurePhysics {
           this.combat.instigate(id, attack.owner, attack.team ?? "party", attack.cause, sim.tick);
         }
       }
+      // Mechanism parts are not destroyed: a striking attack cuts the nearest joint instead.
+      if (pose.assembly !== undefined && attack.damage > 0 && attack.material !== 0)
+        this.cutJoint(sim, pose, attack);
       if (family.toughness <= 0) continue; // Pieces and stumps move; they do not break further.
       if (attack.damage <= 0 || attack.material === 0) continue; // A shove, not a strike.
       const durability = pose.consequences?.durability ?? 100;
@@ -882,6 +951,60 @@ export class AdventurePhysics {
     }
     return hits;
   }
+  /** Cut damage to the intact joint of this member nearest the attack's origin. */
+  private cutJoint(sim: Simulation, pose: BodyPose, attack: PropAttack): void {
+    let best: { id: string; distance: number } | null = null;
+    for (const joint of this.world.jointList()) {
+      if (joint.broken || (joint.recipe.a !== pose.id && joint.recipe.b !== pose.id)) continue;
+      const a = this.world.pose(joint.recipe.a),
+        b = this.world.pose(joint.recipe.b),
+        anchors = jointAnchors(joint.recipe, a, b),
+        distance = Math.hypot(anchors.ax - attack.x, anchors.ay - attack.y);
+      if (!best || distance < best.distance) best = { id: joint.recipe.id, distance };
+    }
+    if (!best) return;
+    const amount = materialDamage(
+      pose.material!,
+      attack.damage * (attack.material ?? 1),
+      pose.policy.values.materialDurability,
+    );
+    if (amount <= 0) return;
+    const result = this.world.damageJoint(best.id, amount, attack.cause);
+    if (result.broken)
+      for (const event of this.world.drainJointBreaks())
+        this.mechanisms.recordBreak(
+          this.world,
+          this.combat,
+          sim.tick,
+          event.id,
+          event.cause,
+          attack.owner,
+        );
+  }
+  /** Whether a traveler at this point stands on a causeway plank still tied to a bank post. */
+  deckAt(x: number, y: number): boolean {
+    const planks: BodyPose[] = [];
+    for (const assembly of this.world.assemblyList())
+      if (assembly.kind === "bridge")
+        for (const id of assembly.members)
+          if (id.includes("-plank") && this.world.partOf(id)?.anchored)
+            planks.push(this.world.pose(id));
+    return onDeck(planks, x, y);
+  }
+  /**
+   * A traveler moved by a rift carries the prop they hold. An unanchored jointed part travels
+   * whole, with its joints and motion; an anchored one cannot follow, so the hold is released.
+   */
+  carry(sim: Simulation, player: string, dx: number, dy: number): void {
+    const held = this.combat.holding(player);
+    if (!held || !this.world.has(held)) return;
+    const part = this.world.partOf(held);
+    if (part?.anchored && part.size > 1) {
+      this.combat.release(sim, this.world, player, false);
+      return;
+    }
+    this.world.transport(this.world.partMembers(held), dx, dy);
+  }
   private breakProp(
     sim: Simulation,
     pose: BodyPose,
@@ -942,6 +1065,7 @@ export class AdventurePhysics {
       props: this.props(),
       destroyed: this.destroyedRecords(),
       combat: this.combat.save(),
+      mechanisms: this.mechanisms.save(),
     };
   }
   entities(): PhysicalEntityState[] {
@@ -960,7 +1084,7 @@ export class AdventurePhysics {
   }
   save(portable = false): AdventurePhysicsSnapshot {
     return {
-      version: 4,
+      version: 5,
       backend: RAPIER_VERSION,
       landId: this.landId,
       run: this.run,
@@ -977,10 +1101,11 @@ export class AdventurePhysics {
       pendingTerrain: this.terrain.pending(this.sourceWorld),
       destroyed: this.destroyedRecords(),
       combat: this.combat.save(),
+      mechanisms: this.mechanisms.save(),
     };
   }
   static restore(sim: Simulation, snapshot: AdventurePhysicsSnapshot): AdventurePhysics {
-    const migrated = snapshot?.version !== 3 && snapshot?.version !== 4;
+    const migrated = ![3, 4, 5].includes(snapshot?.version);
     snapshot = upgradeAdventurePhysics(snapshot, sim);
     validateAdventurePhysics(snapshot, sim);
     const result = new AdventurePhysics(sim);
@@ -1000,6 +1125,8 @@ export class AdventurePhysics {
       result.archives = new Map(snapshot.archives.map((s) => [s.id, structuredClone(s)]));
       result.destroyed = new Map((snapshot.destroyed ?? []).map((d) => [d.id, structuredClone(d)]));
       result.combat.restore(snapshot.combat);
+      result.mechanisms.restore(snapshot.mechanisms);
+      for (const assembly of result.world.assemblyList()) result.mechanisms.track(assembly);
       for (const id of result.world.ids()) {
         const pose = result.world.pose(id);
         if (pose.role === "prop") result.track(pose);
@@ -1017,6 +1144,8 @@ export class AdventurePhysics {
           ))
             if (!result.world.has(recipe.id)) result.world.spawn(recipe);
       }
+      // M07 mechanisms did not exist in older checkpoints of this land: add them once.
+      if (snapshot.version < 5) result.ensureMechanisms(sim);
       result.navigation = new Map(snapshot.navigation.map((s) => [s.id, structuredClone(s)]));
       result.appliedTransition = snapshot.appliedTransition;
       result.actors = new Set(
@@ -1273,10 +1402,11 @@ export function validateAdventurePhysics(
 ): void {
   if (
     !snapshot ||
-    ![1, 2, 3, 4].includes(snapshot.version) ||
+    ![1, 2, 3, 4, 5].includes(snapshot.version) ||
     (snapshot.version === 2 && snapshot.world?.version !== 4) ||
     (snapshot.version === 3 && snapshot.world?.version !== 5) ||
     (snapshot.version === 4 && snapshot.world?.version !== 6) ||
+    (snapshot.version === 5 && snapshot.world?.version !== 7) ||
     snapshot.backend !== snapshot.world?.backend ||
     (snapshot.version === 1 && snapshot.backend !== RAPIER_VERSION) ||
     !/^land-\d+-\d+$/.test(snapshot.landId) ||
@@ -1304,6 +1434,10 @@ export function validateAdventurePhysics(
     for (const d of validateDestroyed(snapshot.destroyed, "destroyed prop record"))
       if (entries.has(d.id)) throw new Error("Destroyed prop still present");
   if (snapshot.version >= 4) validateCombat(snapshot.combat, entries, sim);
+  if (snapshot.version >= 5)
+    validateMechanisms(snapshot.mechanisms, snapshot.world.assemblies ?? []);
+  else if (snapshot.mechanisms !== undefined)
+    throw new Error("Mechanism state requires envelope 5");
   // A loot body may outlive its drop until the next solve (collected between ticks); drop ids
   // are never reused, so the solve removes it without ambiguity.
   for (const entry of entries.values())
@@ -1402,5 +1536,45 @@ export function validateAdventurePhysics(
       )
         throw new Error("Invalid archived prop");
     }
+    // A land archived before M07 has no assemblies yet; they are added when it is entered.
+    if (snapshot.version < 5 || a.assemblies === undefined) {
+      if (a.assemblies !== undefined || a.joints !== undefined || a.mechanisms !== undefined)
+        throw new Error("Archived assemblies require envelope 5");
+      if (a.props.some((p) => p.assembly !== undefined))
+        throw new Error("Archived member without assembly");
+      continue;
+    }
+    if (!Array.isArray(a.assemblies) || !Array.isArray(a.joints))
+      throw new Error("Invalid archived assemblies");
+    const props = new Map(a.props.map((p) => [p.id, p]));
+    const kinds = new Set<string>();
+    for (const assembly of a.assemblies) {
+      validateAssembly(assembly);
+      if (kinds.has(assembly.id)) throw new Error("Duplicate archived assembly");
+      kinds.add(assembly.id);
+      for (const id of assembly.members)
+        if (props.get(id)?.assembly !== assembly.id)
+          throw new Error("Archived assembly member missing");
+    }
+    for (const p of a.props)
+      if (
+        p.assembly !== undefined &&
+        !a.assemblies.some((x) => x.id === p.assembly && x.members.includes(p.id))
+      )
+        throw new Error("Archived member without assembly");
+    const jointIds = new Set<string>();
+    for (const joint of a.joints) {
+      validateJointEntry(joint);
+      const assembly = a.assemblies.find((x) => x.id === joint.recipe.assembly);
+      if (
+        !assembly ||
+        !assembly.members.includes(joint.recipe.a) ||
+        !assembly.members.includes(joint.recipe.b) ||
+        jointIds.has(joint.recipe.id)
+      )
+        throw new Error("Invalid archived joint");
+      jointIds.add(joint.recipe.id);
+    }
+    validateMechanisms(a.mechanisms, a.assemblies);
   }
 }

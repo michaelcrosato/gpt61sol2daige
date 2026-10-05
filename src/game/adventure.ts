@@ -1530,6 +1530,8 @@ export class Adventure {
     if (kind === "rift") {
       const other = s.mechanics.find((m) => m.id === mechanic.pair);
       if (other) {
+        // An unanchored held part rides along through the rift as one unit.
+        sim.physical?.carry(sim, p.id, other.x - p.x, other.y - p.y);
         this.place(p, other.x, other.y, sim);
         h.invulnerableUntil = sim.tick + 20;
         other.readyAt = Math.max(other.readyAt, sim.tick + 60);
@@ -1551,7 +1553,12 @@ export class Adventure {
     const s = this.state,
       tick = sim.tick;
     // Contacts collected by the previous solve become damage at this command boundary.
-    if (sim.physical) this.applyImpacts(sim, sim.physical.combat.takeImpacts());
+    if (sim.physical) {
+      this.applyImpacts(sim, sim.physical.combat.takeImpacts());
+      // Mechanism changes (latches, launches, snapped or cut links) from the previous solve.
+      for (const e of sim.physical.mechanisms.take())
+        this.emit(sim, "assembly", e.x, e.y, e.owner, e.text, 0, 0, "#e7d7a1");
+    }
     for (const p of sim.players.values()) {
       const h = this.hero(p.id),
         stats = this.stats(p.id, tick);

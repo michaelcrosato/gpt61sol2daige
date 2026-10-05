@@ -428,6 +428,8 @@ test("original M02 master-off checkpoints import frozen consequences and continu
     original.version = 2;
     delete original.scene;
     delete original.continuation;
+    delete original.assemblies;
+    delete original.joints;
     for (const entry of original.bodies) delete entry.state;
     try {
       for (const entry of original.bodies) {

@@ -11,6 +11,7 @@ import {
   validateSemanticTerrain,
 } from "../physics/adventure.ts";
 import { rapier } from "../physics/bootstrap.ts";
+import { onDeck, replicaDeckPlanks } from "../physics/mechanisms.ts";
 import { PhysicsWorld, validatePhysicsSnapshot } from "../physics/runtime.ts";
 import type { PhysicsSnapshot } from "../physics/types.ts";
 import { MAX_NPCS } from "./limits.ts";
@@ -497,7 +498,12 @@ export class Simulation {
         iy /= length;
       }
       if (length > 0) p.facing = Math.atan2(iy, ix);
-      const wading = this.world.at(p.x, p.y).terrain === Terrain.Water;
+      // M07: an anchored causeway plank keeps a traveler out of the creek.
+      const wading =
+        this.world.at(p.x, p.y).terrain === Terrain.Water &&
+        !(this.physical
+          ? this.physical.deckAt(p.x, p.y)
+          : this.replicaPhysics && onDeck(replicaDeckPlanks(this.replicaPhysics.world), p.x, p.y));
       const speed = (wading ? 58 : 115) * heroStats.speed;
       let intentX = ix * speed,
         intentY = iy * speed;
