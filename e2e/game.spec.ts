@@ -286,19 +286,11 @@ test("real WebRTC joins eight clients, syncs builds, combat and world, rejects n
       )
       .toBe(4);
     // Each guest chooses its own view budget; population changes remain host-authoritative.
-    await host.page.evaluate(() => window.fern.settings.set({ population: 32768 }));
+    // Co-op scale is not a performance gate (D53): the 6,000-creature scene above already
+    // crosses chunked transfer, so this checks only the local budget and room authority.
     await guest.page.evaluate(() =>
       window.fern.settings.set({ drawDistance: 256, entityLimit: 512 }),
     );
-    // A complete 32,768-creature frame is about 2 MB compressed. With nine browsers on a
-    // four-core runner it measured 10-14 s from the population change to a guest's replica.
-    const completeScene = { timeout: 45_000 };
-    await expect
-      .poll(
-        async () => (await guest.page.evaluate(() => window.fern.observe())).network.population,
-        completeScene,
-      )
-      .toBe(32768);
     await expect
       .poll(async () => (await guest.page.evaluate(() => window.fern.observe())).render.drawn)
       .toBeLessThanOrEqual(512);
@@ -311,16 +303,17 @@ test("real WebRTC joins eight clients, syncs builds, combat and world, rejects n
       }
     });
     expect(denied).toBe(true);
-    expect((await host.page.evaluate(() => window.fern.observe())).population).toBe(32768);
+    expect((await host.page.evaluate(() => window.fern.observe())).population).toBe(6000);
+    expect((await guest.page.evaluate(() => window.fern.observe())).network.population).toBe(6000);
     await guest.page.evaluate(() =>
       window.fern.settings.set({ drawDistance: 16384, entityLimit: 32768 }),
     );
     await expect
       .poll(async () => (await guest.page.evaluate(() => window.fern.observe())).population)
-      .toBe(32768);
+      .toBe(6000);
     await expect
       .poll(async () => (await guest.page.evaluate(() => window.fern.observe())).render.drawn)
-      .toBeGreaterThan(25000);
+      .toBeGreaterThan(512);
     const ninth = await traveler(browser, baseURL!);
     participants.push(ninth);
     const rejection = await ninth.page.evaluate(async (code) => {
@@ -333,12 +326,8 @@ test("real WebRTC joins eight clients, syncs builds, combat and world, rejects n
     }, room);
     expect(rejection).toContain("full");
     await guest.page.evaluate(() => window.fern.network.leave());
-    // At this population the loaded host can process a channel close seconds late.
     await expect
-      .poll(
-        async () => (await host.page.evaluate(() => window.fern.observe())).players.length,
-        completeScene,
-      )
+      .poll(async () => (await host.page.evaluate(() => window.fern.observe())).players.length)
       .toBe(7);
     await ninth.page.evaluate((code) => window.fern.network.join(code), room);
     await expect
