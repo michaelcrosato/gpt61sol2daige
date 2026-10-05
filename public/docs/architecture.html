@@ -336,7 +336,7 @@ recent effects. Relative float encoding retains subpixel detail far from
 the origin. Total packet size, counts, values and enum ranges are
 validated before state mutation. Both ArrayBuffer and reassembled
 Uint8Array delivery are supported and regression-tested.</p>
-<p>Wire protocol <strong>4</strong> uses a separate version-1 physical
+<p>Wire protocol <strong>5</strong> uses a separate version-2 physical
 channel described below. The bounded observational packet helper remains
 available for tools/tests: up to 65,536 compact ambient records plus
 512,000 metadata bytes (1,560,584 bytes total). It is not a complete
@@ -582,8 +582,10 @@ solver contact caches are re-created, so subsequent physical
 trajectories use outcome tolerances. Gameplay facts remain exact.
 Corrupt compatible bytes are rejected, not silently replaced with fresh
 content. Original M01 v1 and M02 v2 lab bytes, M03 adventure v1/world
-v3, and pre-physics version-1 games import explicitly; only content
-absent from an old save receives defaults.</p>
+v3, and pre-physics version-1 games import explicitly; old version-1
+co-op legacy/replica flags migrate into fresh authoritative physics with
+unchanged builds/terrain; only content absent from an old save receives
+defaults.</p>
 <p><code>validateSave</code>, <code>validatePhysicsSnapshot</code> and
 semantic terrain validation reject invalid identities, motor/policy
 facts, pose mappings, seed/land bindings and recipes before allocating a
@@ -593,25 +595,32 @@ correspondence. <code>Adventure.configureTerrain</code> shares seeded
 region configuration with validation. Pending terrain saves keep the
 previous collider boundary until the next tick, as in M03.</p>
 <p><code>src/net/physical.ts</code> owns physical wire
-<strong>1</strong>, separate from the observational JSON header. A
+<strong>2</strong>, separate from the observational JSON header. A
 <code>physical-start</code> manifest names sequence, scene revision,
-total UTF-8 length, chunk count and checksum.
+compressed and expanded UTF-8 lengths, chunk count and checksum.
 <code>physical-chunk</code> payloads are at most <strong>48,000
-bytes</strong>; total transfer is explicitly bounded at
-<strong>256,000,000 bytes</strong>. The payload includes a complete
-portable save and reliable scene/spawn/remove/policy lifecycle events.
-Every selected ambient creature and physical body is carried. A scene
-exceeding that bound reports an export/checkpoint-loading error; no body
-is clipped. Complete frames are shared among recipients at the same
-tick; sending waits for acknowledgement/backpressure without altering
-host simulation or physical eligibility. Large scenes may transmit at
-less than the nominal 10 Hz cadence.</p>
+bytes</strong>; compressed and expanded transfer lengths are explicitly
+bounded at <strong>256,000,000 bytes</strong> each. Native gzip streams
+preserve every semantic fact; bounded inflation rejects over-expansion
+before scene allocation. The payload includes a complete portable save
+and reliable scene/spawn/remove/policy lifecycle events. Every selected
+ambient creature and physical body is carried. A scene exceeding that
+bound reports an export/checkpoint-loading error; no body is clipped.
+Complete frames are shared among recipients at the same tick; sending
+waits for acknowledgement/backpressure without altering host simulation
+or physical eligibility. Large scenes may transmit at less than the
+nominal 10 Hz cadence.</p>
 <p>One receiver stages chunks, accepting equal duplicates and any chunk
 order after its manifest. Missing chunks leave the previous complete
 scene intact. Conflicting duplicates, invalid counts/lengths,
 checksum/schema corruption and old sequences cannot publish a partial
 world. A new transfer supersedes unfinished staging; unacknowledged
-transfers retry after five seconds. The manifest precedes chunks on the
+transfers retry the same immutable sequence/payload after five seconds.
+Chunk bursts respect both native and PeerJS buffered data. Already
+committed duplicates receive acknowledgement, and accepted actions
+invalidate same-tick caches. Valid transfer traffic refreshes
+join/connection liveness, so loading a large baseline does not
+spuriously close a working channel. The manifest precedes chunks on the
 reliable channel. Both PeerJS ArrayBuffer and Uint8Array chunk forms are
 supported. First baseline publication/acknowledgement precedes guest
 interactions. A pending join retains its old local scene until a
@@ -643,7 +652,14 @@ and frees replaced worlds/queues. Received ambient arrays preserve the
 actual selected population, even when a guest’s draw budget is small.
 The CLI’s <code>restore-file</code> parses expanded checkpoint files
 outside the unchanged 8 MB JSONL command limit; browser IndexedDB and
-JSON export retain complete saves.</p></main>
+JSON export retain complete saves.</p>
+<p>M04 release repair also keeps paused browser input stable until
+explicit input or resume. A distant teleport publishes Rapier’s solved
+Float32 pose to game state immediately, so legitimate paused saves do
+not contain contradictory coordinates. Version-1 co-op solver flags
+migrate to fresh physics initialized in the saved land after restoring
+game/terrain, avoiding unused initial worlds and phantom land
+archives.</p></main>
 <footer>Fern · A world engine built for agents · <a href="https://github.com/michaelcrosato/gpt61sol2daige">Source on GitHub</a></footer>
 </body>
 </html>

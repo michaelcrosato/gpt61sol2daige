@@ -19,7 +19,7 @@ function scene(count = 0) {
 function transfer(sim: Simulation, sequence = 0) {
   const state = sim.save(true);
   return frameTransfer({
-    version: 1,
+    version: 2,
     sequence,
     revision: 1,
     scene: physicalScene(state),
@@ -126,34 +126,42 @@ test("incompatible backend rebuild preserves every semantic body, motor, policy 
     rebuilt.dispose();
   }
 });
-test("atomic baselines handle missing, duplicate, reversed and stale chunks without exposing partial scenes", () => {
-  const sim = scene(256),
+test("atomic baselines handle missing, duplicate, reversed and stale chunks without exposing partial scenes", async () => {
+  const sim = scene(2048),
     replica = new Simulation(142, 0, "replica"),
     receiver = new BaselineReceiver();
   try {
-    const first = transfer(sim);
+    const first = await transfer(sim);
     assert.ok(first.chunks.length > 1);
     receiver.begin(first.start);
     const before = replica.stateHash();
     for (const chunk of first.chunks.slice(1).reverse()) {
-      assert.equal(receiver.chunk(chunk), null);
-      assert.equal(receiver.chunk(chunk), null);
+      assert.equal(await receiver.chunk(chunk), null);
+      assert.equal(await receiver.chunk(chunk), null);
     }
     assert.equal(replica.stateHash(), before);
-    const full = receiver.chunk({
+    const full = (await receiver.chunk({
       ...first.chunks[0],
       bytes: (first.chunks[0].bytes as Uint8Array).slice().buffer,
-    })!;
+    }))!;
     assert.ok(full);
+    assert.equal(receiver.isComplete(first.start.sequence), true);
+    assert.equal(receiver.isComplete(first.start.sequence + 1), false);
     replica.applyReplica(full.state);
     assert.equal(replica.replicaPhysics!.world.bodies.length, sim.physical!.world.ids().length);
-    const newer = transfer(sim, 2);
+    assert.ok(first.start.length < first.start.expandedLength);
+    const bounded = new BaselineReceiver();
+    bounded.begin({ ...first.start, expandedLength: 64 });
+    for (const chunk of first.chunks.slice(0, -1)) await bounded.chunk(chunk);
+    await assert.rejects(() => bounded.chunk(first.chunks.at(-1)!), /declared bound/);
+    assert.equal(replica.replicaPhysics!.world.bodies.length, sim.physical!.world.ids().length);
+    const newer = await transfer(sim, 2);
     receiver.begin(newer.start);
-    assert.equal(receiver.chunk(first.chunks[0]), null);
+    assert.equal(await receiver.chunk(first.chunks[0]), null);
     const bad = { ...newer.chunks[0], bytes: new Uint8Array(newer.chunks[0].bytes as Uint8Array) };
-    receiver.chunk(bad);
+    await receiver.chunk(bad);
     bad.bytes[0] ^= 1;
-    assert.throws(() => receiver.chunk(bad), /Conflicting/);
+    await assert.rejects(() => receiver.chunk(bad), /Conflicting/);
     assert.throws(
       () => receiver.begin({ ...newer.start, sequence: 3, length: 256_000_001 }),
       /framing/,
@@ -273,12 +281,15 @@ test("legacy game checkpoints retain builds/terrain; CLI imports files beyond it
     old = sim.save();
   old.version = 1;
   delete old.actorPhysics;
+  old.movementBackend = "legacy";
   const restored = Simulation.restore(old);
   mkdirSync("artifacts", { recursive: true });
   const directory = mkdtempSync("artifacts/m04-import-");
   const expanded = scene(5000);
   try {
     assert.deepEqual(restored.adventure.save(), old.adventure);
+    assert.equal(restored.movementBackend, "rapier");
+    assert.ok(restored.physical);
     assert.deepEqual(restored.save().patches, old.patches);
     expanded.physical!.configure({
       expectedRevision: 0,
@@ -306,5 +317,53 @@ test("legacy game checkpoints retain builds/terrain; CLI imports files beyond it
     restored.dispose();
     expanded.dispose();
     rmSync(directory, { recursive: true });
+  }
+});
+
+test("fractional distant teleports publish the movement owner's pose before paused save/restore", () => {
+  const sim = scene();
+  try {
+    sim.world.paint(500000, 2, 1, 1, 5, 0);
+    sim.teleport("local", 8000000.1, 34.1);
+    const pose = sim.physical!.world.pose("player-local");
+    assert.equal(sim.players.get("local")!.x, pose.x);
+    const restored = Simulation.restore(sim.save());
+    try {
+      sim.step();
+      restored.step();
+      assert.deepEqual(sim.save(), restored.save());
+    } finally {
+      restored.dispose();
+    }
+  } finally {
+    sim.dispose();
+  }
+});
+
+test("old co-op land saves initialize default physics in the saved land without phantom archives", () => {
+  const old = new Simulation(142, 64, "legacy");
+  old.addPlayer("local");
+  old.addPlayer("guest");
+  old.adventure.startArea(old, 9);
+  const state = old.save();
+  state.version = 1;
+  const restored = Simulation.restore(state);
+  try {
+    assert.equal(restored.movementBackend, "rapier");
+    assert.equal(restored.physical!.landId, "land-1-2");
+    assert.deepEqual(restored.save().actorPhysics!.archives, []);
+    assert.deepEqual(restored.adventure.save(), state.adventure);
+    restored.step();
+    const next = Simulation.restore(restored.save());
+    try {
+      restored.step();
+      next.step();
+      assert.deepEqual(next.save(), restored.save());
+    } finally {
+      next.dispose();
+    }
+  } finally {
+    old.dispose();
+    restored.dispose();
   }
 });

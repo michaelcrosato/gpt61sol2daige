@@ -62,7 +62,16 @@ export class Coop {
   private generation = 0;
   private joinRequest = 0;
   private readonly receiver = new BaselineReceiver();
-  private readonly transfers = new Map<string, { sequence: number; sentAt: number }>();
+  private readonly transfers = new Map<
+    string,
+    {
+      sequence: number;
+      sentAt: number;
+      cursor: number;
+      transfer?: Awaited<ReturnType<typeof frameTransfer>>;
+    }
+  >();
+  private lastReceive = 0;
   private readonly ready = new Set<string>();
   private frameSequence = 0;
   private revision = 0;
@@ -71,13 +80,44 @@ export class Coop {
   private policySignature = "";
   private cachedTransfer?: ReturnType<typeof frameTransfer>;
   private transferKey = "";
-  private sendPhysical(conn: DataConnection): void {
+  private async sendPhysical(conn: DataConnection): Promise<void> {
     if (!conn.open || this.transfers.has(conn.peer)) return;
+    const pending = { sequence: -1, sentAt: performance.now(), cursor: 0 } as {
+      sequence: number;
+      sentAt: number;
+      cursor: number;
+      transfer?: Awaited<ReturnType<typeof frameTransfer>>;
+    };
+    this.transfers.set(conn.peer, pending);
+    try {
+      const transfer = await this.buildTransfer();
+      if (
+        this.transfers.get(conn.peer) !== pending ||
+        this.connections.get(conn.peer) !== conn ||
+        !conn.open
+      )
+        return;
+      pending.transfer = transfer;
+      pending.sequence = transfer.start.sequence;
+      conn.send(transfer.start);
+      this.pumpTransfer(conn);
+    } catch (error) {
+      if (this.transfers.get(conn.peer) !== pending) return;
+      this.transfers.delete(conn.peer);
+      if (conn.open)
+        conn.send({
+          type: "error",
+          message: error instanceof Error ? error.message : "Physical transfer failed",
+        });
+      this.status.message = error instanceof Error ? error.message : "Physical transfer failed";
+      this.changed();
+    }
+  }
+  private buildTransfer(): ReturnType<typeof frameTransfer> {
     const sim = this.getSim();
     const key = `${sim.tick}:${sim.world.revision}:${[...sim.players.keys()].join(",")}`;
     if (this.transferKey === key && this.cachedTransfer) {
-      this.sendTransfer(conn, this.cachedTransfer);
-      return;
+      return this.cachedTransfer;
     }
     const state = this.getSim().save(true);
     if (!state.actorPhysics) throw new Error("Host has no authoritative physical scene");
@@ -97,7 +137,7 @@ export class Coop {
     this.policySignature = policy;
     const sequence = this.frameSequence++;
     const transfer = frameTransfer({
-      version: 1,
+      version: 2,
       sequence,
       revision: this.revision,
       scene,
@@ -106,13 +146,28 @@ export class Coop {
     });
     this.cachedTransfer = transfer;
     this.transferKey = key;
-    this.sendTransfer(conn, transfer);
+    return transfer;
   }
-  private sendTransfer(conn: DataConnection, transfer: ReturnType<typeof frameTransfer>): void {
-    this.transfers.set(conn.peer, { sequence: transfer.start.sequence, sentAt: performance.now() });
-    conn.send(transfer.start);
-    for (const chunk of transfer.chunks) {
+  private pumpTransfer(conn: DataConnection): void {
+    const pending = this.transfers.get(conn.peer),
+      transfer = pending?.transfer;
+    if (!pending || !transfer || !conn.open) return;
+    if (pending.cursor === transfer.chunks.length && performance.now() - pending.sentAt > 5000) {
+      // Retry the identical scene/sequence. Replacing staging every timeout can starve large joins.
+      pending.cursor = 0;
+      conn.send(transfer.start);
+    }
+    for (
+      let burst = 0;
+      burst < 4 &&
+      pending.cursor < transfer.chunks.length &&
+      conn.dataChannel.bufferedAmount < 262144 &&
+      (!("bufferSize" in conn) || Number(conn.bufferSize) < 8);
+      burst++
+    ) {
+      const chunk = transfer.chunks[pending.cursor++];
       conn.send(chunk);
+      pending.sentAt = performance.now();
       this.status.sent += chunk.bytes.byteLength;
     }
   }
@@ -206,14 +261,7 @@ export class Coop {
       welcomeAt = now;
       conn.send({ type: "welcome", id: conn.peer, version: PROTOCOL_VERSION });
       this.getSim().physical?.begin(this.getSim());
-      try {
-        this.sendPhysical(conn);
-      } catch (error) {
-        conn.send({
-          type: "error",
-          message: error instanceof Error ? error.message : "Physical baseline unavailable",
-        });
-      }
+      void this.sendPhysical(conn);
     };
     const admit = () => {
       if (!this.channelOpen(conn) || this.connections.get(conn.peer) === conn) return;
@@ -256,7 +304,14 @@ export class Coop {
       }
       if (this.connections.get(conn.peer) !== conn) return;
       if (data.type === "physical-ack") {
-        if (data.sequence === this.transfers.get(conn.peer)?.sequence) {
+        const pending = this.transfers.get(conn.peer);
+        if (
+          pending?.transfer &&
+          pending.cursor === pending.transfer.chunks.length &&
+          Number.isSafeInteger(data.sequence) &&
+          Number(data.sequence) >= 0 &&
+          data.sequence === pending.sequence
+        ) {
           this.transfers.delete(conn.peer);
           this.ready.add(conn.peer);
         }
@@ -280,7 +335,8 @@ export class Coop {
             this.getSim().adventure.action(this.getSim(), conn.peer, action);
           }
           conn.send({ type: "action-result", seq: data.seq, ok: true });
-          this.sendPhysical(conn);
+          this.cachedTransfer = undefined;
+          void this.sendPhysical(conn);
         } catch (error) {
           conn.send({
             type: "action-result",
@@ -416,33 +472,48 @@ export class Coop {
           clearTimeout(timer);
           clearInterval(welcomeTimer);
         };
-        const timer = setTimeout(() => {
+        this.lastReceive = performance.now();
+        let timer: ReturnType<typeof setTimeout>;
+        const checkTimeout = () => {
+          const remaining = timeout - (performance.now() - this.lastReceive);
+          if (remaining > 0) {
+            timer = setTimeout(checkTimeout, remaining);
+            return;
+          }
           clearTimers();
           reject(
             new RetryableJoinError(
               "Could not reach the host. They must keep their expedition open. Some networks require a TURN relay.",
             ),
           );
-        }, timeout);
+        };
+        timer = setTimeout(checkTimeout, timeout);
         const done = () => {
           if (completed) return;
           completed = true;
           clearTimers();
           resolve();
         };
-        conn.on("data", (raw) => {
+        conn.on("data", async (raw) => {
           if (generation !== this.generation) return;
           try {
             if (raw && typeof raw === "object") {
               const data = raw as Record<string, unknown>;
               if (data.type === "physical-start" && welcomed) {
                 this.receiver.begin(data as unknown as BaselineStart);
+                this.lastReceive = performance.now();
                 return;
               }
               if (data.type === "physical-chunk" && welcomed) {
-                const frame = this.receiver.chunk(data as unknown as BaselineChunk);
+                this.lastReceive = performance.now();
+                const frame = await this.receiver.chunk(data as unknown as BaselineChunk);
+                if (generation !== this.generation) return;
                 this.status.received += (data.bytes as Uint8Array)?.byteLength ?? 0;
-                if (!frame) return;
+                if (!frame) {
+                  if (this.receiver.isComplete(Number(data.sequence)))
+                    conn.send({ type: "physical-ack", sequence: data.sequence });
+                  return;
+                }
                 if (!frame.state.players.some((p) => p.id === this.localId))
                   throw new Error("Host removed this traveler");
                 const sim = this.getSim();
@@ -482,6 +553,7 @@ export class Coop {
               }
             }
           } catch (error) {
+            if (generation !== this.generation) return;
             clearTimers();
             reject(error);
             if (completed) {
@@ -575,7 +647,7 @@ export class Coop {
         });
         this.lastSent = now;
       }
-      if (now - this.lastSnapshot > 10000) {
+      if (now - Math.max(this.lastSnapshot, this.lastReceive) > 10000) {
         this.disconnect();
         this.status.message = "Host stopped responding. Continuing solo.";
         this.changed();
@@ -585,22 +657,19 @@ export class Coop {
     if (this.status.role !== "host") return;
     for (const [id, time] of this.lastInput)
       if (now - time > 300) this.getSim().setInput(id, idleInput());
+    for (const conn of this.connections.values()) this.pumpTransfer(conn);
     this.elapsed += dt;
     if (this.elapsed < 0.1) return;
     this.elapsed = 0;
-    for (const [id, conn] of this.connections)
-      if (conn.open && conn.dataChannel.bufferedAmount < 262144) {
-        const pending = this.transfers.get(id);
-        if (pending && now - pending.sentAt > 5000) this.transfers.delete(id);
-        try {
-          this.sendPhysical(conn);
-        } catch (error) {
-          this.status.message = error instanceof Error ? error.message : "Physical transfer failed";
-          conn.send({ type: "error", message: this.status.message });
-          this.changed();
-        }
-      }
+    for (const conn of this.connections.values())
+      if (
+        conn.open &&
+        conn.dataChannel.bufferedAmount < 262144 &&
+        (!("bufferSize" in conn) || Number(conn.bufferSize) < 8)
+      )
+        void this.sendPhysical(conn);
   }
+
   disconnect(cancelJoin = true, recover = true): void {
     if (cancelJoin) this.joinRequest++;
     this.generation++;

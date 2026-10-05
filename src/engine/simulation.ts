@@ -379,6 +379,11 @@ export class Simulation {
     p.y = p.py = y;
     p.vx = p.vy = 0;
     this.physical?.teleport(playerBodyId(id), x, y);
+    if (this.physical?.world.has(playerBodyId(id))) {
+      const pose = this.physical.world.pose(playerBodyId(id));
+      p.x = p.px = pose.x;
+      p.y = p.py = pose.y;
+    }
   }
   private emit(type: GameEvent["type"], p: Player, message: string): void {
     this.events.push({ tick: this.tick, type, x: p.x, y: p.y, player: p.id, message });
@@ -808,10 +813,11 @@ export class Simulation {
   }
   static restore(state: SaveState): Simulation {
     validateSave(state);
+    const backend = state.version === 1 ? "rapier" : (state.movementBackend ?? "rapier");
     const sim = new Simulation(
       state.seed,
       0,
-      state.actorPhysics ? "replica" : (state.movementBackend ?? "rapier"),
+      state.actorPhysics || backend === "rapier" ? "replica" : backend,
     );
     if (state.patches?.length) sim.world.setPatches(state.patches);
     sim.tick = state.tick;
@@ -838,7 +844,10 @@ export class Simulation {
         sim.dispose();
         throw error;
       }
-    } else sim.physical?.synchronizeLand(sim);
+    } else if (backend === "rapier") {
+      sim.physical = new AdventurePhysics(sim);
+      sim.movementBackend = "rapier";
+    }
     if (state.playground) {
       try {
         sim.playground = PhysicsWorld.restore(state.playground);

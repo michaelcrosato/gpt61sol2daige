@@ -1,0 +1,12 @@
+{
+  "source": "m03-coop",
+  "sha": "c3ae7201aafaf5719bcf0a235dcd5fcd1255b75a",
+  "saveBefore": 1,
+  "backendBefore": "legacy",
+  "saveAfter": 2,
+  "backendAfter": "rapier",
+  "landId": "land-1-2",
+  "buildsAndTerrainPreserved": true,
+  "phantomArchives": false,
+  "roundTripContinuation": true
+}

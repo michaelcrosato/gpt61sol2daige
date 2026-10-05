@@ -203,7 +203,7 @@ node tools/agent.ts --count 0 < examples/physics-playground.jsonl
 
 When importing the engine directly, await `initializePhysics()` from `src/physics/bootstrap.ts` first; synchronous construction, restore, commands and replay follow that barrier. Dispose caller-owned `Simulation` instances when finished. World-v4 checkpoints identify the backend and retain complete semantic state for incompatible-backend rebuilding; original M01/M02 raw formats import explicitly, and old version-1 saves without this member retain their builds/terrain with fresh physical content. FPS/throughput telemetry is informational, with no FPS acceptance threshold.
 
-M02's policy document remains version 1. M04 writes outer save 2, adventure envelope 2 and world 4, retaining explicit M01–M03 import. Room protocol is 4 with a separate physical channel. Collider/region overlays are local device preferences, absent from saves and hashes.
+M02's policy document remains version 1. M04 writes outer save 2, adventure envelope 2 and world 4, retaining explicit M01–M03 import. Room protocol is 5 with a separate physical channel. Collider/region overlays are local device preferences, absent from saves and hashes.
 
 Each policy edit has `type` and these fields:
 
@@ -281,7 +281,7 @@ window.fern.network.status(); // baselineReady, physicalRevision, population, by
 
 A guest must finish its complete baseline before interacting. Requests accept a prop within 96 units, ±120 impulse components and optional paired application coordinates within 32 units of that prop. The host supplies identity and rejects policy fields, actor targets, unknown objects and excessive/far interactions. Frozen props discard impulses. Host `actors/configure` uses the same expectedRevision/atomic edits as solo; guests can read `inspect`, `body` and `policy` but cannot edit shared physics. The host lab's Playable adventure controls remain available online; explicit paused apply requires a solo pause.
 
-Physical wire 1 uses protocol-4 rooms and reliable 48,000-byte chunks with a checked manifest, complete portable scene and lifecycle events. Its 256 MB total bound is separate from the observational packet's 512 KB header. Missing/duplicate/reversed/stale chunks never publish partial state. All selected ambient creatures and physical bodies remain in the replica even when local draw settings show fewer. Large scene transmission can take longer; it never cuts physical eligibility. Portal/land transitions snap interpolation, and leaving/host loss retains the received scene and each guest's build for solo play.
+Physical wire 2 uses protocol-5 rooms and reliable 48,000-byte chunks with a checked manifest, complete portable scene and lifecycle events. Its 256 MB total bound is separate from the observational packet's 512 KB header. Missing/duplicate/reversed/stale chunks never publish partial state. All selected ambient creatures and physical bodies remain in the replica even when local draw settings show fewer. Lossless gzip and buffer-paced immutable retries carry the whole scene; a progressing baseline can outlast the initial handshake timer. Compressed and expanded lengths are bounded, and inflation is validated before publication. Large scene transmission can take longer; it never cuts physical eligibility. Portal/land transitions snap interpolation, and leaving/host loss retains the received scene and each guest's build for solo play.
 
 ```bash
 node tools/agent.ts --count 0 <<'JSONL'
