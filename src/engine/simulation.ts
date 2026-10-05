@@ -11,7 +11,7 @@ import {
   validateSemanticTerrain,
 } from "../physics/adventure.ts";
 import { rapier } from "../physics/bootstrap.ts";
-import { onDeck, replicaDeckPlanks } from "../physics/mechanisms.ts";
+import { type LinkView, linkViews, onDeck, replicaDeckPlanks } from "../physics/mechanisms.ts";
 import { PhysicsWorld, validatePhysicsSnapshot } from "../physics/runtime.ts";
 import type { PhysicsSnapshot } from "../physics/types.ts";
 import { MAX_NPCS } from "./limits.ts";
@@ -159,6 +159,17 @@ export class Simulation {
           angle: old.angle + angleDelta * alpha,
         };
       });
+  }
+  /** Drawable joints (M07) from the live world or, on guests, the received scene. */
+  physicalLinks(alpha = 1): LinkView[] {
+    if (this.physical) {
+      const world = this.physical.world;
+      return linkViews(world.jointList(), (id) => (world.has(id) ? world.pose(id) : undefined));
+    }
+    const joints = this.replicaPhysics?.world.joints;
+    if (!joints?.length) return [];
+    const props = new Map(this.physicalProps(alpha).map((p) => [p.id, p]));
+    return linkViews(joints, (id) => props.get(id));
   }
   ownsPhysicalAmbient(slot: number): boolean {
     return this.physical?.ownsAmbient(slot) ?? this.replicaAmbient.has(slot);

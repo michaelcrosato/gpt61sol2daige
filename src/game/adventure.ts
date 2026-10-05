@@ -5,6 +5,7 @@ import { World } from "../engine/world.ts";
 import { enemyBodyId, type PropHit, playerBodyId } from "../physics/adventure.ts";
 import { LOOT_SETTLE_TICKS, type PendingImpact } from "../physics/combat.ts";
 import { MATERIALS } from "../physics/materials.ts";
+import { insidePen } from "../physics/mechanisms.ts";
 import type { AreaRecipe } from "./content.ts";
 import {
   ARCHETYPES,
@@ -1308,7 +1309,8 @@ export class Adventure {
       (elite ? 2 : 1) *
       (1 + (sim.players.size - 1) * 0.45);
     const hp = baseHealth * s.tuning.enemyHealth * s.tuning.difficulty;
-    if (!sim.world.walkable(x, y)) {
+    // Nothing starts a wave penned behind a gate (M07): a jammed gate must not trap the goal.
+    if (!sim.world.walkable(x, y) || insidePen(s.recipe, x, y)) {
       x = s.recipe.x + ((ordinal % 7) - 3) * 18;
       y = s.recipe.y + ((ordinal % 5) - 2) * 18;
     }

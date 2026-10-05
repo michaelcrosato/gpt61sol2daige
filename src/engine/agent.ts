@@ -5,10 +5,11 @@ import type { AdventureAction } from "../game/types.ts";
 import { adventureAreaAt } from "../physics/adventure.ts";
 import { blueprintExport } from "../physics/blueprints.ts";
 import { interactPhysics } from "../physics/interaction.ts";
+import { linkViews, mechanismExport } from "../physics/mechanisms.ts";
 import type { PolicyEdit } from "../physics/policies.ts";
 import { PolicyController } from "../physics/policies.ts";
 import { createPlayground } from "../physics/runtime.ts";
-import type { BodyRecipe } from "../physics/types.ts";
+import type { AssemblyRecipe, BodyRecipe, JointMotor, JointRecipe } from "../physics/types.ts";
 import { ENGINE_VERSION, idleInput, MAX_NPCS, type SaveState, Simulation } from "./simulation.ts";
 import { LANDMARKS, WORLD_LIMIT } from "./world.ts";
 
@@ -35,15 +36,23 @@ export const COMMANDS = {
       "place: id,x,y relocates the existing lab body, clears motion and corrects wake overlaps; drive: id,x,y sets contact actor velocity (±600 units/s)",
     description:
       "Separate solo Rapier playground; step/save/restore/replay include it. Use actors for the integrated adventure physical world.",
+    assembly:
+      "assembly: recipe {id,kind:lab,areaId,root,members,event:none} for already spawned bodies whose recipe names it in `assembly`, plus joints [{id,kind:hinge|fixed|rope|spring|slider,assembly,a,b,anchorA,anchorB,frame?,length?,stiffness?,damping?,limits?,axis?,motor?,breakLoad,toughness}]; cut: id, damage; motor: id, motor {mode:position|velocity,target,stiffness,damping} or null",
   },
   actors: {
     action:
-      "inspect (default), body, props, recipes, attacks, damage, configure, apply, policy, impulse, place, spawn",
+      "inspect (default), body, props, recipes, attacks, mechanisms, damage, cut, motor, transport, configure, apply, policy, impulse, place, spawn",
     description:
-      "Host/solo adventure physical world; guests inspect received bodies, props, destroyed records and policies. Shared tuning and damage are host-only.",
+      "Host/solo adventure physical world; guests inspect received bodies, props, destroyed records, assemblies, joints and policies. Shared tuning, damage and cuts are host-only.",
     values:
-      "worldReactions, dynamicProps, propBlocking, crowdContacts, ambientPhysics, sweptCollision, destruction, impactDamage, projectileWorld, physicalLoot: booleans; impulseStrength, impactStrength: 0..10; materialDurability: 0.05..20 (x toughness); debrisLifetime: 0..3600 s (0 = scene lifetime)",
-    id: "body/impulse/place/damage: player-<player id>, enemy-<id>, ambient-<slot>-<generation>, crate-<area>-<ordinal>, wheel-<area>, prop-<family>-<area>-<n>, <parent id>-<piece>",
+      "worldReactions, dynamicProps, propBlocking, crowdContacts, ambientPhysics, sweptCollision, destruction, impactDamage, projectileWorld, physicalLoot, mechanisms, jointBreakage: booleans; impulseStrength, impactStrength: 0..10; materialDurability, jointStrength: 0.05..20 (x toughness / break thresholds); debrisLifetime: 0..3600 s (0 = scene lifetime)",
+    mechanisms:
+      "mechanisms: the M07 registry (kinds, joint types, strain/cut/motor/policy rules) plus every assembly, joint (intact or broken, load, damage, motor), drawable link and gate/launcher/causeway state",
+    cut: "cut: id <assembly>:<joint> (gate-1:hinge, chain-1:anchor, vine-1:pod, bridge-1:south…), optional damage (default: enough to sever); honors jointBreakage",
+    motor: "motor: hinge/slider id and motor {mode,target,stiffness,damping} or null",
+    transport:
+      "transport: id of a member, dx, dy; moves its whole connected part (refused while anchored to a post)",
+    id: "body/impulse/place/damage: player-<player id>, enemy-<id>, ambient-<slot>-<generation>, crate-<area>-<ordinal>, wheel-<area>, prop-<family>-<area>-<n>, <parent id>-<piece>; mechanism parts prop-gate-<area>-leaf, prop-chain-<area>-ball, prop-vine-<area>-pod, prop-launcher-<area>-sled, prop-vane-<area>-rotor, prop-bridge-<area>-plank<k>",
     props:
       "props: every scenery body with material, blueprint {family, palette, piece?, parent?, expiresAt?} and durability %, plus destroyed-parent records",
     recipes: "recipes: reproducible material/blueprint/fracture/layout export",
@@ -177,8 +186,21 @@ export class AgentRuntime {
               props: this.sim.physicalProps(),
               destroyed: snapshot.destroyed ?? [],
               combat: snapshot.combat ?? null,
+              mechanisms: snapshot.mechanisms ?? null,
+              assemblies: snapshot.world.assemblies ?? [],
+              joints: snapshot.world.joints ?? [],
               policies: new PolicyController(snapshot.world.policies).inspect(),
             };
+          if (action === "mechanisms") {
+            const states = new Map(snapshot.world.bodies.map((b) => [b.recipe.id, b.state]));
+            return {
+              registry: mechanismExport(),
+              assemblies: snapshot.world.assemblies ?? [],
+              joints: snapshot.world.joints ?? [],
+              links: linkViews(snapshot.world.joints ?? [], (id) => states.get(id)),
+              state: snapshot.mechanisms ?? null,
+            };
+          }
           if (action === "props")
             return { props: this.sim.physicalProps(), destroyed: snapshot.destroyed ?? [] };
           if (action === "recipes") return blueprintExport();
@@ -206,6 +228,16 @@ export class AgentRuntime {
           return { props: physical.props(), destroyed: physical.destroyedRecords() };
         if (action === "recipes") return blueprintExport();
         if (action === "attacks") return attackExport();
+        if (action === "mechanisms")
+          return {
+            registry: mechanismExport(),
+            assemblies: world.assemblyList(),
+            joints: world.jointList(),
+            links: linkViews(world.jointList(), (id) =>
+              world.has(id) ? world.pose(id) : undefined,
+            ),
+            state: physical.mechanisms.save(),
+          };
         if (action === "body") {
           if (typeof command.id !== "string") throw new Error("Body id required");
           return world.pose(command.id);
@@ -237,6 +269,18 @@ export class AgentRuntime {
             damage,
             num("angle", 0),
           );
+        } else if (action === "cut") {
+          if (typeof command.id !== "string") throw new Error("Joint id required");
+          const damage = command.damage === undefined ? undefined : num("damage");
+          if (damage !== undefined && (damage < 0 || damage > 1_000_000))
+            throw new Error("damage must be 0..1000000");
+          result = physical.cut(this.sim, player, command.id, damage);
+        } else if (action === "motor") {
+          if (typeof command.id !== "string") throw new Error("Joint id required");
+          world.setMotor(command.id, (command.motor ?? null) as JointMotor | null);
+        } else if (action === "transport") {
+          if (typeof command.id !== "string") throw new Error("Body id required");
+          world.transport(world.partMembers(command.id), num("dx"), num("dy"));
         } else if (action === "spawn") {
           const body = command.body as BodyRecipe;
           if (body?.role !== "prop" || !body.id?.startsWith("prop-"))
@@ -285,7 +329,15 @@ export class AgentRuntime {
           const world = this.sim.playground;
           if (!world) throw new Error("Open the physics playground with physics/reset first");
           if (action === "spawn") world.spawn(command.body as BodyRecipe);
-          else if (action === "configure")
+          else if (action === "assembly")
+            world.addAssembly(command.recipe as AssemblyRecipe, command.joints as JointRecipe[]);
+          else if (action === "cut") {
+            if (typeof command.id !== "string") throw new Error("Joint id required");
+            result = world.damageJoint(command.id, num("damage"), "cut");
+          } else if (action === "motor") {
+            if (typeof command.id !== "string") throw new Error("Joint id required");
+            world.setMotor(command.id, (command.motor ?? null) as JointMotor | null);
+          } else if (action === "configure")
             result = world.configure({
               expectedRevision: num("expectedRevision"),
               edits: command.edits as PolicyEdit[],

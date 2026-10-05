@@ -25,6 +25,7 @@ import { Coop } from "./net/coop.ts";
 import { variantName } from "./physics/blueprints.ts";
 import { initializePhysics } from "./physics/bootstrap.ts";
 import { GRAB_MAX_MASS, GRAB_REACH } from "./physics/combat.ts";
+import { passesActors } from "./physics/runtime.ts";
 import type { BodyPose } from "./physics/types.ts";
 import { Renderer } from "./render/renderer.ts";
 
@@ -166,7 +167,13 @@ function grabTarget(): BodyPose | null {
   let best: BodyPose | null = null,
     distance = GRAB_REACH;
   for (const prop of runtime.sim.physicalProps()) {
-    if (prop.motion !== "dynamic" || prop.frozen || (prop.mass ?? 1) > GRAB_MAX_MASS) continue;
+    if (
+      prop.motion !== "dynamic" ||
+      prop.frozen ||
+      (prop.mass ?? 1) > GRAB_MAX_MASS ||
+      passesActors(prop)
+    )
+      continue;
     const d = Math.hypot(prop.x - player.x, prop.y - player.y);
     if (d < distance || (d === distance && best && prop.id < best.id)) {
       best = prop;
@@ -1165,6 +1172,15 @@ function processEvents(): void {
         audio.play(material as MaterialSound);
       if (event.type === "break") audio.play("crumble");
     } else if (event.type === "grab") audio.play(event.text.startsWith("throw") ? "dash" : "step");
+    else if (event.type === "assembly") {
+      // Mechanism changes: snapped or cut links ring by material; launches whoosh; latches click.
+      const kind = event.text.split(":")[0];
+      if (event.text.endsWith(":snapped") || event.text.endsWith(":cut"))
+        audio.play(kind === "chain" || kind === "launcher" ? "metal" : "wood");
+      else if (event.text === "launcher:fired") audio.play("dash");
+      else if (event.text === "bridge:span-lost") audio.play("crumble");
+      else audio.play("step");
+    }
   }
   if (runtime.sim.adventure.state.events.length)
     latestCombatEvent = runtime.sim.adventure.state.events.at(-1)!.id;

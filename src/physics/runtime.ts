@@ -894,6 +894,72 @@ export class PhysicsWorld {
         this.breakJoint(r.id, "strain", load);
     }
   }
+  /**
+   * Rapier's iterative solver lets long chains of light parts (a vine's segments, chain links)
+   * stretch far past their length under a sustained pull. After each solve, every connected
+   * part is walked outward from its root (breadth first, joints in id order): a child whose
+   * hinge pin has drifted from its parent's, or whose rope is longer than its length, is moved
+   * back and loses the speed that was separating it. Fixed and frozen parts are never moved.
+   */
+  private projectJoints(): void {
+    const parts = this.assemblyPartMap(),
+      roots = [...new Set([...parts.values()])]
+        .filter((part) => part.size > 1)
+        .map((part) => part.root)
+        .sort(compareIds);
+    const byBody = new Map<string, JointEntry[]>();
+    for (const entry of [...this.joints.values()].sort((a, b) =>
+      compareIds(a.recipe.id, b.recipe.id),
+    )) {
+      if (entry.broken || (entry.recipe.kind !== "hinge" && entry.recipe.kind !== "rope")) continue;
+      for (const id of [entry.recipe.a, entry.recipe.b]) {
+        const list = byBody.get(id) ?? [];
+        list.push(entry);
+        byBody.set(id, list);
+      }
+    }
+    for (const root of roots) {
+      const seen = new Set([root]),
+        queue = [root];
+      while (queue.length) {
+        const parent = queue.shift()!;
+        for (const entry of byBody.get(parent) ?? []) {
+          const r = entry.recipe,
+            child = r.a === parent ? r.b : r.a;
+          if (seen.has(child)) continue;
+          seen.add(child);
+          queue.push(child);
+          const body = this.body(child);
+          if (!body.isDynamic()) continue;
+          const parentAnchor = this.anchorPoint(parent, r.a === parent ? r.anchorA : r.anchorB),
+            childAnchor = this.anchorPoint(child, r.a === parent ? r.anchorB : r.anchorA);
+          let dx = childAnchor.x - parentAnchor.x,
+            dy = childAnchor.y - parentAnchor.y;
+          const distance = Math.hypot(dx, dy),
+            allowed = r.kind === "rope" ? r.length! : 0;
+          if (distance <= allowed + 0.05) continue;
+          // Move back to the allowed distance along the separation.
+          const excess = distance - allowed;
+          dx /= distance;
+          dy /= distance;
+          const p = body.translation();
+          body.setTranslation(
+            { x: p.x - (dx * excess) / UNITS, y: p.y - (dy * excess) / UNITS },
+            false,
+          );
+          const separating =
+            (childAnchor.vx - parentAnchor.vx) * dx + (childAnchor.vy - parentAnchor.vy) * dy;
+          if (separating > 0) {
+            const v = body.linvel();
+            body.setLinvel(
+              { x: v.x - (dx * separating) / UNITS, y: v.y - (dy * separating) / UNITS },
+              false,
+            );
+          }
+        }
+      }
+    }
+  }
   private anchorPoint(id: string, anchor: { x: number; y: number }) {
     const body = this.body(id),
       p = body.translation(),
@@ -1141,6 +1207,7 @@ export class PhysicsWorld {
       this.driveJoints();
     }
     this.world.step(this.queue);
+    if (this.joints.size) this.projectJoints();
     if (this.scene === "adventure")
       for (const entry of this.entries()) {
         const body = this.body(entry.recipe.id);

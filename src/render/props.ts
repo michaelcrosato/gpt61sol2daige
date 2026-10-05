@@ -2,6 +2,7 @@ import { hash } from "../engine/math.ts";
 import type { CombatEvent } from "../game/types.ts";
 import { damageStage, FAMILIES, type PropFamily } from "../physics/blueprints.ts";
 import { isMaterial, MATERIALS, type MaterialId } from "../physics/materials.ts";
+import type { LinkView } from "../physics/mechanisms.ts";
 import type { BodyPose } from "../physics/types.ts";
 
 /**
@@ -139,10 +140,16 @@ export class PropRenderer {
     ctx.restore();
   }
   private shadow(ctx: Ctx, prop: BodyPose, family: PropFamily): void {
-    ctx.fillStyle = "#10201944";
+    // Deck planks lie on the water; the raised vane casts a long, offset shadow.
+    if (family === "plank") return;
+    ctx.fillStyle = family === "vane" ? "#10201926" : "#10201944";
     ctx.beginPath();
     if (family === "tree") ctx.ellipse(0, 2, 24, 10, 0, 0, Math.PI * 2);
-    else if (prop.shape.kind === "circle")
+    else if (family === "vane") {
+      const c = Math.abs(Math.cos(prop.angle)),
+        s = Math.abs(Math.sin(prop.angle));
+      ctx.ellipse(6, 12, (34 * c + 4 * s) / 2, (34 * s + 4 * c) * 0.3 + 1, 0, 0, Math.PI * 2);
+    } else if (prop.shape.kind === "circle")
       ctx.ellipse(1, 3, prop.shape.radius + 1, prop.shape.radius * 0.55 + 1, 0, 0, Math.PI * 2);
     else {
       // Box shadows follow the body's long axis so rails and logs do not cast round blobs.
@@ -165,7 +172,79 @@ export class PropRenderer {
     else if (family === "wagon") wagon(ctx, look);
     else if (family === "fence") fence(ctx, look);
     else if (family === "stump") stump(ctx, look);
+    else if (family === "post") post(ctx, look);
+    else if (family === "gate") gate(ctx, look);
+    else if (family === "link") link(ctx, look);
+    else if (family === "ball") ball(ctx, look);
+    else if (family === "vine") vine(ctx, look);
+    else if (family === "pod") pod(ctx, look);
+    else if (family === "plank") plank(ctx, look);
+    else if (family === "sled") sled(ctx, look);
+    else if (family === "vane") vane(ctx, look);
+    else if (family === "chest") chest(ctx, look);
     else debris(ctx, look);
+  }
+  /**
+   * M07 joints between mechanism parts: hinge pins, rope tethers, springs and slider rails.
+   * Strain tints a joint toward red as its load nears its break threshold. Presentation only.
+   */
+  links(ctx: Ctx, links: LinkView[], time: number): void {
+    ctx.save();
+    for (const l of links) {
+      if (l.broken) continue;
+      const hot = l.strain > 0.35 ? Math.min(1, (l.strain - 0.35) / 0.65) : 0;
+      if (l.kind === "rope") {
+        ctx.strokeStyle = hot ? mix("#4f7a3a", "#e0533c", hot) : "#4f7a3a";
+        ctx.lineWidth = 1.6;
+        ctx.beginPath();
+        ctx.moveTo(l.ax, l.ay);
+        ctx.lineTo(l.bx, l.by);
+        ctx.stroke();
+      } else if (l.kind === "spring") {
+        const dx = l.bx - l.ax,
+          dy = l.by - l.ay,
+          length = Math.hypot(dx, dy) || 1,
+          nx = -dy / length,
+          ny = dx / length;
+        ctx.strokeStyle = "#b9c2c7";
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.moveTo(l.ax, l.ay);
+        for (let k = 1; k < 9; k++) {
+          const t = k / 9,
+            side = k % 2 ? 3 : -3;
+          ctx.lineTo(l.ax + dx * t + nx * side, l.ay + dy * t + ny * side);
+        }
+        ctx.lineTo(l.bx, l.by);
+        ctx.stroke();
+      } else if (l.kind === "slider") {
+        ctx.strokeStyle = "#5c4129aa";
+        ctx.lineWidth = 2;
+        const dx = l.bx - l.ax,
+          dy = l.by - l.ay;
+        for (const side of [-5, 5]) {
+          const length = Math.hypot(dx, dy) || 1,
+            nx = (-dy / length) * side,
+            ny = (dx / length) * side;
+          ctx.beginPath();
+          ctx.moveTo(l.ax - dx * 0.9 + nx, l.ay - dy * 0.9 + ny);
+          ctx.lineTo(l.ax + dx * 0.5 + nx, l.ay + dy * 0.5 + ny);
+          ctx.stroke();
+        }
+      } else {
+        // Hinge and fixed pins sit at the attachment point; a strained pin flickers.
+        const r = l.kind === "fixed" ? 1.4 : 1.8;
+        ctx.fillStyle = hot
+          ? mix("#3a3f44", "#ff6a3d", hot * (0.75 + Math.sin(time * 30) * 0.25))
+          : "#3a3f44";
+        ctx.beginPath();
+        ctx.arc((l.ax + l.bx) / 2, (l.ay + l.by) / 2, r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "#d9dfe2aa";
+        ctx.fillRect((l.ax + l.bx) / 2 - 0.6, (l.ay + l.by) / 2 - 0.9, 1.2, 0.8);
+      }
+    }
+    ctx.restore();
   }
   private upright(ctx: Ctx, look: Look): void {
     if (look.family === "tree") tree(ctx, look);
@@ -809,4 +888,208 @@ export function drawMaterialEvent(ctx: Ctx, e: CombatEvent, age: number, zoom: n
     ctx.fillText(parts[1] === "resisted" ? "RESIST" : "KEPT", e.x, e.y - 22 - age * 24);
   }
   ctx.restore();
+}
+// M07 mechanism parts.
+function post(ctx: Ctx, { prop, material, palette }: Look): void {
+  const t = tone(material, palette),
+    metal = tone("metal", palette, 0.1);
+  if (prop.shape.kind === "box") {
+    // Launcher frame: a lashed timber block with iron bands.
+    const { w, h } = size(prop);
+    ctx.fillStyle = t.base;
+    ctx.fillRect(-w / 2, -h / 2, w, h);
+    ctx.strokeStyle = t.dark;
+    ctx.lineWidth = 1;
+    ctx.strokeRect(-w / 2 + 0.5, -h / 2 + 0.5, w - 1, h - 1);
+    ctx.fillStyle = metal.light;
+    for (const x of [-w / 2 + 2, w / 2 - 4]) ctx.fillRect(x, -h / 2, 2, h);
+    return;
+  }
+  const r = radius(prop);
+  ctx.fillStyle = t.dark;
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = t.light;
+  ctx.beginPath();
+  ctx.arc(0, 0, r * 0.72, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = t.dark;
+  ctx.lineWidth = 0.6;
+  ctx.beginPath();
+  ctx.arc(0, 0, r * 0.4, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.strokeStyle = palette === 1 ? metal.base : metal.light;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.arc(0, 0, r - 0.5, 0, Math.PI * 2);
+  ctx.stroke();
+}
+function gate(ctx: Ctx, { prop, material, palette }: Look): void {
+  const { w, h } = size(prop),
+    t = tone(material, palette, palette === 3 ? 0.45 : 0.25),
+    metal = tone("metal", palette, 0.1);
+  ctx.fillStyle = t.base;
+  ctx.fillRect(-w / 2, -h / 2, w, h);
+  ctx.strokeStyle = t.dark;
+  ctx.lineWidth = 0.8;
+  for (let x = -w / 2 + 5; x < w / 2; x += 5) {
+    ctx.beginPath();
+    ctx.moveTo(x, -h / 2);
+    ctx.lineTo(x, h / 2);
+    ctx.stroke();
+  }
+  ctx.fillStyle = t.light;
+  ctx.fillRect(-w / 2, -0.6, w, 1.2);
+  // Hinge strap at the pin end, latch hook at the free end.
+  ctx.fillStyle = metal.base;
+  ctx.fillRect(-w / 2, -h / 2, 4, h);
+  ctx.fillStyle = metal.light;
+  ctx.fillRect(w / 2 - 2, -1, 2, 2);
+  if (palette === 3) {
+    ctx.fillStyle = "#3a2a3f";
+    for (let x = -w / 2 + 7; x < w / 2; x += 6) ctx.fillRect(x, -h / 2 - 1, 1, 1.5);
+  }
+}
+function link(ctx: Ctx, { prop, palette }: Look): void {
+  const { w, h } = size(prop),
+    metal = tone("metal", palette, 0.12);
+  ctx.strokeStyle = metal.dark;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.roundRect(-w / 2 + 1, -h / 2 + 0.5, w - 2, h - 1, h / 2);
+  ctx.stroke();
+  ctx.strokeStyle = metal.light;
+  ctx.lineWidth = 0.8;
+  ctx.beginPath();
+  ctx.moveTo(-w / 2 + 2, -h / 2 + 0.8);
+  ctx.lineTo(w / 2 - 2, -h / 2 + 0.8);
+  ctx.stroke();
+}
+function ball(ctx: Ctx, { prop, palette }: Look): void {
+  const r = radius(prop),
+    metal = tone("metal", palette, 0.12);
+  ctx.fillStyle = metal.dark;
+  for (let k = 0; k < 8; k++) {
+    const a = (k / 8) * Math.PI * 2;
+    ctx.beginPath();
+    ctx.moveTo(Math.cos(a - 0.22) * r * 0.9, Math.sin(a - 0.22) * r * 0.9);
+    ctx.lineTo(Math.cos(a) * (r + 3.5), Math.sin(a) * (r + 3.5));
+    ctx.lineTo(Math.cos(a + 0.22) * r * 0.9, Math.sin(a + 0.22) * r * 0.9);
+    ctx.fill();
+  }
+  ctx.fillStyle = metal.base;
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = metal.light;
+  ctx.beginPath();
+  ctx.arc(-r * 0.35, -r * 0.35, r * 0.35, 0, Math.PI * 2);
+  ctx.fill();
+}
+function vine(ctx: Ctx, { prop, palette, seed }: Look): void {
+  const { w, h } = size(prop),
+    [dark, mid, light] = FOLIAGE[palette % FOLIAGE.length];
+  ctx.fillStyle = dark;
+  ctx.beginPath();
+  ctx.roundRect(-w / 2, -h / 2, w, h, h / 2);
+  ctx.fill();
+  ctx.fillStyle = noise(seed, 1) > 0.5 ? mid : light;
+  const side = noise(seed, 2) > 0.5 ? 1 : -1;
+  ctx.beginPath();
+  ctx.ellipse(0, side * (h / 2 + 1.6), 2.6, 1.4, side * 0.5, 0, Math.PI * 2);
+  ctx.fill();
+}
+function pod(ctx: Ctx, { prop, palette }: Look): void {
+  const r = radius(prop),
+    [dark, mid, light] = FOLIAGE[palette % FOLIAGE.length];
+  ctx.fillStyle = mid;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, r, r * 0.82, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = dark;
+  ctx.lineWidth = 0.8;
+  for (const k of [-0.4, 0, 0.4]) {
+    ctx.beginPath();
+    ctx.ellipse(0, 0, r * (1 - Math.abs(k)), r * 0.8, 0, -Math.PI / 2, Math.PI / 2);
+    ctx.stroke();
+  }
+  ctx.fillStyle = light;
+  ctx.beginPath();
+  ctx.arc(-r * 0.35, -r * 0.3, r * 0.25, 0, Math.PI * 2);
+  ctx.fill();
+}
+function plank(ctx: Ctx, { prop, material, palette }: Look): void {
+  const { w, h } = size(prop),
+    t = tone(material, palette, 0.2);
+  ctx.fillStyle = "#1d3b3a55";
+  ctx.fillRect(-w / 2 + 1, -h / 2 + 2, w, h);
+  ctx.fillStyle = t.base;
+  ctx.fillRect(-w / 2, -h / 2, w, h);
+  ctx.strokeStyle = t.dark;
+  ctx.lineWidth = 0.8;
+  for (let k = 1; k < 3; k++) {
+    ctx.beginPath();
+    ctx.moveTo(-w / 2, -h / 2 + (h * k) / 3);
+    ctx.lineTo(w / 2, -h / 2 + (h * k) / 3);
+    ctx.stroke();
+  }
+  ctx.fillStyle = t.light;
+  for (const x of [-w / 2 + 2, w / 2 - 3])
+    for (const y of [-h / 2 + 2, h / 2 - 3]) ctx.fillRect(x, y, 1, 1);
+}
+function sled(ctx: Ctx, { prop, material, palette }: Look): void {
+  const { w, h } = size(prop),
+    t = tone(material, palette),
+    metal = tone("metal", palette, 0.1);
+  ctx.fillStyle = t.base;
+  ctx.fillRect(-w / 2, -h / 2, w, h);
+  ctx.fillStyle = metal.light;
+  ctx.fillRect(-w / 2, h / 2 - 2.5, w, 2.5);
+  ctx.strokeStyle = t.dark;
+  ctx.lineWidth = 0.8;
+  ctx.strokeRect(-w / 2 + 0.5, -h / 2 + 0.5, w - 1, h - 1);
+}
+function vane(ctx: Ctx, { prop, palette }: Look): void {
+  const { w, h } = size(prop),
+    wood = tone("wood", palette),
+    cloth = tone("cloth", palette, 0.4);
+  ctx.fillStyle = wood.dark;
+  ctx.fillRect(-w / 2, -h / 2, w, h);
+  for (const side of [-1, 1]) {
+    ctx.fillStyle = cloth.base;
+    ctx.beginPath();
+    ctx.moveTo((side * w) / 2, -h / 2);
+    ctx.lineTo(side * (w / 2 - 11), -h / 2);
+    ctx.lineTo(side * (w / 2 - 11), -h / 2 - 7);
+    ctx.lineTo((side * w) / 2, -h / 2 - 5);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = cloth.dark;
+    ctx.lineWidth = 0.6;
+    ctx.stroke();
+  }
+  ctx.fillStyle = wood.light;
+  ctx.beginPath();
+  ctx.arc(0, 0, 2.5, 0, Math.PI * 2);
+  ctx.fill();
+}
+function chest(ctx: Ctx, { prop, material, palette }: Look): void {
+  const { w, h } = size(prop),
+    t = tone(material, palette, 0.3),
+    metal = tone("metal", palette, 0.15);
+  ctx.fillStyle = t.base;
+  ctx.fillRect(-w / 2, -h / 2, w, h);
+  ctx.fillStyle = t.light;
+  ctx.fillRect(-w / 2, -h / 2, w, h * 0.38);
+  ctx.strokeStyle = t.dark;
+  ctx.lineWidth = 0.8;
+  ctx.beginPath();
+  ctx.moveTo(-w / 2, -h / 2 + h * 0.38);
+  ctx.lineTo(w / 2, -h / 2 + h * 0.38);
+  ctx.stroke();
+  ctx.fillStyle = metal.base;
+  for (const x of [-w / 2 + 3, w / 2 - 5]) ctx.fillRect(x, -h / 2, 2, h);
+  ctx.fillStyle = palette === 1 ? "#f0b34a" : TINTS[palette];
+  ctx.fillRect(-1.5, -h / 2 + h * 0.3, 3, 3.5);
 }

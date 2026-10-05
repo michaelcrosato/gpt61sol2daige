@@ -33,6 +33,7 @@ import {
 import {
   jointAnchors,
   PhysicsWorld,
+  passesActors,
   upgradePolicySamples,
   validateAssembly,
   validateBody,
@@ -811,7 +812,12 @@ export class AdventurePhysics {
       dx,
       dy,
       radius,
-      (id, role) => !skip.includes(id) && (role === "prop" ? isPropId(id) : !id.endsWith("-water")),
+      // Deck planks and raised vanes are not cover: shots pass over and under them.
+      (id, role) =>
+        !skip.includes(id) &&
+        (role === "prop"
+          ? isPropId(id) && !passesActors(this.world.recipeOf(id))
+          : !id.endsWith("-water")),
     );
     if (!hit) return null;
     const pose = this.world.pose(hit.id);
@@ -980,6 +986,17 @@ export class AdventurePhysics {
           event.cause,
           attack.owner,
         );
+  }
+  /** QA/agent cut: authored cut damage (default: enough to sever) through the same policy. */
+  cut(sim: Simulation, owner: string, id: string, damage?: number) {
+    const joint = this.world.joint(id),
+      policy = this.world.policyOf(joint.recipe.a);
+    const amount =
+      damage ?? Math.max(0, joint.recipe.toughness * policy.values.jointStrength - joint.damage);
+    const result = this.world.damageJoint(id, amount, "cut");
+    for (const event of this.world.drainJointBreaks())
+      this.mechanisms.recordBreak(this.world, this.combat, sim.tick, event.id, event.cause, owner);
+    return result;
   }
   /** Whether a traveler at this point stands on a causeway plank still tied to a bank post. */
   deckAt(x: number, y: number): boolean {

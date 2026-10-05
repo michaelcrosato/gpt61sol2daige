@@ -74,6 +74,28 @@ export const MECHANISMS: Record<MechanismKind, MechanismInfo> = {
     joints: "hinges; lashings 900 load / 25 cut, plank joints 1300 / 40",
   },
 };
+/** Reproducible registry export for agents and documentation. */
+export function mechanismExport() {
+  return {
+    version: 1,
+    kinds: structuredClone(MECHANISMS),
+    joints: {
+      hinge: "revolute pin; optional angle limits (rad) and a motor",
+      fixed: "rigid attachment at an authored relative angle",
+      rope: "tether: distance between anchors at most its length",
+      spring: "damped spring toward its rest length",
+      slider: "travel along one axis; optional limits (units) and a motor",
+    },
+    strain:
+      "load = Σ over moving members of the connected part: mass × speed away from the joint's anchor, measured before each solve (ropes when taut, springs past 2.5× rest, sliders across the axis). A joint snaps when load > breakLoad × jointStrength and jointBreakage is on.",
+    cut: "attacks on a member cut its nearest intact joint by the member material's damage; it severs at toughness × jointStrength",
+    motors:
+      "Fern rules before each solve: position motors are damped springs (stiffness 1/s², damping 1/s); velocity motors approach their speed at rate damping (1/s); limits stop motion exactly at them",
+    policy:
+      "mechanisms off freezes jointed parts where they stand; jointBreakage off stops new snaps and cuts; both resolve at each connected part's root",
+    launchSpeed: LAUNCH_SPEED,
+  };
+}
 /** Speed a firing launcher gives what lies in front of it (units/s, times impulse strength). */
 export const LAUNCH_SPEED = 420;
 const LATCH_ANGLE = 1.45;
@@ -81,6 +103,16 @@ const UNLATCH_ANGLE = 0.35;
 /** Gentle, nearly critically damped return spring (stiffness 1/s², damping 1/s). */
 const GATE_MOTOR = { stiffness: 6, damping: 4 };
 
+/** The gate pen's footprint (fence walls included), relative to its area's center. */
+export const PEN_BOUNDS = { left: -131, right: -82, top: -315, bottom: -258 } as const;
+/** Whether a point lies inside an area's gate pen, where no monster should start a wave. */
+export function insidePen(area: { x: number; y: number }, x: number, y: number): boolean {
+  const dx = x - area.x,
+    dy = y - area.y;
+  return (
+    dx > PEN_BOUNDS.left && dx < PEN_BOUNDS.right && dy > PEN_BOUNDS.top && dy < PEN_BOUNDS.bottom
+  );
+}
 /** The six mechanisms and their companion scenery for one area. */
 export function areaMechanisms(
   area: { index: number; x: number; y: number },
