@@ -17,6 +17,10 @@ export const POLICY_DEFAULTS = {
   mechanisms: true,
   jointBreakage: true,
   jointStrength: 1,
+  materialReactions: true,
+  chainReactions: true,
+  environmentalForces: true,
+  fieldStrength: 1,
 };
 export type PolicyValues = Partial<typeof POLICY_DEFAULTS>;
 export type PolicyScope = "land" | "area" | "region";
@@ -94,6 +98,9 @@ export const POLICY_PRESETS = {
     physicalLoot: false,
     mechanisms: false,
     jointBreakage: false,
+    materialReactions: false,
+    chainReactions: false,
+    environmentalForces: false,
   },
   Reactive: { ...POLICY_DEFAULTS },
   Wild: {
@@ -102,6 +109,7 @@ export const POLICY_PRESETS = {
     materialDurability: 0.6,
     impactStrength: 2,
     jointStrength: 0.5,
+    fieldStrength: 2,
   },
   Sanctuary: {
     ...POLICY_DEFAULTS,
@@ -111,6 +119,9 @@ export const POLICY_PRESETS = {
     destruction: false,
     impactDamage: false,
     jointBreakage: false,
+    materialReactions: false,
+    chainReactions: false,
+    fieldStrength: 0.35,
   },
 };
 export type PresetName = keyof typeof POLICY_PRESETS;
@@ -150,6 +161,9 @@ export function validateValues(values: PolicyValues) {
     "physicalLoot",
     "mechanisms",
     "jointBreakage",
+    "materialReactions",
+    "chainReactions",
+    "environmentalForces",
   ] as const)
     if (key in values && typeof values[key] !== "boolean")
       throw new Error(`${key} must be boolean`);
@@ -158,6 +172,7 @@ export function validateValues(values: PolicyValues) {
   if ("debrisLifetime" in values) number(values.debrisLifetime, 0, 3600);
   if ("impactStrength" in values) number(values.impactStrength, 0, 10);
   if ("jointStrength" in values) number(values.jointStrength, 0.05, 20);
+  if ("fieldStrength" in values) number(values.fieldStrength, 0, 10);
 }
 const cross = (
   a: { x: number; y: number },
@@ -501,6 +516,9 @@ function composePolicy(
       "physicalLoot",
       "mechanisms",
       "jointBreakage",
+      "materialReactions",
+      "chainReactions",
+      "environmentalForces",
     ] as const)
       if (patch[key] !== undefined) {
         values[key] = patch[key];
@@ -512,6 +530,7 @@ function composePolicy(
       "debrisLifetime",
       "impactStrength",
       "jointStrength",
+      "fieldStrength",
     ] as const)
       if (patch[key] !== undefined) {
         values[key] = patch[key];
@@ -548,6 +567,9 @@ function composePolicy(
       physicalLoot: values.worldReactions && values.physicalLoot,
       mechanisms: values.worldReactions && values.mechanisms,
       jointBreakage: values.worldReactions && values.jointBreakage,
+      materialReactions: values.worldReactions && values.materialReactions,
+      chainReactions: values.worldReactions && values.chainReactions,
+      environmentalForces: values.worldReactions && values.environmentalForces,
     },
     provenance,
     landId: land.id,
