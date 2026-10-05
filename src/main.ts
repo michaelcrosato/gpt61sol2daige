@@ -215,6 +215,14 @@ function updateGrabHint(): void {
 /** While holding, the attack input throws instead of slashing. */
 function throwHeld(): boolean {
   if (!heldProp()) return false;
+  // Apply this frame's aim first so the throw follows the click or stick, then release.
+  if (net.status.role !== "guest" && !paused) {
+    const input = getInput(performance.now());
+    runtime.sim.setInput(net.localId, input);
+    if (net.status.role === "solo")
+      runtime.log.push({ op: "input", player: net.localId, ...input });
+    lastInput = JSON.stringify(input);
+  }
   void adventureUI.act({ type: "release", throw: true });
   return true;
 }

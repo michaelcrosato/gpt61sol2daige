@@ -175,6 +175,8 @@ export class AgentRuntime {
               bodyCount: snapshot.world.bodies.length,
               bodies: snapshot.world.bodies.slice(0, 100).map((b) => b.state),
               props: this.sim.physicalProps(),
+              destroyed: snapshot.destroyed ?? [],
+              combat: snapshot.combat ?? null,
               policies: new PolicyController(snapshot.world.policies).inspect(),
             };
           if (action === "props")

@@ -40,6 +40,17 @@ M05 registers three more adventure values, accepted at every scope, in presets a
 
 `dynamicProps` also governs fracture pieces: a break in a frozen region spawns frozen pieces at their authored positions, and freezing later stops existing pieces at their current pose. Waking separates them like any prop (authored pieces never start interpenetrated, so they wake cleanly). Neither switch reconstructs a destroyed parent. Presets: Quiet and Sanctuary set `destruction` off; Wild sets `materialDurability` 0.6 (easier breakage); Reactive keeps the defaults. Foliage and cloth response is presentation-only in M05: canopies and wagon covers sway with solved velocity and shudder when struck, and rest where effective world reactions are off. M09 adds physical foliage. Impact (contact) damage remains M06. M05 scenery takes damage only from authored attacks and the agent `damage` action.
 
+## M06 delivered controls
+
+| Value | Meaning | Off / zero |
+| --- | --- | --- |
+| `impactDamage` (boolean, default on) | Props launched at 110+ units/s closing speed hurt what they strike, under team rules and with their instigator's credit. | Launched props still fly, bounce and push; contacts add no damage. Base combat hits are unaffected. |
+| `impactStrength` (0–10, default 1) | Multiplies impact damage. | 0 behaves like impact damage off. |
+| `projectileWorld` (boolean, default on) | Thornlance pierces, breaks, stops on or ricochets off scenery; enemy shots treat props and rooted terrain as cover. | Projectiles ignore scenery and keep every base target hit; scenery is neither cover nor damaged by them. |
+| `physicalLoot` (boolean, default on) | Drops launch, bounce off terrain and props and settle for half a second before the magnet takes gold and experience. | Drops have no body. They stay where they appeared (or the nearest reachable ground) and remain collectible by magnet and E. |
+
+All four are gated by world reactions, and master-off is absolute. Off never removes a pending impact's earlier effects or an earned reward. Grabbing follows `dynamicProps`: a frozen prop cannot be grabbed, and freezing a held prop ends the hold where it stands. Throws scale with `impulseStrength` like every commanded impulse. Presets: Quiet turns all three switches off; Sanctuary turns impact damage off; Wild doubles impact strength. Field forces (wind, suction) remain M08.
+
 ## Scope and precedence
 
 Resolve values in this order: engine defaults, land profile, area profile, containing named region, then applicable live debug overrides. A more specific live override wins over a broader live override; the session-wide master `worldReactions = false` is an absolute off switch. Within one specificity, use declared priority and stable region ID to break ties. Show the effective value and the source that supplied it.

@@ -3,7 +3,7 @@ import { collideCircles, moveBody } from "../engine/physics.ts";
 import type { Player, Simulation } from "../engine/simulation.ts";
 import { World } from "../engine/world.ts";
 import { enemyBodyId, type PropHit, playerBodyId } from "../physics/adventure.ts";
-import type { PendingImpact } from "../physics/combat.ts";
+import { LOOT_SETTLE_TICKS, type PendingImpact } from "../physics/combat.ts";
 import { MATERIALS } from "../physics/materials.ts";
 import type { AreaRecipe } from "./content.ts";
 import {
@@ -1809,7 +1809,8 @@ export class Adventure {
           )[0];
         if (!p) continue;
         const distance = Math.hypot(p.x - drop.x, p.y - drop.y);
-        if (distance < 130) {
+        // The magnet waits out the drop's launch/settle phase (M06 physical loot).
+        if (distance < 130 && tick - drop.born >= LOOT_SETTLE_TICKS) {
           drop.x += (p.x - drop.x) * 0.16;
           drop.y += (p.y - drop.y) * 0.16;
         }

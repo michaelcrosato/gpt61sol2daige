@@ -63,6 +63,8 @@ export const GRAB_REACH = 72;
 export const THROW_SPEED = 430;
 const HOLD_BREAK = 150;
 const MAGNET_RANGE = 130;
+/** Every drop gets this long (0.5 s) to launch and bounce before the magnet takes it. */
+export const LOOT_SETTLE_TICKS = 30;
 
 export class CombatPhysics {
   private instigators = new Map<string, Instigator>();
@@ -305,6 +307,7 @@ export class CombatPhysics {
         areaId = areaAt(drop.x, drop.y),
         magnet =
           drop.kind !== "item" &&
+          sim.tick - drop.born >= LOOT_SETTLE_TICKS &&
           living.some((p) => Math.hypot(p.x - drop.x, p.y - drop.y) < MAGNET_RANGE),
         physical = !magnet && world.policyAt(areaId, drop.x, drop.y).effective.physicalLoot;
       if (physical && !world.has(id)) {
