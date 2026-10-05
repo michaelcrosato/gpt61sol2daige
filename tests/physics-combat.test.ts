@@ -559,8 +559,8 @@ test("real M05 checkpoints migrate to the M06 envelope and keep their destructio
       assert.ok(Math.abs(pose.x - entry.state!.x) < 1e-6);
     }
     const saved = sim.save();
-    assert.equal(saved.actorPhysics!.version, 5);
-    assert.equal(saved.actorPhysics!.world.version, 7);
+    assert.equal(saved.actorPhysics!.version, 6);
+    assert.equal(saved.actorPhysics!.world.version, 8);
     assert.deepEqual(saved.actorPhysics!.combat!.holds, []);
     sim.step(10);
     const forged = structuredClone(legacy);

@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { MATERIAL_SOUNDS, type SoundName, synthesize, wav } from "../src/audio/synth.ts";
+import {
+  MATERIAL_SOUNDS,
+  REACTION_SOUNDS,
+  type SoundName,
+  synthesize,
+  wav,
+} from "../src/audio/synth.ts";
 import { Simulation } from "../src/engine/simulation.ts";
 import { decodeSnapshot, encodeSnapshot, snapshotBuffer } from "../src/net/protocol.ts";
 import { initializePhysics } from "../src/physics/bootstrap.ts";
@@ -124,6 +130,7 @@ test("every procedural sound is deterministic, non-silent, bounded, and encodes 
     "level",
     ...MATERIAL_SOUNDS,
     "crumble",
+    ...REACTION_SOUNDS,
   ] as SoundName[]) {
     const samples = synthesize(name),
       bytes = wav(samples),

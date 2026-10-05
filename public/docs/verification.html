@@ -943,7 +943,138 @@ mechanisms and keeps its destroyed pot.</td>
 gate, the drifting cut causeway, the launcher and the vane</a>. The
 registry export hashes to <code>b0a40cb4…</code> and is byte-identical
 across calls. These are mechanics observations, not performance
-claims.</p></main>
+claims.</p>
+<h2 id="m08-material-reactions-and-fields-evidence">M08 material
+reactions and fields evidence</h2>
+<p>On 2026-10-05, <code>npm run check</code> passed <strong>121 headless
+tests</strong>, <code>npm run build</code> produced the bundle and
+<code>npm run test:e2e</code> passed <strong>34 browser
+scenarios</strong>, including the preserved WebRTC stories (now
+functional smoke checks, <a href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/physics/DECISIONS.md">D53</a>) and two
+new M08 scenarios. <code>npm run verify:run</code> cleared all nine
+areas (level 18, 3,033 gold; <a
+href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/evidence/physics-m08-route.jsonl">route</a>): reaction-broken
+scenery pays its rewards. The numbers below come from the <a
+href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/evidence/physics-m08.json">receipt</a> (seed 142, area 1, monsters
+and area mechanics cleared unless a scenario places its own).</p>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr>
+<th>M08 acceptance</th>
+<th>Evidence</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Ignition and extinguishing</td>
+<td>Fire on a crate burns it for 540 ticks: two burn pulses take it to
+32.5% durability, and the fire spreads to the three crates and the wheel
+touching it. A water stimulus puts it out (<code>extinguish</code>, 900
+wet ticks); 60 ticks later its durability is unchanged. A new flame on
+the wet crate only steams it (wet 900 → 540, no ignition).</td>
+</tr>
+<tr>
+<td>Wet and metal conduction</td>
+<td>A broken water cask leaves a 46-unit puddle; a monster standing in
+it is soaked (593 ticks). One slash on the storm coil sends the
+discharge through both rods, the puddle and the cask pieces (16 arcs, 40
+visited keys): the wet monster takes 50 damage and a dry monster away
+from conductors takes none. The discharge sparks the powder keg, whose
+blast breaks the second cask. The chain is owned by the striker: conduct
+→ detonate → spill → soak → ignite → steam → extinguish.</td>
+</tr>
+<tr>
+<td>An explosion moving other objects</td>
+<td>A lit keg explodes after its 50-tick fuse. Its pressure throws a
+5,000-health monster 20.9 units outward (36 damage) and moves or breaks
+every dynamic prop within range. A 20-health monster is killed with the
+igniter’s credit. Blast damage breaks the fuse brush, both casks and two
+fence sections (all credited to the igniter) and the casks spill.</td>
+</tr>
+<tr>
+<td>A field bending a fight</td>
+<td>A struck fan drives a monster that was walking upwind 49 units
+downwind in one second; with environmental forces off it advances 29
+units. The fan blows a water cask 151 units. The authored wind lane
+spins the meadow vane at 1.52 rad/s against 0.67 calm. A Gravity Knot
+field pulls a pot 69.2 units toward its centre: 33.3 at field strength
+0.5 and 0 at 0. <a href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/evidence/physics-m08-touch-gust.png">Touch
+gust</a>.</td>
+</tr>
+<tr>
+<td>A reproducible chain of three or more rule types, with causes and
+attribution</td>
+<td>Fire on the first brush segment runs the fuse in 17-tick steps
+(<code>spread</code>, depths 1–4), lights the keg
+(<code>detonate:fuse</code>, depth 5) and explodes at tick 142. The
+blast spills both casks, whose water soaks and steams the debris and
+puts out a burning stave. Rules: ignite → spread → detonate → spill →
+soak → steam → extinguish, depth 6, 37 events. A monster beside the keg
+dies with the igniter’s credit and ten destroyed records name the
+igniter. Two fresh runs are byte-identical (state hash
+<code>89ebdc85</code>). <a
+href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/evidence/physics-m08-flare.png">Flare</a>, <a
+href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/evidence/physics-m08-blast.png">blast</a>.</td>
+</tr>
+<tr>
+<td>Propagation off and material reactions off</td>
+<td>Chain reactions off: the struck brush burns, its neighbour never
+catches, and a struck coil’s chain visits only the coil. Material
+reactions off: a burning log’s remaining 537 ticks stay 537 for 120
+ticks and do no damage, and new stimuli add nothing. A slash still deals
+15 and Cinderwake’s combat burn still applies. Re-enabling produces 0
+extra events.</td>
+</tr>
+<tr>
+<td>Region policy at source and target</td>
+<td>A small region with material reactions off over the third brush
+segment stops the fuse there: the second segment burns, the third never
+catches and the keg never lights.</td>
+</tr>
+<tr>
+<td>Mid-chain save and guests</td>
+<td>A checkpoint taken mid-chain (a burning segment, a puddle) restores
+raw and continues with an identical state hash. Portable restores keep
+identical reaction state, and the agent replay matches
+(<code>a3ffd4b7</code>). A late-join replica receives byte-identical
+statuses, surfaces, fields, delayed reactions and chains, and a guest
+can inspect but not stimulate. Leaving for another land and returning
+keeps fires burning and puddles in place. In the browser, a burning oil
+slick survives a page save/restore and keeps burning down.</td>
+</tr>
+<tr>
+<td>M07 migration</td>
+<td>A real M07 checkpoint (envelope 5 / world 7, from <code>main</code>
+<code>fcba70a</code>) restores to envelope 6 / world 8 and gains 56 yard
+props and its wind lanes once. Its archived pre-M08 land is untouched
+until entered again; returning adds that land’s yard and keeps its cut
+vine link and destroyed pot.</td>
+</tr>
+</tbody>
+</table>
+<p>In the browser, real V/WASD/mouse input carries an oil jar onto the
+brazier until it bursts into a burning slick, and a real mouse slash on
+the coil sets off the keg. A touch Slash on the fan drives the casks
+downwind. <a href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/evidence/physics-m08-yard.png">Yard</a>. The registry
+export hashes to <code>903ca4539da3e2cd</code> and is byte-identical
+across calls.</p>
+<p>Feedback-volume note: with a reaction yard beside every clearing, a
+long fight produces more events. Two M05 browser and headless checks now
+read the full event ring (or collect events as they happen) instead of
+the latest 12 or 96 entries; their assertions are unchanged.</p>
+<p>Rendering and simulation cost (informational, D53): with no other
+load, reactions add about 8% to a headless combat tick (median 15.7 ms
+against 14.5 ms with all three switches off, 2,400 creatures). In the
+browser, 47 burning bodies add about 7 ms per frame (36 ms against 29).
+Two pre-existing per-tick and per-frame pose clones were removed:
+terrain synchronization and the renderer now read positions directly.
+The full-population browser clear (64.9 s against 64.1 s on
+<code>main</code> in the same container) was given more wall-clock
+time.</p></main>
 <footer>Fern · A world engine built for agents · <a href="https://github.com/michaelcrosato/gpt61sol2daige">Source on GitHub</a></footer>
 </body>
 </html>

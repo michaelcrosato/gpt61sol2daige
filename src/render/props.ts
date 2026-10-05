@@ -3,7 +3,9 @@ import type { CombatEvent } from "../game/types.ts";
 import { damageStage, FAMILIES, type PropFamily } from "../physics/blueprints.ts";
 import { isMaterial, MATERIALS, type MaterialId } from "../physics/materials.ts";
 import type { LinkView } from "../physics/mechanisms.ts";
+import type { ReactionStatus } from "../physics/reactions.ts";
 import type { BodyPose } from "../physics/types.ts";
+import { drawStatus } from "./reactions.ts";
 
 /**
  * M05 prop presentation. Each family draws its own silhouette over its collider in the body's
@@ -62,6 +64,8 @@ interface Look {
   time: number;
   shake: number;
   sway: number;
+  /** A lit brazier, a blowing fan or a charged coil (M08). */
+  active: boolean;
 }
 export class PropRenderer {
   private readonly seen = new Map<string, { durability: number; shakeAt: number; frame: number }>();
@@ -84,7 +88,16 @@ export class PropRenderer {
     if (this.seen.size > 1024)
       for (const [id, entry] of this.seen) if (this.frame - entry.frame > 300) this.seen.delete(id);
   }
-  draw(ctx: Ctx, prop: BodyPose, time: number, tick: number, held = false): void {
+  /** Fans blowing this frame (an active `fan:<id>` field); set by the renderer. */
+  activeFans = new Set<string>();
+  draw(
+    ctx: Ctx,
+    prop: BodyPose,
+    time: number,
+    tick: number,
+    held = false,
+    status?: ReactionStatus,
+  ): void {
     const blueprint = prop.blueprint,
       family = blueprint?.family ?? (prop.shape.kind === "circle" ? "wheel" : "crate"),
       material = prop.material ?? FAMILIES[family].material,
@@ -104,6 +117,14 @@ export class PropRenderer {
       sway: reactive
         ? Math.sin(time * 1.4 + (seed % 628) / 100) + Math.max(-1, Math.min(1, prop.vx / 120))
         : 0,
+      active:
+        family === "brazier"
+          ? (prop.policy?.effective.materialReactions ?? true)
+          : family === "fan"
+            ? this.activeFans.has(prop.id)
+            : family === "coil"
+              ? (status?.charged ?? 0) > 0
+              : false,
     };
     const fade =
       blueprint?.expiresAt === undefined
@@ -138,6 +159,13 @@ export class PropRenderer {
       ctx.setLineDash([]);
     }
     ctx.restore();
+    // M08 statuses read upright in world space: flames rise, drips fall.
+    if (status) {
+      ctx.save();
+      ctx.globalAlpha = fade;
+      drawStatus(ctx, prop.x, prop.y, extent(prop), status, time);
+      ctx.restore();
+    }
   }
   private shadow(ctx: Ctx, prop: BodyPose, family: PropFamily): void {
     // Deck planks lie on the water; the raised vane casts a long, offset shadow.
@@ -182,6 +210,13 @@ export class PropRenderer {
     else if (family === "sled") sled(ctx, look);
     else if (family === "vane") vane(ctx, look);
     else if (family === "chest") chest(ctx, look);
+    else if (family === "brazier") brazier(ctx, look);
+    else if (family === "coil") coil(ctx, look);
+    else if (family === "rod") rod(ctx, look);
+    else if (family === "cask") cask(ctx, look);
+    else if (family === "jar") jar(ctx, look);
+    else if (family === "brush") brush(ctx, look);
+    else if (family === "fan") fan(ctx, look);
     else debris(ctx, look);
   }
   /**
@@ -1092,4 +1127,166 @@ function chest(ctx: Ctx, { prop, material, palette }: Look): void {
   for (const x of [-w / 2 + 3, w / 2 - 5]) ctx.fillRect(x, -h / 2, 2, h);
   ctx.fillStyle = palette === 1 ? "#f0b34a" : TINTS[palette];
   ctx.fillRect(-1.5, -h / 2 + h * 0.3, 3, 3.5);
+}
+/** M08: an iron bowl on a stone ring, with coals that burn while reactions are on there. */
+function brazier(ctx: Ctx, { prop, palette, time, seed, active }: Look): void {
+  const r = radius(prop),
+    stone = tone("stone", palette, 0.2),
+    metal = tone("metal", palette, 0.15);
+  ctx.fillStyle = stone.dark;
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = metal.base;
+  ctx.beginPath();
+  ctx.arc(0, 0, r * 0.78, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#2a1d17";
+  ctx.beginPath();
+  ctx.arc(0, 0, r * 0.58, 0, Math.PI * 2);
+  ctx.fill();
+  for (let k = 0; k < 6; k++) {
+    const a = (k / 6) * Math.PI * 2 + (seed % 9),
+      glow = active ? 0.55 + Math.sin(time * 6 + k * 1.7) * 0.35 : 0;
+    ctx.fillStyle = active
+      ? `rgba(255, ${120 + Math.round(glow * 90)}, 60, ${0.5 + glow * 0.5})`
+      : "#4a3a33";
+    ctx.fillRect(Math.cos(a) * r * 0.32 - 1, Math.sin(a) * r * 0.32 - 1, 2.2, 2.2);
+  }
+  if (!active) return;
+  for (let k = 0; k < 3; k++) {
+    const h = 6 + Math.sin(time * 8 + k * 2.3) * 2.5;
+    ctx.fillStyle = k === 1 ? "#ffd36acc" : "#ff8a3acc";
+    ctx.beginPath();
+    ctx.moveTo(-3 + k * 3 - 1.6, 0);
+    ctx.quadraticCurveTo(-3 + k * 3, -h * 0.6, -3 + k * 3 + Math.sin(time * 9 + k), -h);
+    ctx.quadraticCurveTo(-3 + k * 3 + 1, -h * 0.5, -3 + k * 3 + 1.6, 0);
+    ctx.fill();
+  }
+}
+/** M08: a copper-wound storm coil under a glass cap that glows while charged. */
+function coil(ctx: Ctx, { prop, palette, time, active }: Look): void {
+  const r = radius(prop),
+    metal = tone("metal", palette, 0.12);
+  ctx.fillStyle = metal.dark;
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = "#c27a43";
+  ctx.lineWidth = 1.1;
+  for (let k = 0; k < 3; k++) {
+    ctx.beginPath();
+    ctx.arc(0, 0, r * (0.82 - k * 0.18), 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  ctx.fillStyle = active ? `rgba(200, 245, 255, ${0.7 + Math.sin(time * 30) * 0.3})` : "#9fd7e3aa";
+  ctx.beginPath();
+  ctx.arc(0, 0, r * 0.32, 0, Math.PI * 2);
+  ctx.fill();
+}
+/** M08: a slim conductor rod with a bright spike. */
+function rod(ctx: Ctx, { prop, palette }: Look): void {
+  const r = radius(prop),
+    metal = tone("metal", palette, 0.1);
+  ctx.fillStyle = metal.dark;
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = metal.light;
+  ctx.beginPath();
+  ctx.arc(-r * 0.25, -r * 0.25, r * 0.45, 0, Math.PI * 2);
+  ctx.fill();
+}
+/** M08: a water cask: staves, blue-painted hoops and a droplet mark. */
+function cask(ctx: Ctx, { prop, material, palette }: Look): void {
+  const r = radius(prop),
+    t = tone(material, palette, 0.15);
+  ctx.fillStyle = t.base;
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = t.dark;
+  ctx.lineWidth = 0.8;
+  for (let k = 0; k < 8; k++) {
+    const a = (k / 8) * Math.PI * 2;
+    ctx.beginPath();
+    ctx.moveTo(Math.cos(a) * r * 0.55, Math.sin(a) * r * 0.55);
+    ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+    ctx.stroke();
+  }
+  ctx.strokeStyle = "#5c9fc9";
+  ctx.lineWidth = 1.5;
+  for (const k of [0.95, 0.55]) {
+    ctx.beginPath();
+    ctx.arc(0, 0, r * k, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  ctx.fillStyle = "#bfe6fb";
+  ctx.beginPath();
+  ctx.moveTo(0, -r * 0.36);
+  ctx.quadraticCurveTo(r * 0.3, r * 0.05, 0, r * 0.26);
+  ctx.quadraticCurveTo(-r * 0.3, r * 0.05, 0, -r * 0.36);
+  ctx.fill();
+}
+/** M08: a stoppered oil jar with a dark oil band and a drip. */
+function jar(ctx: Ctx, { prop, material, palette }: Look): void {
+  const r = radius(prop),
+    t = tone(material, palette, 0.25);
+  ctx.fillStyle = t.base;
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#3a2d3a";
+  ctx.beginPath();
+  ctx.arc(0, 0, r * 0.62, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = t.light;
+  ctx.beginPath();
+  ctx.arc(0, 0, r * 0.3, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#6a5a7a";
+  ctx.fillRect(r * 0.55, -0.6, 1.4, r * 0.7);
+}
+/** M08: a dry brush strip, tufts leaning with the sway. */
+function brush(ctx: Ctx, { prop, palette, sway, seed }: Look): void {
+  const { w, h } = size(prop),
+    t = tone("vegetation", palette, 0.15);
+  ctx.fillStyle = "#6f5a2e88";
+  ctx.fillRect(-w / 2, -h / 2, w, h);
+  ctx.lineWidth = 1;
+  for (let k = 0; k < 9; k++) {
+    const x = -w / 2 + ((k + 0.5) / 9) * w,
+      lean = sway * 1.2 + ((seed + k * 7) % 5) - 2;
+    ctx.strokeStyle = k % 3 ? "#c8a95a" : t.light;
+    ctx.beginPath();
+    ctx.moveTo(x, h / 2);
+    ctx.lineTo(x + lean * 0.6, -h / 2 - 2);
+    ctx.stroke();
+  }
+}
+/** M08: a fan with cloth blades that spin while it blows. */
+function fan(ctx: Ctx, { prop, palette, time, active }: Look): void {
+  const r = radius(prop),
+    metal = tone("metal", palette, 0.12),
+    cloth = tone("cloth", palette, 0.3),
+    spin = active ? time * 18 : 0.3;
+  ctx.fillStyle = metal.dark;
+  ctx.beginPath();
+  ctx.arc(0, 0, r * 0.45, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = cloth.light;
+  for (let k = 0; k < 4; k++) {
+    const a = spin + (k / 4) * Math.PI * 2;
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.arc(0, 0, r, a, a + 0.6);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.strokeStyle = metal.light;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(r * 0.5, 0);
+  ctx.lineTo(r + 4, 0);
+  ctx.stroke();
 }

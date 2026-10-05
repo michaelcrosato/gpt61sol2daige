@@ -62,6 +62,10 @@ export function mountPhysicsUI(options: {
         <label>Jointed mechanisms <select id="physics-mechanisms" aria-label="Jointed mechanisms override"><option value="inherit">Inherited</option><option value="true">On</option><option value="false">Off</option></select></label>
         <label>Joint breakage <select id="physics-jointBreakage" aria-label="Joint breakage override"><option value="inherit">Inherited</option><option value="true">On</option><option value="false">Off</option></select></label>
         <label>Joint strength × <input id="physics-jointStrength" aria-label="Joint strength override" type="number" min="0.05" max="20" step="0.05" placeholder="Inherited"></label>
+        <label>Material reactions <select id="physics-materialReactions" aria-label="Material reactions override"><option value="inherit">Inherited</option><option value="true">On</option><option value="false">Off</option></select></label>
+        <label>Chain reactions <select id="physics-chainReactions" aria-label="Chain reactions override"><option value="inherit">Inherited</option><option value="true">On</option><option value="false">Off</option></select></label>
+        <label>Environmental forces <select id="physics-environmentalForces" aria-label="Environmental forces override"><option value="inherit">Inherited</option><option value="true">On</option><option value="false">Off</option></select></label>
+        <label>Field strength × <input id="physics-fieldStrength" aria-label="Field strength override" type="number" min="0" max="10" step="0.05" placeholder="Inherited"></label>
         <button class="secondary-button" id="physics-queue">Queue policy edit</button>
         <button class="secondary-button" id="physics-reset-scope">Reset this scope</button>
         <button class="secondary-button" id="physics-reset-authored">Reset to authored</button>
@@ -217,6 +221,9 @@ export function mountPhysicsUI(options: {
       "physicalLoot",
       "mechanisms",
       "jointBreakage",
+      "materialReactions",
+      "chainReactions",
+      "environmentalForces",
     ] as const) {
       const value = get<HTMLSelectElement>(`physics-${key}`).value;
       if (value !== "inherit") values[key] = value === "true";
@@ -227,6 +234,7 @@ export function mountPhysicsUI(options: {
       "debrisLifetime",
       "impactStrength",
       "jointStrength",
+      "fieldStrength",
     ] as const) {
       const value = get<HTMLInputElement>(`physics-${key}`).value;
       if (value !== "") values[key] = Number(value);
@@ -352,6 +360,9 @@ export function mountPhysicsUI(options: {
         "physicalLoot",
         "mechanisms",
         "jointBreakage",
+        "materialReactions",
+        "chainReactions",
+        "environmentalForces",
       ] as const)
         get<HTMLSelectElement>(`physics-${key}`).value =
           override?.[key] === undefined ? "inherit" : String(override[key]);
@@ -361,6 +372,7 @@ export function mountPhysicsUI(options: {
         "debrisLifetime",
         "impactStrength",
         "jointStrength",
+        "fieldStrength",
       ] as const)
         get<HTMLInputElement>(`physics-${key}`).value =
           override?.[key] === undefined ? "" : String(override[key]);

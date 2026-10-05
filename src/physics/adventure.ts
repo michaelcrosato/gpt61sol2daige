@@ -1,6 +1,12 @@
 import { MAX_NPCS } from "../engine/limits.ts";
 import type { Simulation } from "../engine/simulation.ts";
-import { type TerrainPatch, validatePatches, WORLD_LIMIT, World } from "../engine/world.ts";
+import {
+  Terrain,
+  type TerrainPatch,
+  validatePatches,
+  WORLD_LIMIT,
+  World,
+} from "../engine/world.ts";
 import { areaRecipe } from "../game/content.ts";
 import type { AttackTeam } from "../game/interactions.ts";
 import type { AdventureState, Enemy } from "../game/types.ts";
@@ -30,6 +36,15 @@ import {
   type PolicyLayout,
   type PolicyTransaction,
 } from "./policies.ts";
+import {
+  areaReactions,
+  type ReactionArchive,
+  type ReactionHost,
+  ReactionPhysics,
+  type ReactionState,
+  type Stimulus,
+  validateReactions,
+} from "./reactions.ts";
 import {
   jointAnchors,
   PhysicsWorld,
@@ -92,6 +107,8 @@ interface LandArchive {
   assemblies?: AssemblyRecipe[];
   joints?: JointEntry[];
   mechanisms?: MechanismState;
+  /** M08: statuses, surfaces, fields and pending reactions, with relative timers. */
+  reactions?: ReactionArchive;
 }
 /** Persistent destruction fact. The parent body is gone; its pieces are ordinary props. */
 export interface DestroyedRecord {
@@ -142,6 +159,12 @@ export interface PropAttack {
   torque?: number;
   material?: number;
   team?: AttackTeam;
+  /** M08: an elemental strike (a Cinderwake-burning hero's fire) also stimulates what it hits. */
+  element?: Stimulus;
+  /** M08: the reaction chain responsible (fire, shock and blast damage). */
+  chain?: string;
+  /** M08: a prop this area attack leaves alone (an explosion's own barrel). */
+  except?: string;
   /** Strike each prop at most once per key (a charge, a sweep) within the repeat window. */
   once?: string;
 }
@@ -153,7 +176,7 @@ interface NavigationState {
   turn: number;
 }
 export interface AdventurePhysicsSnapshot {
-  version: 1 | 2 | 3 | 4 | 5;
+  version: 1 | 2 | 3 | 4 | 5 | 6;
   backend: string;
   landId: string;
   run: number;
@@ -171,6 +194,8 @@ export interface AdventurePhysicsSnapshot {
   combat?: CombatPhysicsState;
   /** Version 5 (M07): gate latches, cocked launchers, causeway spans and pending events. */
   mechanisms?: MechanismState;
+  /** Envelope 6 (M08): material statuses, surfaces, fields, delayed reactions and chains. */
+  reactions?: ReactionState;
 }
 function layout(sim: Simulation): PolicyLayout {
   const s = sim.adventure.state,
@@ -294,6 +319,8 @@ export class AdventurePhysics {
   readonly combat = new CombatPhysics();
   /** M07 authored mechanism behavior on top of the joints. */
   readonly mechanisms = new MechanismPhysics();
+  /** M08 material reactions, surfaces, fields and causal chains. */
+  readonly reactions = new ReactionPhysics();
   /** Debris with an explicit lifetime: id -> cleanup tick. Derived from recipes on restore. */
   private expiring = new Map<string, number>();
   private actors = new Set<string>();
@@ -330,6 +357,7 @@ export class AdventurePhysics {
         this.mechanisms.track(assembly);
       }
       this.ensureMechanisms(sim);
+      this.ensureReactions(sim, archive.reactions === undefined);
       return;
     }
     const palette = sim.adventure.state.townLand % PALETTES,
@@ -368,6 +396,7 @@ export class AdventurePhysics {
       for (const recipe of clearingProps(r, palette, blocked)) this.world.spawn(recipe);
     }
     this.ensureMechanisms(sim);
+    this.ensureReactions(sim, true);
   }
   /**
    * M07 mechanisms and their companion scenery for every area of this land. Only content that
@@ -393,6 +422,72 @@ export class AdventurePhysics {
         if (!this.world.has(body.id) && !this.destroyed.has(body.id)) this.world.spawn(body);
     }
   }
+  /**
+   * M08 reaction yards (braziers, coils, rods, casks, oil jars, fuse brush, a powder keg and a
+   * fan) and each area's authored wind lane. Like mechanisms, only content that never existed is
+   * added: destroyed yard props never return, and fields are authored only into a land that has
+   * no reaction state yet.
+   */
+  private ensureReactions(sim: Simulation, fields: boolean): void {
+    const s = sim.adventure.state,
+      palette = s.townLand % PALETTES,
+      blocked = solidTerrain(sim.world);
+    for (let i = 0; i < 4; i++) {
+      const yard = areaReactions(areaRecipe(s.seed, s.townLand * 4 + i + 1), palette, blocked);
+      for (const body of yard.props)
+        if (!this.world.has(body.id) && !this.destroyed.has(body.id)) this.world.spawn(body);
+      if (fields)
+        for (const field of yard.fields)
+          if (!this.reactions.hasField(field.id)) this.reactions.addField(field);
+    }
+  }
+  /** The hooks reactions use: water terrain, areas and burnt-out ash. */
+  reactionHost(sim: Simulation): ReactionHost {
+    return {
+      tick: sim.tick,
+      world: this.world,
+      combat: this.combat,
+      waterAt: (x, y) => {
+        const terrain = sim.world.at(x, y).terrain;
+        return terrain === Terrain.Water || terrain === Terrain.DeepWater;
+      },
+      areaAt: (x, y) => this.areaAt(sim, x, y),
+      ash: (id, owner, chain) => {
+        const pose = this.world.pose(id);
+        this.breakProp(sim, pose, 0, {
+          owner,
+          cause: "burnout",
+          chain,
+          x: pose.x,
+          y: pose.y,
+          radius: 0,
+          damage: 0,
+        });
+      },
+    };
+  }
+  /** Agent and mechanic stimuli: fire, water, oil, shock or a blast at a point or on a body. */
+  stimulate(
+    sim: Simulation,
+    stimulus: Stimulus,
+    options: {
+      x: number;
+      y: number;
+      radius?: number;
+      target?: string;
+      owner?: string;
+      team?: AttackTeam;
+      cause?: string;
+      strength?: number;
+    },
+  ): string {
+    if (options.target !== undefined && !this.world.has(options.target))
+      throw new Error("Unknown reaction target");
+    return this.reactions.stimulate(this.reactionHost(sim), stimulus, {
+      ...options,
+      ...(stimulus === "shock" || stimulus === "blast" ? { source: options.target ?? "" } : {}),
+    });
+  }
   private track(recipe: BodyRecipe): void {
     if (recipe.blueprint?.expiresAt !== undefined)
       this.expiring.set(recipe.id, recipe.blueprint.expiresAt);
@@ -413,6 +508,7 @@ export class AdventurePhysics {
         assemblies: this.world.assemblyList(),
         joints: this.world.jointList(),
         mechanisms: this.mechanisms.save(),
+        reactions: this.reactions.archive(sim.tick),
       });
     else this.archives.clear();
     const archive = this.archives.get(id);
@@ -438,6 +534,7 @@ export class AdventurePhysics {
     this.destroyed = new Map((archive?.destroyed ?? []).map((d) => [d.id, d]));
     this.combat.clear();
     this.mechanisms.restore(archive?.mechanisms);
+    this.reactions.unarchive(archive?.reactions, sim.tick);
     this.spawnProps(sim, archive);
   }
   private actor(
@@ -568,8 +665,13 @@ export class AdventurePhysics {
     for (const e of sim.adventure.state.enemies)
       if (e.hp > 0) points.push({ x: e.x, y: e.y, radius: 80 });
     // Fixed scenery never meets terrain; only movable props need their surroundings solid.
-    for (const p of this.props())
-      if (p.motion === "dynamic") points.push({ x: p.x, y: p.y, radius: 40 });
+    // Solved positions are read directly: building complete poses here cloned every prop's
+    // recipe and policy every tick (the largest avoidable cost once M08 added reaction yards).
+    for (const id of this.world.ids())
+      if (isPropId(id) && this.world.recipeOf(id).motion === "dynamic") {
+        const m = this.world.motionOf(id);
+        points.push({ x: m.x, y: m.y, radius: 40 });
+      }
     for (const drop of sim.adventure.state.drops)
       if (this.world.has(lootBodyId(drop.id))) points.push({ x: drop.x, y: drop.y, radius: 24 });
     for (const sample of this.ambient.values())
@@ -723,11 +825,14 @@ export class AdventurePhysics {
     const solid = this.solidAt(sim);
     this.combat.syncLoot(sim, this.world, (x, y) => this.areaAt(sim, x, y), solid);
     this.combat.beforeStep(sim, this.world);
+    // Field forces are velocity changes before the solve, so strain and projection see them.
+    this.reactions.applyFields(this.reactionHost(sim));
     const contacts = this.world.contacts;
     this.world.step(true);
     sim.metrics.contacts += this.world.contacts - contacts;
     this.combat.afterStep(sim, this.world);
     this.mechanisms.update(sim.tick, this.world, this.combat);
+    this.reactions.update(this.reactionHost(sim));
     this.combat.afterLoot(sim, this.world, solid);
     for (const p of sim.players.values())
       if (this.world.has(playerBodyId(p.id))) {
@@ -774,6 +879,12 @@ export class AdventurePhysics {
       .ids()
       .filter((id) => id.startsWith("crate-") || id.startsWith("wheel-") || id.startsWith("prop-"))
       .map((id) => this.world.pose(id));
+  }
+  /** Read-only prop views for presentation (renderer, grab hints): no recipe/policy clones. */
+  views(): BodyPose[] {
+    const out: BodyPose[] = [];
+    for (const id of this.world.ids()) if (isPropId(id)) out.push(this.world.view(id));
+    return out;
   }
   /** Terrain solids plus fixed scenery: where loot cannot rest and travelers cannot reach. */
   private solidAt(sim: Simulation) {
@@ -851,9 +962,12 @@ export class AdventurePhysics {
     const arc = attack.arc ?? Math.PI,
       angle = attack.angle ?? 0,
       hits: PropHit[] = [];
+    let host: ReactionHost | null = null,
+      elementChain: string | undefined = attack.chain;
     for (const id of this.world.ids()) {
       if (!(id.startsWith("crate-") || id.startsWith("wheel-") || id.startsWith("prop-"))) continue;
       if (attack.only !== undefined && id !== attack.only) continue;
+      if (attack.except !== undefined && id === attack.except) continue;
       const pose = this.world.pose(id);
       if (!pose.blueprint || !pose.material) continue;
       const reach =
@@ -887,6 +1001,29 @@ export class AdventurePhysics {
       // Mechanism parts are not destroyed: a striking attack cuts the nearest joint instead.
       if (pose.assembly !== undefined && attack.damage > 0 && attack.material !== 0)
         this.cutJoint(sim, pose, attack);
+      // M08 devices and elemental strikes. A reaction's own damage never re-triggers them.
+      if (attack.damage > 0 && attack.material !== 0 && attack.chain === undefined) {
+        host ??= this.reactionHost(sim);
+        if (pose.blueprint.family === "coil")
+          this.reactions.strikeCoil(host, id, attack.owner, attack.team ?? "party");
+        else if (pose.blueprint.family === "fan")
+          this.reactions.strikeFan(host, id, attack.owner, attack.team ?? "party");
+        if (attack.element) {
+          elementChain ??= this.reactions.begin(
+            attack.cause,
+            attack.owner,
+            attack.team ?? "party",
+            sim.tick,
+          );
+          this.reactions.stimulate(host, attack.element, {
+            x: pose.x,
+            y: pose.y,
+            target: id,
+            chain: elementChain,
+            ...(attack.element === "shock" ? { source: id } : {}),
+          });
+        }
+      }
       if (family.toughness <= 0) continue; // Pieces and stumps move; they do not break further.
       if (attack.damage <= 0 || attack.material === 0) continue; // A shove, not a strike.
       const durability = pose.consequences?.durability ?? 100;
@@ -1065,6 +1202,25 @@ export class AdventurePhysics {
       pieces: pieces.map((p) => p.recipe.id),
     };
     this.destroyed.set(record.id, record);
+    // Containers spill, sources release, volatiles detonate, fire carries into the pieces.
+    this.reactions.broke(
+      this.reactionHost(sim),
+      {
+        id: pose.id,
+        x: pose.x,
+        y: pose.y,
+        areaId: pose.areaId ?? this.areaAt(sim, pose.x, pose.y),
+        ...(pose.material ? { material: pose.material } : {}),
+        family: pose.blueprint!.family,
+      },
+      record.pieces,
+      {
+        owner: attack.owner,
+        team: attack.team ?? "party",
+        cause: attack.cause,
+        ...(attack.chain ? { chain: attack.chain } : {}),
+      },
+    );
     return structuredClone(record);
   }
   inspect() {
@@ -1083,6 +1239,7 @@ export class AdventurePhysics {
       destroyed: this.destroyedRecords(),
       combat: this.combat.save(),
       mechanisms: this.mechanisms.save(),
+      reactions: this.reactions.save(),
     };
   }
   entities(): PhysicalEntityState[] {
@@ -1101,7 +1258,7 @@ export class AdventurePhysics {
   }
   save(portable = false): AdventurePhysicsSnapshot {
     return {
-      version: 5,
+      version: 6,
       backend: RAPIER_VERSION,
       landId: this.landId,
       run: this.run,
@@ -1119,10 +1276,11 @@ export class AdventurePhysics {
       destroyed: this.destroyedRecords(),
       combat: this.combat.save(),
       mechanisms: this.mechanisms.save(),
+      reactions: this.reactions.save(),
     };
   }
   static restore(sim: Simulation, snapshot: AdventurePhysicsSnapshot): AdventurePhysics {
-    const migrated = ![3, 4, 5].includes(snapshot?.version);
+    const migrated = ![3, 4, 5, 6].includes(snapshot?.version);
     snapshot = upgradeAdventurePhysics(snapshot, sim);
     validateAdventurePhysics(snapshot, sim);
     const result = new AdventurePhysics(sim);
@@ -1143,6 +1301,7 @@ export class AdventurePhysics {
       result.destroyed = new Map((snapshot.destroyed ?? []).map((d) => [d.id, structuredClone(d)]));
       result.combat.restore(snapshot.combat);
       result.mechanisms.restore(snapshot.mechanisms);
+      result.reactions.restore(snapshot.reactions);
       for (const assembly of result.world.assemblyList()) result.mechanisms.track(assembly);
       for (const id of result.world.ids()) {
         const pose = result.world.pose(id);
@@ -1163,6 +1322,8 @@ export class AdventurePhysics {
       }
       // M07 mechanisms did not exist in older checkpoints of this land: add them once.
       if (snapshot.version < 5) result.ensureMechanisms(sim);
+      // M08 reaction yards and wind lanes did not exist in older checkpoints: add them once.
+      if (snapshot.version < 6) result.ensureReactions(sim, true);
       result.navigation = new Map(snapshot.navigation.map((s) => [s.id, structuredClone(s)]));
       result.appliedTransition = snapshot.appliedTransition;
       result.actors = new Set(
@@ -1419,11 +1580,12 @@ export function validateAdventurePhysics(
 ): void {
   if (
     !snapshot ||
-    ![1, 2, 3, 4, 5].includes(snapshot.version) ||
+    ![1, 2, 3, 4, 5, 6].includes(snapshot.version) ||
     (snapshot.version === 2 && snapshot.world?.version !== 4) ||
     (snapshot.version === 3 && snapshot.world?.version !== 5) ||
     (snapshot.version === 4 && snapshot.world?.version !== 6) ||
     (snapshot.version === 5 && snapshot.world?.version !== 7) ||
+    (snapshot.version === 6 && snapshot.world?.version !== 8) ||
     snapshot.backend !== snapshot.world?.backend ||
     (snapshot.version === 1 && snapshot.backend !== RAPIER_VERSION) ||
     !/^land-\d+-\d+$/.test(snapshot.landId) ||
@@ -1455,6 +1617,13 @@ export function validateAdventurePhysics(
     validateMechanisms(snapshot.mechanisms, snapshot.world.assemblies ?? []);
   else if (snapshot.mechanisms !== undefined)
     throw new Error("Mechanism state requires envelope 5");
+  if (snapshot.version >= 6) {
+    if (!snapshot.reactions) throw new Error("Missing reaction state");
+    validateReactions(snapshot.reactions);
+    for (const status of snapshot.reactions.statuses)
+      if (!entries.has(status.id)) throw new Error("Reaction status for a missing body");
+  } else if (snapshot.reactions !== undefined)
+    throw new Error("Reaction state requires envelope 6");
   // A loot body may outlive its drop until the next solve (collected between ticks); drop ids
   // are never reused, so the solve removes it without ambiguity.
   for (const entry of entries.values())
@@ -1552,6 +1721,14 @@ export function validateAdventurePhysics(
         ![p.x, p.y, p.angle, p.vx, p.vy, p.angularVelocity].every(Number.isFinite)
       )
         throw new Error("Invalid archived prop");
+    }
+    // A land archived before M08 has no reaction state; its yard is added when it is entered.
+    if (a.reactions !== undefined) {
+      if (snapshot.version < 6) throw new Error("Archived reactions require envelope 6");
+      validateReactions(a.reactions, true);
+      const ids = new Set(a.props.map((p) => p.id));
+      for (const status of a.reactions.statuses)
+        if (!ids.has(status.id)) throw new Error("Archived reaction status for a missing prop");
     }
     // A land archived before M07 has no assemblies yet; they are added when it is entered.
     if (snapshot.version < 5 || a.assemblies === undefined) {

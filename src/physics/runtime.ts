@@ -537,6 +537,31 @@ export class PhysicsWorld {
       policy: clonePolicy(entry.policy!),
     };
   }
+  /**
+   * A read-only pose for drawing and hints: the same fields as `pose`, but sharing the
+   * (frozen) recipe and applied policy instead of cloning them. Never mutate or keep it.
+   */
+  view(id: string): BodyPose {
+    const entry = this.registry.get(id);
+    if (!entry) throw new Error(`Unknown physics body: ${id}`);
+    const body = this.body(id),
+      p = body.translation(),
+      v = body.linvel();
+    return {
+      ...entry.recipe,
+      x: p.x * UNITS,
+      y: p.y * UNITS,
+      angle: body.rotation(),
+      vx: v.x * UNITS,
+      vy: v.y * UNITS,
+      angularVelocity: body.angvel(),
+      sleeping: body.isSleeping(),
+      frozen: entry.frozen ?? false,
+      reactivationBlocked: entry.reactivationBlocked ?? false,
+      ccdEnabled: body.isCcdEnabled(),
+      policy: entry.policy!,
+    };
+  }
   motor(
     id: string,
     x: number,
@@ -579,6 +604,33 @@ export class PhysicsWorld {
     const body = this.body(id),
       velocity = body.linvel();
     body.setLinvel({ x: velocity.x + x / UNITS, y: velocity.y + y / UNITS }, true);
+  }
+  /**
+   * M08 field force: a velocity change (and optional spin) applied before the solve, so joint
+   * strain and projection treat it like any other motion. Frozen props, quiet regions and fixed
+   * bodies ignore it; actors take it as decaying external motion like a hit. Returns whether
+   * the body moved.
+   */
+  fieldPush(id: string, dvx: number, dvy: number, spin = 0): boolean {
+    finite(dvx, "field x", 8000);
+    finite(dvy, "field y", 8000);
+    finite(spin, "field spin", 100);
+    const entry = this.registry.get(id);
+    if (!entry) return false;
+    const body = this.body(id);
+    if (!body.isDynamic()) return false;
+    if (entry.recipe.actorKind) {
+      if (entry.recipe.actorKind === "loot") {
+        const v = body.linvel();
+        body.setLinvel({ x: v.x + dvx / UNITS, y: v.y + dvy / UNITS }, true);
+      } else this.velocityChange(id, dvx, dvy);
+      return true;
+    }
+    if (entry.frozen || !entry.policy!.effective.dynamicProps) return false;
+    const v = body.linvel();
+    body.setLinvel({ x: v.x + dvx / UNITS, y: v.y + dvy / UNITS }, true);
+    if (spin) body.setAngvel(body.angvel() + spin, true);
+    return true;
   }
   bindArea(id: string, areaId: string): void {
     const entry = this.registry.get(id)!;
@@ -1640,7 +1692,7 @@ export class PhysicsWorld {
     if (this.scene === "lab" && bytes.length > MAX_SNAPSHOT_BYTES)
       throw new Error("Playground checkpoint exceeds its 4 MB binary bound");
     return {
-      version: 7,
+      version: 8,
       scene: this.scene,
       backend: RAPIER_VERSION,
       continuation: portable ? "rebuild" : "snapshot",
@@ -1943,7 +1995,7 @@ export function upgradePolicySamples(snapshot: PhysicsSnapshot): PhysicsSnapshot
     );
   if (
     !snapshot ||
-    ![3, 4, 5, 6].includes(snapshot.version) ||
+    ![3, 4, 5, 6, 7].includes(snapshot.version) ||
     !Array.isArray(snapshot.bodies) ||
     !snapshot.bodies.some((b) => b?.policy?.values && missing(b.policy.values).length)
   )
@@ -1975,7 +2027,7 @@ export function validatePhysicsSnapshot(snapshot: PhysicsSnapshot): void {
   snapshot = upgradePolicySamples(snapshot);
   if (
     !snapshot ||
-    ![1, 2, 3, 4, 5, 6, 7].includes(snapshot.version) ||
+    ![1, 2, 3, 4, 5, 6, 7, 8].includes(snapshot.version) ||
     (snapshot.version === 3 && snapshot.scene !== "adventure") ||
     (snapshot.version < 3 && snapshot.scene !== undefined) ||
     (snapshot.version >= 4 && !["adventure", "lab"].includes(snapshot.scene!)) ||

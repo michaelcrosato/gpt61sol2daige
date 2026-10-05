@@ -128,7 +128,7 @@ test("eight real WebRTC travelers share props/policies, late join atomically and
           if (typeof data === "string") {
             const message = JSON.parse(data);
             if (message.type === "OFFER" && message.payload?.metadata) {
-              message.payload.metadata.version = 7;
+              message.payload.metadata.version = 8;
               data = JSON.stringify(message);
             }
           }

@@ -425,9 +425,16 @@ function execute(command: Command): unknown {
     !["observe", "describe", "inspect", "save", "catalog"].includes(command.op) &&
     !(
       command.op === "actors" &&
-      ["inspect", "body", "policy", "props", "recipes", "attacks", "mechanisms"].includes(
-        String(command.action ?? "inspect"),
-      )
+      [
+        "inspect",
+        "body",
+        "policy",
+        "props",
+        "recipes",
+        "attacks",
+        "mechanisms",
+        "reactions",
+      ].includes(String(command.action ?? "inspect"))
     ) &&
     !(command.op === "adventure" && !command.action)
   )
@@ -1180,6 +1187,18 @@ function processEvents(): void {
       else if (event.text === "launcher:fired") audio.play("dash");
       else if (event.text === "bridge:span-lost") audio.play("crumble");
       else audio.play("step");
+    } else if (event.type === "reaction") {
+      // M08: each reaction rule has its own voice; quiet bookkeeping (soak, coat) stays silent.
+      const rule = event.text.split(":")[0];
+      if (event.text === "blast") audio.play("boom");
+      else if (rule === "ignite" || rule === "spread" || rule === "flare" || rule === "heat")
+        audio.play("ignite");
+      else if (rule === "extinguish" || rule === "steam") audio.play("hiss");
+      else if (rule === "conduct" || rule === "discharge") audio.play("zap");
+      else if (rule === "spill") audio.play("splash");
+      else if (rule === "field") audio.play("gust");
+      else if (rule === "detonate") audio.play("metal");
+      else if (event.text === "burnout:ash") audio.play("crumble");
     }
   }
   if (runtime.sim.adventure.state.events.length)

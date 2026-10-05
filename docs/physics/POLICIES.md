@@ -61,6 +61,17 @@ All four are gated by world reactions, and master-off is absolute. Off never rem
 
 Both switches are gated by world reactions; master-off is absolute. A connected part resolves its policy once, at its root (the declared anchor, or the first listed member of a part cut loose), so a region boundary never leaves half a chain frozen. `mechanisms` off with `jointBreakage` on still lets a blow cut a frozen joint; the freed part starts moving when mechanisms resume. Presets: Quiet turns both off; Sanctuary turns breakage off; Wild halves joint strength. A frozen anchored causeway still carries travelers over the creek.
 
+## M08 delivered controls
+
+| Value | Meaning | Off / zero |
+| --- | --- | --- |
+| `materialReactions` (boolean, default on) | Fire, water, oil and electricity change bodies and surfaces here: ignition, burning damage and burnout, soaking and drying, oil coats and burning slicks, conduction, fuses, explosions, spills and releases. | Every status and surface timer here pauses where it stands (a burning log keeps its flames and its remaining burn but does no damage and does not spread); new stimuli add nothing; a pending effect aimed here waits. Base combat is unaffected: swords land and Cinderwake's burning strikes still burn monsters. |
+| `chainReactions` (boolean, default on) | Reactions may set off further reactions from here (propagation): fire spreading to neighbours, burning slicks lighting what walks in, blasts igniting things or setting off other kegs, discharges hopping between conductors. | The direct effect of a stimulus still happens (the struck body ignites, the keg explodes and pushes, a spill splashes, a struck coil charges itself). Propagation queued from here is dropped (checked when queued and every tick while pending), never saved for later. |
+| `environmentalForces` (boolean, default on) | Wind lanes, struck fans, explosion pressure, Gravity Knot attraction, Riftstep repulsion and Slipstream vortices push bodies here. | No field force on bodies here; motion they already have continues (dynamic simulation off freezes them as before). Fields stay registered. |
+| `fieldStrength` (0–10, default 1) | Multiplies field acceleration on bodies here. | 0 behaves like environmental forces off. |
+
+All four are gated by world reactions; master-off is absolute. A reaction is checked at its source (propagation) and accepted at its target (material reactions): fire spreading along a fuse stops at a protected segment and never reaches the keg beyond it. Statuses and surfaces carry their chain's owner; reaction damage credits that owner like an M06 impact. Presets: Quiet turns all three switches off; Sanctuary turns material and chain reactions off and sets field strength 0.35 (a gentle breeze); Wild doubles field strength. Turning a feature back on resumes from the paused counters: no accumulated burst (measured 0 extra events).
+
 ## Scope and precedence
 
 Resolve values in this order: engine defaults, land profile, area profile, containing named region, then applicable live debug overrides. A more specific live override wins over a broader live override; the session-wide master `worldReactions = false` is an absolute off switch. Within one specificity, use declared priority and stable region ID to break ties. Show the effective value and the source that supplied it.

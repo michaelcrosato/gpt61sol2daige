@@ -35,7 +35,9 @@ test("solo menus and atlas pause time while preserving an explicit lab pause", a
 test("the browser completes the build, combat, loot, outward travel and resupply loop", async ({
   page,
 }) => {
-  test.setTimeout(120000);
+  // Wall-clock waits are not performance gates (D53): M08's reaction yards and fires make this
+  // full-population encounter heavier on slow runners, and it must still clear.
+  test.setTimeout(240000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   await page.goto("/");
@@ -134,7 +136,7 @@ test("the browser completes the build, combat, loot, outward travel and resupply
   await page.screenshot({ path: "artifacts/adventure-combat.png" });
   await expect
     .poll(async () => (await page.evaluate(() => window.fern.game.observe())).cleared, {
-      timeout: 60000,
+      timeout: 150000,
     })
     .toBe(true);
   const victory = await page.evaluate(() => window.fern.game.observe());

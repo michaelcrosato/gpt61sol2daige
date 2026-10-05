@@ -150,7 +150,7 @@ export interface ContactEvent {
   started: boolean;
 }
 export interface PhysicsSnapshot {
-  version: 1 | 2 | 3 | 4 | 5 | 6 | 7;
+  version: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
   scene?: "adventure" | "lab";
   backend: string;
   continuation?: "snapshot" | "rebuild";

@@ -358,3 +358,23 @@ Joint ids are `<assembly>:<name>`: `gate-N:hinge`, `chain-N:anchor|link1..3|ball
 ```
 
 Mechanism changes appear as `assembly` events (`gate:latched`, `gate:closed`, `launcher:cocked`, `launcher:fired`, `bridge:span-lost`, `<kind>:<joint>:snapped|cut`) with the responsible traveler as owner. New policy values: `mechanisms`, `jointBreakage` (booleans) and `jointStrength` (0.05–20). Saves write adventure envelope 5 / world 7; rooms use protocol 8. See [the M07 contract](ARCHITECTURE.md#m07-jointed-mechanisms-and-assemblies).
+
+## M08 material reactions and fields
+
+| Command | Fields and behavior |
+| --- | --- |
+| `{"op":"actors","action":"reactions"}` | The registry (stimuli, every rule with its parameters, material fuel/windage/flammable/conductive, containers, releases, field kinds, yard layout, chain and policy rules) plus the state: statuses, surfaces, fields, delayed reactions, chains (owner, origin, rules fired, visited `rule|target` keys, depth) and recent events. Works on guests (read-only). |
+| `{"op":"actors","action":"stimulate","stimulus":"fire","id":"prop-brush-1-0"}` | Apply `fire`, `water`, `oil`, `shock` or `blast` to one body (`id`, a prop or `enemy-<id>`) or everything within `radius` (0–400) of `x,y`, with optional `strength` (0.1–4). Starts a chain owned by the caller and returns it. Honors the material and chain policies. Host only. |
+| `{"op":"actors","action":"field","field":{"kind":"wind","shape":{"kind":"lane","x":900,"y":120,"angle":0,"length":200,"width":80},"strength":300,"ticks":600}}` | Add a field (`wind`, `pressure`, `attract`, `repel`, `vortex`; `circle {x,y,radius}` or `lane {x,y,angle,length,width}`; strength 0–20,000 units/s²; ticks, −1 permanent; optional `id`, `gust` 0–1, `actors`). `{"remove":"<id>"}` removes one. Host only. |
+| `{"op":"actors","action":"body","id":"crate-1-0"}` | Now includes `reaction`, the body's status or `null`. |
+
+Yard ids per area N: `prop-brazier-N-0`, `prop-jar-N-0..1` (oil), `prop-brush-N-0..4` (fuse), `prop-barrel-N-2` (powder keg), `prop-cask-N-0..1` (water), `prop-rod-N-0..1`, `prop-coil-N-0` and `prop-fan-N-0`. Authored wind lanes are `wind-N`. A struck fan's field is `fan:<fan id>`, a mechanic's is `mechanic:<id>` and an explosion's is `blast:<chain>:<source>`.
+
+```json
+{"op":"encounter","index":1}
+{"op":"actors","action":"stimulate","stimulus":"fire","id":"prop-brush-1-0"}
+{"op":"step","ticks":200}
+{"op":"actors","action":"reactions"}
+```
+
+That reproduces the fuse chain: the brush burns segment by segment, lights the keg's fuse, and the explosion breaks the water casks, which spill and steam the debris. Reaction changes appear as `reaction` events with the chain owner. New policy values: `materialReactions`, `chainReactions`, `environmentalForces` (booleans) and `fieldStrength` (0–10). Saves write adventure envelope 6 / world 8; rooms use protocol 9. See [the M08 contract](ARCHITECTURE.md#m08-material-reactions-and-environmental-fields).

@@ -8,6 +8,13 @@ import { interactPhysics } from "../physics/interaction.ts";
 import { linkViews, mechanismExport } from "../physics/mechanisms.ts";
 import type { PolicyEdit } from "../physics/policies.ts";
 import { PolicyController } from "../physics/policies.ts";
+import {
+  FIELD_KINDS,
+  type FieldRecipe,
+  reactionExport,
+  STIMULI,
+  type Stimulus,
+} from "../physics/reactions.ts";
 import { createPlayground } from "../physics/runtime.ts";
 import type { AssemblyRecipe, BodyRecipe, JointMotor, JointRecipe } from "../physics/types.ts";
 import { ENGINE_VERSION, idleInput, MAX_NPCS, type SaveState, Simulation } from "./simulation.ts";
@@ -41,11 +48,17 @@ export const COMMANDS = {
   },
   actors: {
     action:
-      "inspect (default), body, props, recipes, attacks, mechanisms, damage, cut, motor, transport, configure, apply, policy, impulse, place, spawn",
+      "inspect (default), body, props, recipes, attacks, mechanisms, reactions, damage, cut, motor, transport, stimulate, field, configure, apply, policy, impulse, place, spawn",
     description:
-      "Host/solo adventure physical world; guests inspect received bodies, props, destroyed records, assemblies, joints and policies. Shared tuning, damage and cuts are host-only.",
+      "Host/solo adventure physical world; guests inspect received bodies, props, destroyed records, assemblies, joints, reactions and policies. Shared tuning, damage, cuts, stimuli and fields are host-only.",
     values:
-      "worldReactions, dynamicProps, propBlocking, crowdContacts, ambientPhysics, sweptCollision, destruction, impactDamage, projectileWorld, physicalLoot, mechanisms, jointBreakage: booleans; impulseStrength, impactStrength: 0..10; materialDurability, jointStrength: 0.05..20 (x toughness / break thresholds); debrisLifetime: 0..3600 s (0 = scene lifetime)",
+      "worldReactions, dynamicProps, propBlocking, crowdContacts, ambientPhysics, sweptCollision, destruction, impactDamage, projectileWorld, physicalLoot, mechanisms, jointBreakage, materialReactions, chainReactions, environmentalForces: booleans; impulseStrength, impactStrength, fieldStrength: 0..10; materialDurability, jointStrength: 0.05..20 (x toughness / break thresholds); debrisLifetime: 0..3600 s (0 = scene lifetime)",
+    reactions:
+      "reactions: the M08 registry (stimuli, rules with every parameter, material reactivity, containers, releases, field kinds, yard layout) plus statuses, surfaces, fields, delayed reactions, chains (owner, rules fired, visited targets) and recent events",
+    stimulate:
+      "stimulate: stimulus fire|water|oil|shock|blast at x,y with optional radius 0..400, id (one body: its prop- or enemy- id; shock and blast start there) and strength 0.1..4; starts a chain owned by the caller; honors materialReactions/chainReactions",
+    field:
+      "field: {kind wind|pressure|attract|repel|vortex, shape {kind:circle,x,y,radius} or {kind:lane,x,y,angle,length,width}, strength 0..20000 units/s², ticks (-1 permanent), optional id, gust 0..1, actors} or remove: field id",
     mechanisms:
       "mechanisms: the M07 registry (kinds, joint types, strain/cut/motor/policy rules) plus every assembly, joint (intact or broken, load, damage, motor), drawable link and gate/launcher/causeway state",
     cut: "cut: id <assembly>:<joint> (gate-1:hinge, chain-1:anchor, vine-1:pod, bridge-1:south…), optional damage (default: enough to sever); honors jointBreakage",
@@ -187,6 +200,7 @@ export class AgentRuntime {
               destroyed: snapshot.destroyed ?? [],
               combat: snapshot.combat ?? null,
               mechanisms: snapshot.mechanisms ?? null,
+              reactions: snapshot.reactions ?? null,
               assemblies: snapshot.world.assemblies ?? [],
               joints: snapshot.world.joints ?? [],
               policies: new PolicyController(snapshot.world.policies).inspect(),
@@ -201,6 +215,8 @@ export class AgentRuntime {
               state: snapshot.mechanisms ?? null,
             };
           }
+          if (action === "reactions")
+            return { registry: reactionExport(), state: snapshot.reactions ?? null };
           if (action === "props")
             return { props: this.sim.physicalProps(), destroyed: snapshot.destroyed ?? [] };
           if (action === "recipes") return blueprintExport();
@@ -208,7 +224,10 @@ export class AgentRuntime {
           if (action === "body") {
             const entry = snapshot.world.bodies.find((b) => b.recipe.id === command.id);
             if (!entry) throw new Error("Unknown physical body");
-            return entry.state;
+            return {
+              ...entry.state,
+              reaction: snapshot.reactions?.statuses.find((r) => r.id === command.id) ?? null,
+            };
           }
           if (action === "policy")
             return new PolicyController(snapshot.world.policies).resolve(
@@ -238,9 +257,11 @@ export class AgentRuntime {
             ),
             state: physical.mechanisms.save(),
           };
+        if (action === "reactions")
+          return { registry: reactionExport(), state: physical.reactions.save() };
         if (action === "body") {
           if (typeof command.id !== "string") throw new Error("Body id required");
-          return world.pose(command.id);
+          return { ...world.pose(command.id), reaction: physical.reactions.status(command.id) };
         }
         if (action === "policy")
           return world.policyAt(
@@ -281,6 +302,52 @@ export class AgentRuntime {
         } else if (action === "transport") {
           if (typeof command.id !== "string") throw new Error("Body id required");
           world.transport(world.partMembers(command.id), num("dx"), num("dy"));
+        } else if (action === "stimulate") {
+          const stimulus = command.stimulus as Stimulus;
+          if (!(STIMULI as readonly string[]).includes(stimulus))
+            throw new Error("stimulus must be fire, water, oil, shock or blast");
+          const radius = num("radius", 0),
+            strength = num("strength", 1);
+          if (radius < 0 || radius > 400) throw new Error("radius must be 0..400");
+          if (strength < 0.1 || strength > 4) throw new Error("strength must be 0.1..4");
+          if (command.id !== undefined && typeof command.id !== "string")
+            throw new Error("id must be a body id");
+          const target = command.id as string | undefined,
+            at = target ? world.motionOf(target) : { x: num("x"), y: num("y") };
+          const chain = physical.stimulate(this.sim, stimulus, {
+            x: at.x,
+            y: at.y,
+            radius,
+            strength,
+            ...(target ? { target } : {}),
+            owner: player,
+            team: "party",
+            cause: "agent",
+          });
+          result = { chain: physical.reactions.chain(chain) };
+        } else if (action === "field") {
+          if (typeof command.remove === "string") physical.reactions.removeField(command.remove);
+          else {
+            const field = command.field as Partial<FieldRecipe>;
+            if (!field || !(FIELD_KINDS as readonly string[]).includes(String(field.kind)))
+              throw new Error("field.kind must be wind, pressure, attract, repel or vortex");
+            const shape = field.shape as FieldRecipe["shape"];
+            if (!shape || typeof shape !== "object") throw new Error("field.shape required");
+            physical.reactions.addField({
+              id: field.id ?? `agent:${this.sim.tick}:${physical.reactions.fieldList().length}`,
+              kind: field.kind as FieldRecipe["kind"],
+              areaId: physical.areaAt(this.sim, shape.x, shape.y),
+              shape,
+              strength: field.strength ?? 0,
+              ticks: field.ticks ?? -1,
+              gust: field.gust ?? 0,
+              actors: field.actors ?? true,
+              owner: player,
+              team: "party",
+              source: "agent",
+            });
+          }
+          result = { fields: physical.reactions.fieldList() };
         } else if (action === "spawn") {
           const body = command.body as BodyRecipe;
           if (body?.role !== "prop" || !body.id?.startsWith("prop-"))

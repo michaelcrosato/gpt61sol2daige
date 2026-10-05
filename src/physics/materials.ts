@@ -1,7 +1,7 @@
 /**
  * M05 material registry. One shared recipe per material drives body response, durability,
- * breakage and feedback. Flammability and conductivity are recorded for M08 reaction rules;
- * nothing reads them as live behavior before then.
+ * breakage and feedback. Flammability and conductivity drive the M08 reaction rules
+ * (`reactions.ts`): flammable materials ignite, conductive ones carry discharges.
  */
 export const MATERIAL_IDS = [
   "wood",

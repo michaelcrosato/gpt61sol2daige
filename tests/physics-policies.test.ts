@@ -502,6 +502,10 @@ test("working presets, numeric zero and scope resets preserve the scene", () => 
       "mechanisms",
       "jointBreakage",
       "jointStrength",
+      "materialReactions",
+      "chainReactions",
+      "environmentalForces",
+      "fieldStrength",
     ]);
   } finally {
     world.dispose();
@@ -608,7 +612,7 @@ test("applied/off and queued policies survive JSON save, replay, continuation; c
         delete body.state;
       }
       const migrated = PhysicsWorld.restore(snapshot);
-      assert.equal(migrated.save().version, 7);
+      assert.equal(migrated.save().version, 8);
       assert.equal(
         pose(migrated, "legacy-quiet").frozen,
         true,
