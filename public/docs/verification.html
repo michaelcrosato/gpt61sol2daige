@@ -516,6 +516,14 @@ rebinding and per-guest frame builds amplified the load. A 1 Hz host
 heartbeat now carries liveness, builds are shared and cost-spaced, and
 staged receipts stop resends to guests that are still decoding. <a
 href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/evidence/physics-m04-release.json">Release evidence</a>.</li>
+<li>M03 made ambient ownership a per-tick, per-creature pass that
+rebuilt four area recipes and a full policy object for every creature. A
+32,768-creature tick took a median 184 ms in Node, against 7.4 ms before
+physics on the earlier benchmark machine. Memoized policy resolution,
+cached area footprints and in-place samples bring 6,000/32,768/65,536
+creatures to 18/78/177 ms, with state and save hashes identical to the
+uncached path. <a href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/evidence/physics-ambient-tick.json">Tick
+evidence</a>.</li>
 </ul>
 <h2 id="scope-limits">Scope limits</h2>
 <p>The physics tests cover circles, static terrain and the reference

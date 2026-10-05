@@ -407,28 +407,47 @@ export function editPolicies(current: PolicyState, transaction: PolicyTransactio
   validatePolicyState(next);
   return canonical(next);
 }
+function areaProfiles(state: PolicyState, areaId: string) {
+  const area = state.profiles.areas.find((p) => p.id === areaId);
+  if (!area) throw new Error(`Unknown body area: ${areaId}`);
+  const land = state.profiles.lands.find((p) => p.id === area.landId)!;
+  return { area, land, regions: state.profiles.regions.filter((r) => r.areaId === areaId) };
+}
+function containingRegions(
+  state: PolicyState,
+  candidates: RegionProfile[],
+  x: number,
+  y: number,
+  previous: readonly string[],
+): RegionProfile[] {
+  return candidates
+    .filter((region) =>
+      containsRegion(
+        region.shape,
+        x,
+        y,
+        previous.includes(region.id) ? state.boundaryMargin : -state.boundaryMargin,
+      ),
+    )
+    .sort((a, b) => a.priority - b.priority || compareIds(b.id, a.id));
+}
 export function resolvePolicy(
   state: PolicyState,
   areaId: string,
   x: number,
   y: number,
-  previous: string[] = [],
+  previous: readonly string[] = [],
 ): ResolvedPolicy {
-  const area = state.profiles.areas.find((p) => p.id === areaId);
-  if (!area) throw new Error(`Unknown body area: ${areaId}`);
-  const land = state.profiles.lands.find((p) => p.id === area.landId)!;
-  const regions = state.profiles.regions
-    .filter(
-      (region) =>
-        region.areaId === areaId &&
-        containsRegion(
-          region.shape,
-          x,
-          y,
-          previous.includes(region.id) ? state.boundaryMargin : -state.boundaryMargin,
-        ),
-    )
-    .sort((a, b) => a.priority - b.priority || compareIds(b.id, a.id));
+  const { area, land, regions } = areaProfiles(state, areaId);
+  return composePolicy(state, area, land, containingRegions(state, regions, x, y, previous));
+}
+/** Values depend only on the state, the area and its ordered containing regions. */
+function composePolicy(
+  state: PolicyState,
+  area: AreaProfile,
+  land: LandProfile,
+  regions: RegionProfile[],
+): ResolvedPolicy {
   const values = { ...POLICY_DEFAULTS },
     provenance = {} as ResolvedPolicy["provenance"];
   for (const key of Object.keys(POLICY_DEFAULTS) as (keyof typeof POLICY_DEFAULTS)[])
@@ -478,9 +497,16 @@ export function resolvePolicy(
     },
     provenance,
     landId: land.id,
-    areaId,
+    areaId: area.id,
     regions: regions.map((p) => p.id),
   };
+}
+function freezeResolved(policy: ResolvedPolicy): ResolvedPolicy {
+  Object.freeze(policy.values);
+  Object.freeze(policy.effective);
+  Object.freeze(policy.provenance);
+  Object.freeze(policy.regions);
+  return Object.freeze(policy);
 }
 export class PolicyController {
   private state: PolicyState;
@@ -516,8 +542,35 @@ export class PolicyController {
     this.pending = [];
     return changed;
   }
-  resolve(areaId: string, x: number, y: number, previous: string[] = []) {
-    return resolvePolicy(this.state, areaId, x, y, previous);
+  /** Per-state memo of `resolvePolicy`. States are replaced, never mutated, so identity
+   * invalidates it. Only region containment is position-dependent; every creature in the same
+   * area and region set shares one frozen result. */
+  private memo?: {
+    state: PolicyState;
+    areas: Map<string, ReturnType<typeof areaProfiles>>;
+    results: Map<string, ResolvedPolicy>;
+  };
+  resolve(areaId: string, x: number, y: number, previous: readonly string[] = []) {
+    let memo = this.memo;
+    if (memo?.state !== this.state)
+      memo = this.memo = { state: this.state, areas: new Map(), results: new Map() };
+    let profiles = memo.areas.get(areaId);
+    if (!profiles) {
+      profiles = areaProfiles(this.state, areaId);
+      memo.areas.set(areaId, profiles);
+    }
+    const regions = profiles.regions.length
+      ? containingRegions(this.state, profiles.regions, x, y, previous)
+      : profiles.regions;
+    const key = regions.length
+      ? `${areaId}\u0000${regions.map((r) => r.id).join("\u0000")}`
+      : areaId;
+    let resolved = memo.results.get(key);
+    if (!resolved) {
+      resolved = freezeResolved(composePolicy(this.state, profiles.area, profiles.land, regions));
+      memo.results.set(key, resolved);
+    }
+    return resolved;
   }
   inspect() {
     return {

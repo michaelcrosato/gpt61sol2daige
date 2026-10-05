@@ -122,6 +122,7 @@ The final 300-frame browser measurement includes both Canvas rendering and live 
 - Large checkpoint storage now uses IndexedDB. The test covers a 65,536-creature world at distant coordinates with the full 2,048-tile patch layer, as well as existing localStorage saves.
 - High-population region rebalancing now clears derived proximity flags when a slot respawns; the checkpoint test checks exact future state while travelers separate.
 - M04's eight-client test lost six guests at 32,768 creatures on main CI and on both commits of its first repair. Local reproduction showed a loaded host processing guest acknowledgements 3–10 s late, so stop-and-wait guests heard nothing for 10 s; per-hello population-sized rebinding and per-guest frame builds amplified the load. A 1 Hz host heartbeat now carries liveness, builds are shared and cost-spaced, and staged receipts stop resends to guests that are still decoding. [Release evidence](evidence/physics-m04-release.json).
+- M03 made ambient ownership a per-tick, per-creature pass that rebuilt four area recipes and a full policy object for every creature. A 32,768-creature tick took a median 184 ms in Node, against 7.4 ms before physics on the earlier benchmark machine. Memoized policy resolution, cached area footprints and in-place samples bring 6,000/32,768/65,536 creatures to 18/78/177 ms, with state and save hashes identical to the uncached path. [Tick evidence](evidence/physics-ambient-tick.json).
 
 ## Scope limits
 
