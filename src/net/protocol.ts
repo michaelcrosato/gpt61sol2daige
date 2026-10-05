@@ -11,7 +11,7 @@ import { type TerrainPatch, validatePatches, WORLD_LIMIT } from "../engine/world
 import type { AdventureState } from "../game/types.ts";
 import { validateAdventure } from "../game/validation.ts";
 
-export const PROTOCOL_VERSION = 5;
+export const PROTOCOL_VERSION = 6;
 export const MAX_HEADER = 512_000;
 export const MAX_PACKET = MAX_NPCS * 16 + MAX_HEADER + 8;
 export interface SnapshotView extends ViewRegion {
@@ -28,7 +28,7 @@ export function snapshotBuffer(value: ArrayBuffer | ArrayBufferView): ArrayBuffe
   return new Uint8Array(value.buffer, value.byteOffset, value.byteLength).slice().buffer;
 }
 interface Header {
-  version: 5;
+  version: 6;
   seed: number;
   tick: number;
   population: number;

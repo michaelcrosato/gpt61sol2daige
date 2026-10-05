@@ -85,8 +85,10 @@ test("dash phases through actors but continuously respects patched world obstacl
     sim.setInput("local", { x: 1 });
     sim.step(40);
     assert.ok(p.x > tx * 16 + 20, "patch removal releases the motor");
+    // Only the painted column must release; natural water elsewhere in loaded chunks remains.
+    const painted = new Set(Array.from({ length: 9 }, (_, k) => `-${tx}-${ty - 4 + k}-water`));
     assert.ok(
-      !sim.physical!.world.ids().some((id) => id.includes(`-${tx}-`) && id.endsWith("water")),
+      !sim.physical!.world.ids().some((id) => [...painted].some((end) => id.endsWith(end))),
     );
   } finally {
     sim.dispose();

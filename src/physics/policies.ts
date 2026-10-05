@@ -7,6 +7,9 @@ export const POLICY_DEFAULTS = {
   crowdContacts: true,
   ambientPhysics: false,
   sweptCollision: true,
+  destruction: true,
+  materialDurability: 1,
+  debrisLifetime: 0,
 };
 export type PolicyValues = Partial<typeof POLICY_DEFAULTS>;
 export type PolicyScope = "land" | "area" | "region";
@@ -78,14 +81,16 @@ export const POLICY_PRESETS = {
     dynamicProps: false,
     propBlocking: false,
     crowdContacts: false,
+    destruction: false,
   },
   Reactive: { ...POLICY_DEFAULTS },
-  Wild: { ...POLICY_DEFAULTS, impulseStrength: 2.5 },
+  Wild: { ...POLICY_DEFAULTS, impulseStrength: 2.5, materialDurability: 0.6 },
   Sanctuary: {
     ...POLICY_DEFAULTS,
     propBlocking: false,
     crowdContacts: false,
     impulseStrength: 0.35,
+    destruction: false,
   },
 };
 export type PresetName = keyof typeof POLICY_PRESETS;
@@ -119,10 +124,13 @@ export function validateValues(values: PolicyValues) {
     "crowdContacts",
     "ambientPhysics",
     "sweptCollision",
+    "destruction",
   ] as const)
     if (key in values && typeof values[key] !== "boolean")
       throw new Error(`${key} must be boolean`);
   if ("impulseStrength" in values) number(values.impulseStrength, 0, 10);
+  if ("materialDurability" in values) number(values.materialDurability, 0.05, 20);
+  if ("debrisLifetime" in values) number(values.debrisLifetime, 0, 3600);
 }
 const cross = (
   a: { x: number; y: number },
@@ -460,15 +468,17 @@ function composePolicy(
       "crowdContacts",
       "ambientPhysics",
       "sweptCollision",
+      "destruction",
     ] as const)
       if (patch[key] !== undefined) {
         values[key] = patch[key];
         provenance[key] = source;
       }
-    if (patch.impulseStrength !== undefined) {
-      values.impulseStrength = patch.impulseStrength;
-      provenance.impulseStrength = source;
-    }
+    for (const key of ["impulseStrength", "materialDurability", "debrisLifetime"] as const)
+      if (patch[key] !== undefined) {
+        values[key] = patch[key];
+        provenance[key] = source;
+      }
   };
   apply(land.values, `land:${land.id}/profile`);
   apply(area.values, `area:${area.id}/profile`);
@@ -494,6 +504,7 @@ function composePolicy(
       crowdContacts: values.worldReactions && values.crowdContacts,
       ambientPhysics: values.worldReactions && values.ambientPhysics,
       sweptCollision: values.worldReactions && values.sweptCollision,
+      destruction: values.worldReactions && values.destruction,
     },
     provenance,
     landId: land.id,

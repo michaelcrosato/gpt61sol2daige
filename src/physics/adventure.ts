@@ -1,16 +1,38 @@
 import { MAX_NPCS } from "../engine/limits.ts";
 import type { Simulation } from "../engine/simulation.ts";
-import { type TerrainPatch, validatePatches, WORLD_LIMIT, type World } from "../engine/world.ts";
+import { type TerrainPatch, validatePatches, WORLD_LIMIT, World } from "../engine/world.ts";
 import { areaRecipe } from "../game/content.ts";
 import type { AdventureState, Enemy } from "../game/types.ts";
+import {
+  clearingProps,
+  damageStage,
+  FAMILIES,
+  fracture,
+  legacyBlueprint,
+  PALETTES,
+  PROP_FAMILIES,
+  type PropFamily,
+} from "./blueprints.ts";
+import { isMaterial, MATERIALS, type MaterialId, materialDamage } from "./materials.ts";
 import {
   type PolicyCheckpoint,
   PolicyController,
   type PolicyLayout,
   type PolicyTransaction,
 } from "./policies.ts";
-import { PhysicsWorld, validateBody, validatePhysicsSnapshot } from "./runtime.ts";
-import { type ChunkCoordinate, occupiedChunks, TerrainRegistry, terrainRecipe } from "./terrain.ts";
+import {
+  PhysicsWorld,
+  upgradePolicySamples,
+  validateBody,
+  validatePhysicsSnapshot,
+} from "./runtime.ts";
+import {
+  type ChunkCoordinate,
+  occupiedChunks,
+  solidTerrain,
+  TerrainRegistry,
+  terrainRecipe,
+} from "./terrain.ts";
 import { type BodyPose, type BodyRecipe, type PhysicsSnapshot, RAPIER_VERSION } from "./types.ts";
 
 export const playerBodyId = (id: string) => `player-${id}`;
@@ -43,6 +65,53 @@ interface LandArchive {
   policies: PolicyCheckpoint;
   props: BodyPose[];
   patches: TerrainPatch[];
+  /** M05: destroyed parents never respawn when the land is restored. */
+  destroyed: DestroyedRecord[];
+}
+/** Persistent destruction fact. The parent body is gone; its pieces are ordinary props. */
+export interface DestroyedRecord {
+  id: string;
+  family: PropFamily;
+  palette: number;
+  material: MaterialId;
+  x: number;
+  y: number;
+  angle: number;
+  tick: number;
+  owner: string;
+  cause: string;
+  /** Party gold granted exactly once, when the object broke. */
+  reward: number;
+  pieces: string[];
+}
+/** One attack's effect on one prop, for gameplay rewards and presentation feedback. */
+export interface PropHit {
+  id: string;
+  family: PropFamily;
+  material: MaterialId;
+  x: number;
+  y: number;
+  /** Durability percentage removed by this hit. */
+  damage: number;
+  /** Material resistance absorbed the whole hit. */
+  resisted: boolean;
+  /** The target's resolved destruction policy is off: feedback only, no durability change. */
+  protectedByPolicy: boolean;
+  durability: number;
+  stage: number;
+  broken: DestroyedRecord | null;
+}
+export interface PropAttack {
+  owner: string;
+  cause: string;
+  x: number;
+  y: number;
+  radius: number;
+  damage: number;
+  angle?: number;
+  arc?: number;
+  /** Agent/QA strikes aim at one prop through the same material damage path. */
+  only?: string;
 }
 interface NavigationState {
   id: number;
@@ -52,7 +121,7 @@ interface NavigationState {
   turn: number;
 }
 export interface AdventurePhysicsSnapshot {
-  version: 1 | 2;
+  version: 1 | 2 | 3;
   backend: string;
   landId: string;
   run: number;
@@ -64,6 +133,8 @@ export interface AdventurePhysicsSnapshot {
   navigation: NavigationState[];
   appliedTransition: number;
   pendingTerrain: boolean;
+  /** Version 3 (M05). */
+  destroyed?: DestroyedRecord[];
 }
 function layout(sim: Simulation): PolicyLayout {
   const s = sim.adventure.state,
@@ -144,7 +215,7 @@ export function validateSemanticTerrain(
   world: World,
   state: AdventureState,
 ): void {
-  if (snapshot.world.version !== 4) return;
+  if (snapshot.world.version < 4) return;
   const chunks = new Set(snapshot.terrainChunks.map((c) => c.join(",")));
   for (const entry of snapshot.world.bodies) {
     if (entry.recipe.role !== "terrain") continue;
@@ -181,6 +252,10 @@ export class AdventurePhysics {
   private readonly ambientIds: string[] = [];
   private readonly ambientIdGenerations: number[] = [];
   private archives = new Map<string, LandArchive>();
+  /** Destroyed parents in this land, by id. */
+  private destroyed = new Map<string, DestroyedRecord>();
+  /** Debris with an explicit lifetime: id -> cleanup tick. Derived from recipes on restore. */
+  private expiring = new Map<string, number>();
   private actors = new Set<string>();
   private navigation = new Map<number, NavigationState>();
   private sourceWorld: World;
@@ -197,13 +272,17 @@ export class AdventurePhysics {
     return adventureAreaAt(sim.adventure.state, x, y);
   }
   private spawnProps(sim: Simulation, archived?: BodyPose[]): void {
+    this.expiring.clear();
     if (archived) {
       for (const pose of archived) {
         this.world.spawn(pose);
         if (!pose.frozen) this.world.motion(pose.id, pose.vx, pose.vy, pose.angularVelocity);
+        this.track(pose);
       }
       return;
     }
+    const palette = sim.adventure.state.townLand % PALETTES,
+      blocked = solidTerrain(sim.world);
     for (let i = 0; i < 4; i++) {
       const r = areaRecipe(sim.adventure.state.seed, sim.adventure.state.townLand * 4 + i + 1);
       for (let n = 0; n < 4; n++)
@@ -220,6 +299,7 @@ export class AdventurePhysics {
           restitution: 0.05,
           damping: 2,
           consequences: { destroyed: false, claimed: false, durability: 100 },
+          ...legacyBlueprint(`crate-${r.index}-${n}`, palette),
         });
       this.world.spawn({
         id: `wheel-${r.index}`,
@@ -232,8 +312,14 @@ export class AdventurePhysics {
         mass: 0.7,
         damping: 1,
         consequences: { destroyed: false, claimed: false, durability: 100 },
+        ...legacyBlueprint(`wheel-${r.index}`, palette),
       });
+      for (const recipe of clearingProps(r, palette, blocked)) this.world.spawn(recipe);
     }
+  }
+  private track(recipe: BodyRecipe): void {
+    if (recipe.blueprint?.expiresAt !== undefined)
+      this.expiring.set(recipe.id, recipe.blueprint.expiresAt);
   }
   synchronizeLand(sim: Simulation): void {
     const id = `land-${sim.adventure.state.run}-${sim.adventure.state.townLand}`;
@@ -247,6 +333,7 @@ export class AdventurePhysics {
         policies: { state: previous.state, pending: previous.pending },
         props,
         patches: [...this.sourceWorld.patches.values()].map((p) => [...p]),
+        destroyed: [...this.destroyed.values()],
       });
     else this.archives.clear();
     const archive = this.archives.get(id);
@@ -269,6 +356,7 @@ export class AdventurePhysics {
     this.ambient.clear();
     this.actors.clear();
     this.navigation.clear();
+    this.destroyed = new Map((archive?.destroyed ?? []).map((d) => [d.id, d]));
     this.spawnProps(sim, archive?.props);
   }
   private actor(
@@ -308,6 +396,13 @@ export class AdventurePhysics {
   }
   begin(sim: Simulation): void {
     this.synchronizeLand(sim);
+    // Debris cleanup follows its explicit lifetime, recorded when it was created.
+    if (this.expiring.size)
+      for (const [id, tick] of [...this.expiring].sort((a, b) => (a[0] < b[0] ? -1 : 1)))
+        if (tick <= sim.tick) {
+          if (this.world.has(id)) this.world.remove(id);
+          this.expiring.delete(id);
+        }
     this.world.boundary();
     const wanted = new Set<string>();
     for (const p of sim.players.values()) {
@@ -391,7 +486,9 @@ export class AdventurePhysics {
     const points = [...sim.players.values()].map((p) => ({ x: p.x, y: p.y, radius: 80 }));
     for (const e of sim.adventure.state.enemies)
       if (e.hp > 0) points.push({ x: e.x, y: e.y, radius: 80 });
-    for (const p of this.props()) points.push({ x: p.x, y: p.y, radius: 40 });
+    // Fixed scenery never meets terrain; only movable props need their surroundings solid.
+    for (const p of this.props())
+      if (p.motion === "dynamic") points.push({ x: p.x, y: p.y, radius: 40 });
     for (const sample of this.ambient.values())
       if (sample.owner === "rapier")
         points.push({ x: sim.x[sample.slot], y: sim.y[sample.slot], radius: 32 });
@@ -589,6 +686,145 @@ export class AdventurePhysics {
       .filter((id) => id.startsWith("crate-") || id.startsWith("wheel-") || id.startsWith("prop-"))
       .map((id) => this.world.pose(id));
   }
+  /** Destroyed parent IDs are permanent; nothing may spawn under them again. */
+  isDestroyed(id: string): boolean {
+    return this.destroyed.has(id);
+  }
+  destroyedRecords(): DestroyedRecord[] {
+    return [...this.destroyed.values()].map((d) => structuredClone(d));
+  }
+  /**
+   * Basic attack hook: material damage, visible push and one-time breakage for props in an
+   * attack's reach. Breaking replaces the parent with authored pieces at this command boundary
+   * (outside the solver step); a destroyed parent can never be hit, broken or rewarded again.
+   */
+  damageProps(sim: Simulation, attack: PropAttack): PropHit[] {
+    const arc = attack.arc ?? Math.PI,
+      angle = attack.angle ?? 0,
+      hits: PropHit[] = [];
+    for (const id of this.world.ids()) {
+      if (!(id.startsWith("crate-") || id.startsWith("wheel-") || id.startsWith("prop-"))) continue;
+      if (attack.only !== undefined && id !== attack.only) continue;
+      const pose = this.world.pose(id);
+      if (!pose.blueprint || !pose.material) continue;
+      const reach =
+        pose.shape.kind === "circle"
+          ? pose.shape.radius
+          : Math.hypot(pose.shape.width, pose.shape.height) / 2;
+      const dx = pose.x - attack.x,
+        dy = pose.y - attack.y,
+        distance = Math.hypot(dx, dy);
+      if (distance > attack.radius + reach) continue;
+      if (arc < Math.PI && distance > 1 && Math.cos(Math.atan2(dy, dx) - angle) < Math.cos(arc))
+        continue;
+      const family = FAMILIES[pose.blueprint.family],
+        material = MATERIALS[pose.material],
+        policy = pose.policy;
+      const away = distance > 1 ? Math.atan2(dy, dx) : angle;
+      if (pose.motion === "dynamic" && !pose.frozen) {
+        const push = (pose.mass ?? 1) * Math.min(140, 25 + attack.damage * 3) * material.knockback;
+        this.world.impulse(id, Math.cos(away) * push, Math.sin(away) * push);
+      }
+      if (family.toughness <= 0) continue; // Pieces and stumps move; they do not break further.
+      const durability = pose.consequences?.durability ?? 100;
+      const base: Omit<PropHit, "damage" | "resisted" | "durability" | "stage" | "broken"> = {
+        id,
+        family: pose.blueprint.family,
+        material: pose.material,
+        x: pose.x,
+        y: pose.y,
+        protectedByPolicy: !policy.effective.destruction,
+      };
+      if (!policy.effective.destruction) {
+        hits.push({
+          ...base,
+          damage: 0,
+          resisted: false,
+          durability,
+          stage: damageStage(durability),
+          broken: null,
+        });
+        continue;
+      }
+      const loss =
+        (materialDamage(pose.material, attack.damage, policy.values.materialDurability) /
+          family.toughness) *
+        100;
+      if (loss <= 0) {
+        hits.push({
+          ...base,
+          damage: 0,
+          resisted: true,
+          durability,
+          stage: damageStage(durability),
+          broken: null,
+        });
+        continue;
+      }
+      const remaining = Math.max(0, durability - loss);
+      if (remaining > 0) {
+        this.world.setConsequences(id, {
+          destroyed: false,
+          claimed: pose.consequences?.claimed ?? false,
+          durability: remaining,
+        });
+        hits.push({
+          ...base,
+          damage: durability - remaining,
+          resisted: false,
+          durability: remaining,
+          stage: damageStage(remaining),
+          broken: null,
+        });
+        continue;
+      }
+      hits.push({
+        ...base,
+        damage: durability,
+        resisted: false,
+        durability: 0,
+        stage: 3,
+        broken: this.breakProp(sim, pose, away, attack),
+      });
+    }
+    return hits;
+  }
+  private breakProp(
+    sim: Simulation,
+    pose: BodyPose,
+    hitAngle: number,
+    attack: PropAttack,
+  ): DestroyedRecord {
+    const lifetime = Math.round(pose.policy.values.debrisLifetime * 60),
+      pieces = fracture(pose, hitAngle, sim.tick, lifetime),
+      family = FAMILIES[pose.blueprint!.family];
+    this.world.remove(pose.id);
+    for (const piece of pieces) {
+      this.world.spawn(piece.recipe);
+      const spawned = this.world.pose(piece.recipe.id);
+      if (piece.recipe.motion === "dynamic" && !spawned.frozen)
+        this.world.motion(piece.recipe.id, piece.vx, piece.vy, piece.angularVelocity);
+      this.track(piece.recipe);
+    }
+    // Rewards scale with the prop's own clearing, like that area's enemies.
+    const area = Number(/^area-(\d+)$/.exec(pose.areaId ?? "")?.[1] ?? sim.adventure.state.area);
+    const record: DestroyedRecord = {
+      id: pose.id,
+      family: pose.blueprint!.family,
+      palette: pose.blueprint!.palette,
+      material: pose.material!,
+      x: pose.x,
+      y: pose.y,
+      angle: pose.angle,
+      tick: sim.tick,
+      owner: attack.owner,
+      cause: attack.cause,
+      reward: family.reward > 0 ? Math.round(family.reward * (1 + Math.min(area, 500) * 0.13)) : 0,
+      pieces: pieces.map((p) => p.recipe.id),
+    };
+    this.destroyed.set(record.id, record);
+    return structuredClone(record);
+  }
   inspect() {
     const state = this.world.inspect();
     return {
@@ -602,6 +838,7 @@ export class AdventurePhysics {
         ambient: [...this.ambient.values()].filter((s) => s.owner === "ambient").length,
       },
       props: this.props(),
+      destroyed: this.destroyedRecords(),
     };
   }
   entities(): PhysicalEntityState[] {
@@ -620,21 +857,27 @@ export class AdventurePhysics {
   }
   save(portable = false): AdventurePhysicsSnapshot {
     return {
-      version: 2,
+      version: 3,
       backend: RAPIER_VERSION,
       landId: this.landId,
       run: this.run,
       seed: this.seed,
       world: this.world.save(portable),
       terrainChunks: this.terrain.save(),
-      ambient: structuredClone([...this.ambient.values()]),
+      ambient: [...this.ambient.values()].map((sample) => ({
+        ...sample,
+        regions: [...sample.regions],
+      })),
       archives: structuredClone([...this.archives.values()]),
       navigation: structuredClone([...this.navigation.values()]),
       appliedTransition: this.appliedTransition,
       pendingTerrain: this.terrain.pending(this.sourceWorld),
+      destroyed: this.destroyedRecords(),
     };
   }
   static restore(sim: Simulation, snapshot: AdventurePhysicsSnapshot): AdventurePhysics {
+    const migrated = snapshot?.version !== 3;
+    snapshot = upgradeAdventurePhysics(snapshot, sim);
     validateAdventurePhysics(snapshot, sim);
     const result = new AdventurePhysics(sim);
     result.world.dispose();
@@ -651,6 +894,24 @@ export class AdventurePhysics {
       );
       result.ambient = new Map(snapshot.ambient.map((s) => [s.slot, structuredClone(s)]));
       result.archives = new Map(snapshot.archives.map((s) => [s.id, structuredClone(s)]));
+      result.destroyed = new Map((snapshot.destroyed ?? []).map((d) => [d.id, structuredClone(d)]));
+      for (const id of result.world.ids()) {
+        const pose = result.world.pose(id);
+        if (pose.role === "prop") result.track(pose);
+      }
+      if (migrated) {
+        // Content added by M05 did not exist in the saved land: give it fresh default state.
+        const s = sim.adventure.state,
+          palette = s.townLand % PALETTES,
+          blocked = solidTerrain(sim.world);
+        for (let i = 0; i < 4; i++)
+          for (const recipe of clearingProps(
+            areaRecipe(s.seed, s.townLand * 4 + i + 1),
+            palette,
+            blocked,
+          ))
+            if (!result.world.has(recipe.id)) result.world.spawn(recipe);
+      }
       result.navigation = new Map(snapshot.navigation.map((s) => [s.id, structuredClone(s)]));
       result.appliedTransition = snapshot.appliedTransition;
       result.actors = new Set(
@@ -713,14 +974,135 @@ export class AdventurePhysics {
     this.world.dispose();
   }
 }
+const landPalette = (landId: string) => Number(landId.split("-")[2]) % PALETTES;
+function annotateLegacy<T extends BodyRecipe>(recipe: T, palette: number): T {
+  const legacy = legacyBlueprint(recipe.id, palette);
+  return legacy && !recipe.blueprint ? { ...recipe, ...legacy } : recipe;
+}
+/** A saved pose lists its recipe keys first; keep that order so semantic/binary checks match. */
+function annotateState(state: BodyPose, recipe: BodyRecipe): BodyPose {
+  if (state.blueprint || !recipe.blueprint) return state;
+  const out: Record<string, unknown> = {},
+    source = state as unknown as Record<string, unknown>;
+  for (const key of Object.keys(recipe))
+    out[key] = key === "material" || key === "blueprint" ? recipe[key] : source[key];
+  for (const [key, value] of Object.entries(source)) if (!(key in out)) out[key] = value;
+  return out as unknown as BodyPose;
+}
+/**
+ * M03/M04 envelopes predate materials and destruction. Annotate their crates/wheels, start
+ * empty destroyed registries and add M05 clearing props to archived lands as fresh content.
+ */
+export function upgradeAdventurePhysics(
+  snapshot: AdventurePhysicsSnapshot,
+  sim?: Simulation,
+): AdventurePhysicsSnapshot {
+  if (!snapshot || snapshot.version === 3 || ![1, 2].includes(snapshot.version)) return snapshot;
+  const upgraded = structuredClone(snapshot);
+  upgraded.world = upgradePolicySamples(upgraded.world);
+  if (typeof upgraded.landId !== "string" || !Array.isArray(upgraded.world?.bodies))
+    return upgraded;
+  const palette = landPalette(upgraded.landId);
+  for (const entry of upgraded.world.bodies) {
+    if (!entry?.recipe) continue;
+    entry.recipe = annotateLegacy(entry.recipe, palette);
+    if (entry.state) entry.state = annotateState(entry.state, entry.recipe);
+  }
+  upgraded.destroyed = [];
+  for (const archive of Array.isArray(upgraded.archives) ? upgraded.archives : []) {
+    if (!archive || typeof archive.id !== "string" || !Array.isArray(archive.props)) continue;
+    const archivePalette = landPalette(archive.id);
+    archive.props = archive.props.map((p) => annotateLegacy(p, archivePalette));
+    archive.destroyed = [];
+    if (!sim) continue;
+    const land = Number(archive.id.split("-")[2]),
+      present = new Set(archive.props.map((p) => p.id)),
+      terrain = new World(sim.world.seed);
+    if (Array.isArray(archive.patches)) terrain.setPatches(archive.patches);
+    const blocked = solidTerrain(terrain);
+    for (let i = 0; i < 4; i++)
+      for (const recipe of clearingProps(
+        areaRecipe(sim.adventure.state.seed, land * 4 + i + 1),
+        archivePalette,
+        blocked,
+      ))
+        if (!present.has(recipe.id))
+          archive.props.push({
+            ...recipe,
+            angle: recipe.angle ?? 0,
+            vx: 0,
+            vy: 0,
+            angularVelocity: 0,
+            sleeping: false,
+            frozen: false,
+            reactivationBlocked: false,
+            ccdEnabled: recipe.ccd ?? true,
+            policy: undefined as unknown as BodyPose["policy"],
+          });
+  }
+  return upgraded;
+}
+function validateDestroyed(records: unknown, label: string): DestroyedRecord[] {
+  if (!Array.isArray(records) || records.length > 100_000) throw new Error(`Invalid ${label}`);
+  const ids = new Set<string>();
+  for (const d of records as DestroyedRecord[]) {
+    if (
+      !d ||
+      typeof d !== "object" ||
+      Object.keys(d).some(
+        (key) =>
+          ![
+            "id",
+            "family",
+            "palette",
+            "material",
+            "x",
+            "y",
+            "angle",
+            "tick",
+            "owner",
+            "cause",
+            "reward",
+            "pieces",
+          ].includes(key),
+      ) ||
+      typeof d.id !== "string" ||
+      !/^[\w-]{1,160}$/.test(d.id) ||
+      ids.has(d.id) ||
+      !(PROP_FAMILIES as readonly string[]).includes(d.family) ||
+      FAMILIES[d.family].toughness <= 0 ||
+      !Number.isInteger(d.palette) ||
+      d.palette < 0 ||
+      d.palette >= PALETTES ||
+      !isMaterial(d.material) ||
+      ![d.x, d.y].every((n) => Number.isFinite(n) && Math.abs(n) <= WORLD_LIMIT) ||
+      !Number.isFinite(d.angle) ||
+      !Number.isSafeInteger(d.tick) ||
+      d.tick < 0 ||
+      typeof d.owner !== "string" ||
+      d.owner.length > 160 ||
+      typeof d.cause !== "string" ||
+      d.cause.length > 80 ||
+      !Number.isSafeInteger(d.reward) ||
+      d.reward < 0 ||
+      !Array.isArray(d.pieces) ||
+      d.pieces.length > 16 ||
+      d.pieces.some((id) => typeof id !== "string" || !id.startsWith(`${d.id}-`))
+    )
+      throw new Error(`Invalid ${label}`);
+    ids.add(d.id);
+  }
+  return records as DestroyedRecord[];
+}
 export function validateAdventurePhysics(
   snapshot: AdventurePhysicsSnapshot,
   sim?: Simulation,
 ): void {
   if (
     !snapshot ||
-    ![1, 2].includes(snapshot.version) ||
+    ![1, 2, 3].includes(snapshot.version) ||
     (snapshot.version === 2 && snapshot.world?.version !== 4) ||
+    (snapshot.version === 3 && snapshot.world?.version !== 5) ||
     snapshot.backend !== snapshot.world?.backend ||
     (snapshot.version === 1 && snapshot.backend !== RAPIER_VERSION) ||
     !/^land-\d+-\d+$/.test(snapshot.landId) ||
@@ -744,6 +1126,9 @@ export function validateAdventurePhysics(
   )
     throw new Error("Invalid physical transition sample");
   const entries = new Map(snapshot.world.bodies.map((entry) => [entry.recipe.id, entry]));
+  if (snapshot.version === 3)
+    for (const d of validateDestroyed(snapshot.destroyed, "destroyed prop record"))
+      if (entries.has(d.id)) throw new Error("Destroyed prop still present");
   const controller = new PolicyController(snapshot.world.policies);
   if (
     !Array.isArray(snapshot.navigation) ||
@@ -824,7 +1209,11 @@ export function validateAdventurePhysics(
     archives.add(a.id);
     new PolicyController(a.policies);
     validatePatches(a.patches);
+    const destroyed =
+      snapshot.version === 3 ? validateDestroyed(a.destroyed, "archived destroyed record") : [];
+    const gone = new Set(destroyed.map((d) => d.id));
     for (const p of a.props) {
+      if (gone.has(p?.id)) throw new Error("Archived destroyed prop still present");
       validateBody(p, true);
       if (
         !p ||

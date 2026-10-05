@@ -59,6 +59,21 @@ export function terrainRecipe(
     };
   return null;
 }
+/** Whether a circular footprint overlaps a tile that terrainRecipe turns into a solid. */
+export function solidTerrain(world: World): (x: number, y: number, reach: number) => boolean {
+  return (x, y, reach) => {
+    for (let ty = Math.floor((y - reach) / TILE); ty <= Math.floor((y + reach) / TILE); ty++)
+      for (let tx = Math.floor((x - reach) / TILE); tx <= Math.floor((x + reach) / TILE); tx++) {
+        const tile = world.sample(tx, ty);
+        if (
+          tile.terrain === Terrain.DeepWater ||
+          [Decor.Pine, Decor.Oak, Decor.Rock].includes(tile.decor as 1 | 2 | 3)
+        )
+          return true;
+      }
+    return false;
+  };
+}
 /** Runtime terrain handles follow occupied chunks, never camera visibility or LRU eviction. */
 export class TerrainRegistry {
   private chunks = new Map<string, string[]>();

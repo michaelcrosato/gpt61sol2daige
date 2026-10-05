@@ -10,7 +10,21 @@ export type SoundName =
   | "slash"
   | "hit"
   | "hurt"
-  | "level";
+  | "level"
+  | MaterialSound
+  | "crumble";
+/** M05 material identity: one impact voice per registered material. */
+export const MATERIAL_SOUNDS = [
+  "wood",
+  "stone",
+  "metal",
+  "glass",
+  "cloth",
+  "vegetation",
+  "ceramic",
+  "volatile",
+] as const;
+export type MaterialSound = (typeof MATERIAL_SOUNDS)[number];
 export const SAMPLE_RATE = 22050;
 export function synthesize(name: SoundName, seed = 142): Float32Array {
   const duration =
@@ -22,7 +36,13 @@ export function synthesize(name: SoundName, seed = 142): Float32Array {
           ? 0.75
           : name === "shard"
             ? 0.65
-            : 0.2;
+            : name === "metal" || name === "glass" || name === "crumble"
+              ? 0.55
+              : name === "volatile"
+                ? 0.7
+                : (MATERIAL_SOUNDS as readonly string[]).includes(name)
+                  ? 0.32
+                  : 0.2;
   const data = new Float32Array(Math.floor(duration * SAMPLE_RATE));
   const frequencies = [130.81, 164.81, 196, 261.63, 329.63, 392, 523.25, 659.25];
   for (let i = 0; i < data.length; i++) {
@@ -64,6 +84,57 @@ export function synthesize(name: SoundName, seed = 142): Float32Array {
         (Math.sin(t * 2 * Math.PI * (115 - t * 220)) * 0.22 + (random(i, 17, seed) - 0.5) * 0.19) *
         envelope;
     else if (name === "hurt") sample = Math.sin(t * 2 * Math.PI * 85) * 0.27 * envelope;
+    else if (name === "wood")
+      sample =
+        (Math.sin(t * 2 * Math.PI * (210 - t * 260)) * 0.2 * Math.exp(-t * 18) +
+          (random(i, 31, seed) - 0.5) * 0.24 * Math.exp(-t * 30)) *
+        Math.min(1, t * 400);
+    else if (name === "stone")
+      sample =
+        (Math.sin(t * 2 * Math.PI * (72 - t * 40)) * 0.26 * Math.exp(-t * 14) +
+          (random(Math.floor(i / 3), 37, seed) - 0.5) * 0.16 * Math.exp(-t * 9)) *
+        Math.min(1, t * 400);
+    else if (name === "metal")
+      sample =
+        (Math.sin(t * 2 * Math.PI * 523) * 0.1 +
+          Math.sin(t * 2 * Math.PI * 1247) * 0.07 +
+          Math.sin(t * 2 * Math.PI * 1868) * 0.04) *
+        Math.exp(-t * 6) *
+        Math.min(1, t * 600);
+    else if (name === "glass") {
+      for (let v = 0; v < 5; v++) {
+        const onset = random(v, 41, seed) * 0.18;
+        if (t > onset)
+          sample +=
+            Math.sin((t - onset) * 2 * Math.PI * (1800 + random(v, 43, seed) * 2400)) *
+            0.06 *
+            Math.exp(-(t - onset) * 22);
+      }
+    } else if (name === "cloth")
+      sample = (random(i, 47, seed) - 0.5) * 0.14 * Math.sin(Math.min(1, u) * Math.PI);
+    else if (name === "vegetation")
+      sample =
+        (random(i, 53, seed) - 0.5) *
+        0.16 *
+        Math.sin(Math.min(1, u) * Math.PI) *
+        (0.6 + 0.4 * Math.sin(t * 2 * Math.PI * 23));
+    else if (name === "ceramic")
+      sample =
+        (Math.sin(t * 2 * Math.PI * 940) * 0.12 * Math.exp(-t * 26) +
+          (random(i, 59, seed) - 0.5) * 0.2 * Math.exp(-t * 24)) *
+        Math.min(1, t * 600);
+    else if (name === "volatile")
+      sample =
+        (Math.sin(t * 2 * Math.PI * (60 - t * 50)) * 0.3 +
+          (random(Math.floor(i / 2), 61, seed) - 0.5) * 0.34) *
+        Math.exp(-t * 6) *
+        Math.min(1, t * 300);
+    else if (name === "crumble")
+      sample =
+        (random(Math.floor(i / 4), 67, seed) - 0.5) *
+        0.22 *
+        Math.exp(-t * 5) *
+        (random(Math.floor(t * 40), 71, seed) > 0.4 ? 1 : 0.3);
     else if (name === "level")
       sample =
         (Math.sin(t * 2 * Math.PI * 659.25) + Math.sin(t * 2 * Math.PI * 987.77)) * 0.13 * envelope;

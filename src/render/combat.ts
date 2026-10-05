@@ -11,6 +11,7 @@ import {
 } from "../game/content.ts";
 import { RARITY_COLORS } from "../game/loot.ts";
 import type { Drop, Enemy } from "../game/types.ts";
+import { drawMaterialEvent } from "./props.ts";
 import { monsterPixels, type RigPose } from "./rigs.ts";
 import { spritePixels } from "./sprites.ts";
 
@@ -708,6 +709,7 @@ export class CombatRenderer {
         ctx.restore();
         this.light(ctx, e.x, e.y, radius * 0.9, e.color, (1 - age / duration) * 0.16);
       }
+      if (e.type === "impact" || e.type === "break") drawMaterialEvent(ctx, e, age, zoom);
       if ((e.type === "hit" || e.type === "hurt") && zoom > 0.65 && age < 0.8) {
         ctx.save();
         ctx.globalAlpha = 1 - age / 0.8;

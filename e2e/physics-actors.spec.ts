@@ -140,21 +140,30 @@ test("normal encounter renders solved prop pushes, held attacks and dash; patche
     window.fern.command({ op: "input", x: 1, attack: true, pulse: true });
     window.fern.command({ op: "step", ticks: 30 });
   });
-  const moved = await page.evaluate(
-    () => window.fern.command({ op: "actors", action: "body", id: "crate-1-0" }) as BodyPose,
+  // Since M05 the held Whorl and slashes also break the wooden crate; its planks carry the push.
+  const scenery = await page.evaluate(
+    () =>
+      window.fern.command({ op: "actors", action: "props" }) as {
+        props: BodyPose[];
+        destroyed: { id: string; pieces: string[] }[];
+      },
   );
-  expect(moved.x).toBeGreaterThan(start.x + 10);
+  const broken = scenery.destroyed.find((d) => d.id === "crate-1-0")!;
+  expect(broken.pieces).toHaveLength(4);
+  const planks = scenery.props.filter((p) => broken.pieces.includes(p.id));
+  expect(planks).toHaveLength(4);
+  expect(planks.reduce((sum, p) => sum + p.x, 0) / planks.length).toBeGreaterThan(start.x + 10);
   const player = await page.evaluate(
     () => window.fern.command({ op: "actors", action: "body", id: "player-local" }) as BodyPose,
   );
   expect(player.angle).toBe(0);
   expect(player.angularVelocity).toBe(0);
-  expect(
-    (await page.evaluate(() => window.fern.game.observe())).events.some((e) => e.type === "slash"),
-  ).toBe(true);
-  expect(
-    (await page.evaluate(() => window.fern.game.observe())).events.some((e) => e.type === "whorl"),
-  ).toBe(true);
+  // observe() shows the latest 12 events; the scenery breaks above follow the attacks, so read
+  // the checkpoint's full bounded history.
+  const history = (await page.evaluate(() => window.fern.command({ op: "save" }) as SaveState))
+    .adventure!.events;
+  expect(history.some((e) => e.type === "slash")).toBe(true);
+  expect(history.some((e) => e.type === "whorl")).toBe(true);
   await page.evaluate(() => {
     const p = window.fern.observe().players[0];
     window.fern.command({

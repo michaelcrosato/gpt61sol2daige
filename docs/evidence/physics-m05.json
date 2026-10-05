@@ -1,0 +1,369 @@
+{
+  "registry": {
+    "exportSha256": "ca5c387a1495ed7d85daaf3df377f69b2c5a52ab85531d269ebdbad1e21f71d9",
+    "materials": {
+      "wood": {
+        "resistance": 0,
+        "vulnerability": 1,
+        "density": 0.0026,
+        "feedback": "splinters"
+      },
+      "stone": {
+        "resistance": 22,
+        "vulnerability": 0.85,
+        "density": 0.009,
+        "feedback": "dust"
+      },
+      "metal": {
+        "resistance": 14,
+        "vulnerability": 0.7,
+        "density": 0.012,
+        "feedback": "sparks"
+      },
+      "glass": {
+        "resistance": 0,
+        "vulnerability": 1.6,
+        "density": 0.0045,
+        "feedback": "shards"
+      },
+      "cloth": {
+        "resistance": 0,
+        "vulnerability": 1.2,
+        "density": 0.0008,
+        "feedback": "fibres"
+      },
+      "vegetation": {
+        "resistance": 3,
+        "vulnerability": 1,
+        "density": 0.0018,
+        "feedback": "leaves"
+      },
+      "ceramic": {
+        "resistance": 0,
+        "vulnerability": 1.4,
+        "density": 0.0042,
+        "feedback": "shards"
+      },
+      "volatile": {
+        "resistance": 0,
+        "vulnerability": 1.5,
+        "density": 0.003,
+        "feedback": "sparks"
+      }
+    },
+    "families": {
+      "crate": {
+        "material": "wood",
+        "toughness": 40,
+        "reward": 3,
+        "pieces": ["plank0", "plank1", "plank2", "plank3"],
+        "variants": [
+          "Pine slat crate",
+          "Iron-bound char crate",
+          "Driftwood crate",
+          "Plum-stained crate",
+          "Birch frost crate"
+        ]
+      },
+      "barrel": {
+        "material": "wood",
+        "toughness": 50,
+        "reward": 4,
+        "pieces": ["plank0", "plank1", "plank2", "hoop"],
+        "variants": [
+          "Oak cider barrel",
+          "Ember-tar barrel",
+          "Salt-cask barrel",
+          "Duskwine barrel",
+          "Frost brine barrel"
+        ]
+      },
+      "pot": {
+        "material": "ceramic",
+        "toughness": 10,
+        "reward": 5,
+        "pieces": ["shard0", "shard1", "shard2", "shard3"],
+        "variants": [
+          "Moss clay pot",
+          "Ash urn",
+          "Tideglass amphora",
+          "Violet jar",
+          "Frost-glazed jar"
+        ]
+      },
+      "log": {
+        "material": "wood",
+        "toughness": 70,
+        "reward": 0,
+        "pieces": ["half0", "half1"],
+        "variants": [
+          "Fallen oak log",
+          "Scorched log",
+          "Salt-bleached log",
+          "Duskwood log",
+          "Frozen birch log"
+        ]
+      },
+      "stone": {
+        "material": "stone",
+        "toughness": 120,
+        "reward": 0,
+        "pieces": ["chunk0", "chunk1", "chunk2"],
+        "variants": [
+          "Mossy boulder",
+          "Basalt chunk",
+          "Sea-worn stone",
+          "Violet slate",
+          "Frost-split rock"
+        ]
+      },
+      "wheel": {
+        "material": "wood",
+        "toughness": 45,
+        "reward": 0,
+        "pieces": ["rim0", "rim1", "rim2", "rim3", "hub"],
+        "variants": [
+          "Cart wheel",
+          "Iron-rim wheel",
+          "Spoked tide wheel",
+          "Pilgrim wheel",
+          "Sled runner"
+        ]
+      },
+      "wagon": {
+        "material": "wood",
+        "toughness": 120,
+        "reward": 9,
+        "pieces": ["canopy", "plank0", "plank1", "plank2", "plank3", "wheel0", "wheel1"],
+        "variants": [
+          "Farm wagon",
+          "Ember cart",
+          "Fisher's wagon",
+          "Pilgrim wagon",
+          "Frost sled-wagon"
+        ]
+      },
+      "fence": {
+        "material": "wood",
+        "toughness": 30,
+        "reward": 0,
+        "pieces": ["rail0", "rail1"],
+        "variants": [
+          "Wattle fence",
+          "Iron-spiked fence",
+          "Driftwood rail",
+          "Thorn fence",
+          "Birch picket"
+        ]
+      },
+      "pylon": {
+        "material": "glass",
+        "toughness": 15,
+        "reward": 0,
+        "pieces": ["shard0", "shard1", "shard2", "shard3", "shard4"],
+        "variants": [
+          "Greenglass pylon",
+          "Obsidian pylon",
+          "Tideglass pylon",
+          "Amethyst pylon",
+          "Iceglass pylon"
+        ]
+      },
+      "lantern": {
+        "material": "metal",
+        "toughness": 18,
+        "reward": 2,
+        "pieces": ["frame", "pane"],
+        "variants": [
+          "Moss lantern",
+          "Ember lantern",
+          "Tide lantern",
+          "Dusk lantern",
+          "Frost lantern"
+        ]
+      },
+      "tree": {
+        "material": "wood",
+        "toughness": 140,
+        "reward": 0,
+        "pieces": ["stump", "log"],
+        "variants": ["Oak", "Ember pine", "Salt willow", "Dusk elm", "Frost birch"]
+      },
+      "stump": {
+        "material": "wood",
+        "toughness": 0,
+        "reward": 0,
+        "pieces": [],
+        "variants": ["Oak stump", "Pine stump", "Willow stump", "Elm stump", "Birch stump"]
+      },
+      "debris": {
+        "material": "wood",
+        "toughness": 0,
+        "reward": 0,
+        "pieces": [],
+        "variants": ["Debris", "Debris", "Debris", "Debris", "Debris"]
+      }
+    }
+  },
+  "propsPerLand": 84,
+  "acceptance": {
+    "crate30": [
+      {
+        "durability": 25,
+        "stage": 2,
+        "resisted": false,
+        "broken": null
+      },
+      {
+        "durability": 0,
+        "stage": 3,
+        "resisted": false,
+        "broken": {
+          "pieces": [
+            "crate-1-0-plank0",
+            "crate-1-0-plank1",
+            "crate-1-0-plank2",
+            "crate-1-0-plank3"
+          ],
+          "reward": 3
+        }
+      }
+    ],
+    "pylon20": [
+      {
+        "durability": 0,
+        "stage": 3,
+        "resisted": false,
+        "broken": {
+          "pieces": [
+            "prop-pylon-1-0-shard0",
+            "prop-pylon-1-0-shard1",
+            "prop-pylon-1-0-shard2",
+            "prop-pylon-1-0-shard3",
+            "prop-pylon-1-0-shard4"
+          ],
+          "reward": 0
+        }
+      }
+    ],
+    "stoneWeak15": [
+      {
+        "durability": 100,
+        "stage": 0,
+        "resisted": true,
+        "broken": null
+      }
+    ],
+    "stoneStrong60": [73.08333333333333],
+    "tree40": [
+      {
+        "durability": 71.43,
+        "stage": 0,
+        "resisted": false,
+        "broken": null
+      },
+      {
+        "durability": 42.86,
+        "stage": 1,
+        "resisted": false,
+        "broken": null
+      },
+      {
+        "durability": 14.29,
+        "stage": 2,
+        "resisted": false,
+        "broken": null
+      },
+      {
+        "durability": 0,
+        "stage": 3,
+        "resisted": false,
+        "broken": {
+          "pieces": ["prop-tree-1-0-stump", "prop-tree-1-0-log"],
+          "reward": 0
+        }
+      }
+    ],
+    "logPush": {
+      "stumpMotion": "fixed",
+      "logMotion": "dynamic",
+      "moved": 41.46
+    }
+  },
+  "destructionOff": {
+    "durabilityBefore": 37.5,
+    "after": 37.5,
+    "protectedHits": 5,
+    "broken": false
+  },
+  "dynamicsOff": {
+    "parentsBrokenWhileFrozen": 19,
+    "pieces": 62,
+    "frozenWhileOff": 60,
+    "reactivationBlockedAfterWake": 0,
+    "parentsReconstructed": 0
+  },
+  "persistence": {
+    "destroyed": [
+      {
+        "id": "crate-1-0",
+        "family": "crate",
+        "material": "wood",
+        "cause": "agent",
+        "reward": 3,
+        "pieces": 4,
+        "tick": 1
+      },
+      {
+        "id": "prop-tree-1-0",
+        "family": "tree",
+        "material": "wood",
+        "cause": "agent",
+        "reward": 0,
+        "pieces": 2,
+        "tick": 1
+      },
+      {
+        "id": "prop-pylon-2-0",
+        "family": "pylon",
+        "material": "glass",
+        "cause": "agent",
+        "reward": 0,
+        "pieces": 5,
+        "tick": 1
+      }
+    ],
+    "rawRestoreEqual": true,
+    "portableRestoreEqual": true,
+    "lateJoinReplicaEqual": true,
+    "replayHash": "464ed360",
+    "hostHash": "464ed360",
+    "recall": {
+      "otherLandDestroyed": 0,
+      "returnedEqual": true,
+      "parentsAbsent": true
+    }
+  },
+  "migration": [
+    {
+      "fixture": "m04-raw.json.gz",
+      "source": "main 9bd16f0",
+      "envelope": [2, 3],
+      "world": [4, 5],
+      "legacyProps": 20,
+      "propsAfter": 84,
+      "legacyAnnotated": 20,
+      "archiveProps": [["land-1-0", 84]]
+    },
+    {
+      "fixture": "m04-portable.json.gz",
+      "source": "main 9bd16f0",
+      "envelope": [2, 3],
+      "world": [4, 5],
+      "legacyProps": 20,
+      "propsAfter": 84,
+      "legacyAnnotated": 20,
+      "archiveProps": [["land-1-0", 84]]
+    }
+  ]
+}

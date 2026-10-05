@@ -345,6 +345,8 @@ export function validateAdventure(s: AdventureState): void {
           "death",
           "potion",
           "boss",
+          "impact",
+          "break",
         ].includes(e.type),
       "event",
     );

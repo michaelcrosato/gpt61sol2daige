@@ -25,7 +25,7 @@ test("documentation and generated assets are served from the deployed package", 
   const assets = await manifest.json();
   expect(assets.version).toBe(1);
   expect(assets.sprites).toHaveLength(8);
-  expect(assets.audio).toHaveLength(10);
+  expect(assets.audio).toHaveLength(19); // Ten effects plus eight M05 material voices and a crumble.
 });
 
 test("exploration, abilities, atlas, audio, lab commands, saving and deterministic browser replay", async ({

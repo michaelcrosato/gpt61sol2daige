@@ -716,13 +716,20 @@ export class Simulation {
     const adventure = JSON.stringify(this.adventure.state);
     for (let i = 0; i < adventure.length; i++)
       h = Math.imul(h ^ adventure.charCodeAt(i), 16777619) >>> 0;
+    // Raw Rapier bytes enter through the snapshot's own checksum field. Serializing the byte
+    // array as JSON dominated every observation of a large physical scene.
     if (this.playground) {
-      const physics = JSON.stringify(this.playground.save());
+      const saved = this.playground.save();
+      const physics = JSON.stringify({ ...saved, bytes: saved.bytes.length });
       for (let i = 0; i < physics.length; i++)
         h = Math.imul(h ^ physics.charCodeAt(i), 16777619) >>> 0;
     }
     if (this.physical) {
-      const physics = JSON.stringify(this.physical.save());
+      const saved = this.physical.save();
+      const physics = JSON.stringify({
+        ...saved,
+        world: { ...saved.world, bytes: saved.world.bytes.length },
+      });
       for (let i = 0; i < physics.length; i++)
         h = Math.imul(h ^ physics.charCodeAt(i), 16777619) >>> 0;
     }
@@ -1004,7 +1011,7 @@ export function validateSave(state: SaveState): void {
       snapshot.landId !== `land-${state.adventure.run}-${state.adventure.townLand}`
     )
       throw new Error("Physical land identity mismatch");
-    if (snapshot.world.version === 4) {
+    if (snapshot.world.version >= 4) {
       const game = new Adventure(state.adventure.seed);
       game.restore(state.adventure);
       const terrain = game.configureTerrain(new World(state.seed));
@@ -1015,7 +1022,7 @@ export function validateSave(state: SaveState): void {
     for (const sample of snapshot.ambient)
       if (sample.slot >= state.count || sample.generation !== state.npcs.generation[sample.slot])
         throw new Error("Ambient identity mismatch");
-    if (snapshot.world.version === 4 && snapshot.appliedTransition === state.adventure.transition) {
+    if (snapshot.world.version >= 4 && snapshot.appliedTransition === state.adventure.transition) {
       const expected = new Map<string, { x: number; y: number; radius: number; boss?: boolean }>();
       for (const p of state.players) expected.set(playerBodyId(p.id), p);
       for (const e of state.adventure.enemies) if (e.hp > 0) expected.set(enemyBodyId(e.id), e);

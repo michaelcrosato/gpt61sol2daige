@@ -57,8 +57,8 @@ test("v2 saves retain moving crate, actor knockback, disabled region, queue and 
   const restored = Simulation.restore(structuredClone(state));
   try {
     assert.equal(state.version, 2);
-    assert.equal(state.actorPhysics!.version, 2);
-    assert.equal(state.actorPhysics!.world.version, 4);
+    assert.equal(state.actorPhysics!.version, 3);
+    assert.equal(state.actorPhysics!.world.version, 5);
     assert.ok(world.pose("crate-1-0").vx > 0);
     assert.ok(
       state.actorPhysics!.world.bodies.find((e) => e.recipe.id === "player-local")!.motor!

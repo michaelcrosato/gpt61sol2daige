@@ -1,3 +1,5 @@
+import type { PropBlueprint } from "./blueprints.ts";
+import type { MaterialId } from "./materials.ts";
 import type { PolicyCheckpoint, ResolvedPolicy } from "./policies.ts";
 
 export const RAPIER_VERSION = "0.21.0";
@@ -25,6 +27,9 @@ export interface BodyRecipe {
   actorKind?: "player" | "monster" | "boss" | "npc" | "ambient" | "loot" | "sensor";
   areaId?: string;
   consequences?: { destroyed: boolean; claimed: boolean; durability?: number };
+  /** M05 prop material and blueprint; both present or both absent. */
+  material?: MaterialId;
+  blueprint?: PropBlueprint;
 }
 export interface BodyPose extends BodyRecipe {
   x: number;
@@ -70,7 +75,7 @@ export interface ContactEvent {
   started: boolean;
 }
 export interface PhysicsSnapshot {
-  version: 1 | 2 | 3 | 4;
+  version: 1 | 2 | 3 | 4 | 5;
   scene?: "adventure" | "lab";
   backend: string;
   continuation?: "snapshot" | "rebuild";
