@@ -492,6 +492,9 @@ test("working presets, numeric zero and scope resets preserve the scene", () => 
       "crowdContacts",
       "ambientPhysics",
       "sweptCollision",
+      "destruction",
+      "materialDurability",
+      "debrisLifetime",
     ]);
   } finally {
     world.dispose();
@@ -596,7 +599,7 @@ test("applied/off and queued policies survive JSON save, replay, continuation; c
         delete body.state;
       }
       const migrated = PhysicsWorld.restore(snapshot);
-      assert.equal(migrated.save().version, 4);
+      assert.equal(migrated.save().version, 5);
       assert.equal(
         pose(migrated, "legacy-quiet").frozen,
         true,

@@ -52,6 +52,9 @@ export function mountPhysicsUI(options: {
         <label>Ambient physics (adventure) <select id="physics-ambientPhysics" aria-label="Ambient physics override"><option value="inherit">Inherited</option><option value="true">On</option><option value="false">Off</option></select></label>
         <label>Swept collision <select id="physics-sweptCollision" aria-label="Swept collision override"><option value="inherit">Inherited</option><option value="true">On</option><option value="false">Off</option></select></label>
         <label>Impulse multiplier <input id="physics-impulseStrength" aria-label="Impulse multiplier override" type="number" min="0" max="10" step="0.05" placeholder="Inherited"></label>
+        <label>Destruction <select id="physics-destruction" aria-label="Destruction override"><option value="inherit">Inherited</option><option value="true">On</option><option value="false">Off</option></select></label>
+        <label>Material toughness × <input id="physics-materialDurability" aria-label="Material durability override" type="number" min="0.05" max="20" step="0.05" placeholder="Inherited"></label>
+        <label>Debris lifetime (s, 0 = scene) <input id="physics-debrisLifetime" aria-label="Debris lifetime override" type="number" min="0" max="3600" step="1" placeholder="Inherited"></label>
         <button class="secondary-button" id="physics-queue">Queue policy edit</button>
         <button class="secondary-button" id="physics-reset-scope">Reset this scope</button>
         <button class="secondary-button" id="physics-reset-authored">Reset to authored</button>
@@ -201,12 +204,15 @@ export function mountPhysicsUI(options: {
       "crowdContacts",
       "ambientPhysics",
       "sweptCollision",
+      "destruction",
     ] as const) {
       const value = get<HTMLSelectElement>(`physics-${key}`).value;
       if (value !== "inherit") values[key] = value === "true";
     }
-    const value = get<HTMLInputElement>("physics-impulseStrength").value;
-    if (value !== "") values.impulseStrength = Number(value);
+    for (const key of ["impulseStrength", "materialDurability", "debrisLifetime"] as const) {
+      const value = get<HTMLInputElement>(`physics-${key}`).value;
+      if (value !== "") values[key] = Number(value);
+    }
     queue([
       { type: "reset", ...selectedScope(), to: "inherited" },
       { type: "override", ...selectedScope(), values },
@@ -322,11 +328,13 @@ export function mountPhysicsUI(options: {
         "crowdContacts",
         "ambientPhysics",
         "sweptCollision",
+        "destruction",
       ] as const)
         get<HTMLSelectElement>(`physics-${key}`).value =
           override?.[key] === undefined ? "inherit" : String(override[key]);
-      get<HTMLInputElement>("physics-impulseStrength").value =
-        override?.impulseStrength === undefined ? "" : String(override.impulseStrength);
+      for (const key of ["impulseStrength", "materialDurability", "debrisLifetime"] as const)
+        get<HTMLInputElement>(`physics-${key}`).value =
+          override?.[key] === undefined ? "" : String(override[key]);
       const profile = profileList.find((p) => p.id === scopeId.value);
       get("physics-scope-inspector").textContent =
         `Authored/current profile values: ${JSON.stringify(profile?.values ?? {})}. Live override: ${JSON.stringify(override ?? {})}. Inherited fields follow the profiles and broader overrides.`;

@@ -2,7 +2,8 @@ import { hash, random } from "../engine/math.ts";
 import { collideCircles, moveBody } from "../engine/physics.ts";
 import type { Player, Simulation } from "../engine/simulation.ts";
 import { World } from "../engine/world.ts";
-import { enemyBodyId, playerBodyId } from "../physics/adventure.ts";
+import { enemyBodyId, type PropHit, playerBodyId } from "../physics/adventure.ts";
+import { MATERIALS } from "../physics/materials.ts";
 import type { AreaRecipe } from "./content.ts";
 import {
   ARCHETYPES,
@@ -710,6 +711,7 @@ export class Adventure {
         stats.damage * [1, 1.15, 1.8][h.combo],
         angle,
         stats.powers.includes("cleave") && h.combo === 2 ? Math.PI : 1.1 + h.combo * 0.18,
+        "slash",
       );
       sim.actorImpulse(playerBodyId(p.id), Math.cos(angle) * 28, Math.sin(angle) * 28);
     } else if (ability === "lance") {
@@ -719,7 +721,7 @@ export class Adventure {
       const radius = ability === "whorl" ? 102 : 155;
       const damage = stats.damage * (ability === "whorl" ? 2 : 3.8);
       h[key] = tick + Math.round((ability === "whorl" ? 95 : 270) * stats.cooldown);
-      this.damageArea(sim, p.id, p.x, p.y, radius, damage);
+      this.damageArea(sim, p.id, p.x, p.y, radius, damage, 0, Math.PI, ability);
       if (stats.powers.includes("echo") && ability === "whorl")
         this.state.delayed.push({
           tick: tick + 22,
@@ -784,6 +786,7 @@ export class Adventure {
     damage: number,
     angle = 0,
     arc = Math.PI,
+    cause = "attack",
   ): void {
     for (const enemy of [...this.state.enemies]) {
       const dx = enemy.x - x,
@@ -794,6 +797,76 @@ export class Adventure {
         (arc >= Math.PI || Math.cos(Math.atan2(dy, dx) - angle) >= Math.cos(arc))
       )
         this.hit(sim, enemy, damage, owner, x, y);
+    }
+    // The same authored hit reaches breakable scenery; the base enemy hit above is unchanged.
+    const physical = sim.physical;
+    if (physical)
+      this.propEffects(
+        sim,
+        owner,
+        angle,
+        physical.damageProps(sim, { owner, cause, x, y, radius, damage, angle, arc }),
+      );
+  }
+  /** Agent/QA strike on one prop: the attack path's material damage, rewards and feedback. */
+  strikeProp(sim: Simulation, owner: string, id: string, damage: number, angle = 0): PropHit[] {
+    const physical = sim.physical;
+    if (!physical) throw new Error("Only the host can damage shared scenery");
+    const target = physical.world.pose(id);
+    const hits = physical.damageProps(sim, {
+      owner,
+      cause: "agent",
+      x: target.x,
+      y: target.y,
+      radius: 0,
+      damage,
+      angle,
+      only: id,
+    });
+    this.propEffects(sim, owner, angle, hits);
+    return hits;
+  }
+  /** Gameplay-owned consequences of scenery hits: one-time party gold and readable feedback. */
+  private propEffects(sim: Simulation, owner: string, angle: number, hits: PropHit[]): void {
+    const s = this.state;
+    let shown = 0;
+    for (const hit of hits) {
+      const color = MATERIALS[hit.material].colors[1];
+      if (hit.broken) {
+        if (hit.broken.reward > 0) {
+          s.drops.push({
+            id: s.nextId++,
+            x: hit.x,
+            y: hit.y + 4,
+            born: sim.tick,
+            kind: "gold",
+            amount: hit.broken.reward,
+          });
+          if (s.drops.length > 150) s.drops = s.drops.slice(-150);
+        }
+        this.emit(
+          sim,
+          "break",
+          hit.x,
+          hit.y,
+          owner,
+          `${hit.family}:${hit.material}`,
+          hit.broken.pieces.length,
+          angle,
+          color,
+        );
+      } else if (shown++ < 6)
+        this.emit(
+          sim,
+          "impact",
+          hit.x,
+          hit.y,
+          owner,
+          `${hit.material}:${hit.resisted ? "resisted" : hit.protectedByPolicy ? "protected" : `stage${hit.stage}`}`,
+          Math.round(hit.damage * 10) / 10,
+          angle,
+          color,
+        );
     }
   }
   private hit(
@@ -1001,7 +1074,8 @@ export class Adventure {
       h.hp + stats.health * (stats.powers.includes("ward") ? 0.85 : 0.6),
     );
     this.emit(sim, "potion", p.x, p.y, p.id, "Flask restored life.");
-    if (stats.powers.includes("bloom")) this.damageArea(sim, p.id, p.x, p.y, 120, stats.damage * 3);
+    if (stats.powers.includes("bloom"))
+      this.damageArea(sim, p.id, p.x, p.y, 120, stats.damage * 3, 0, Math.PI, "bloom");
   }
   private spawnWave(sim: Simulation): void {
     const s = this.state,
@@ -1198,7 +1272,7 @@ export class Adventure {
       mechanicOf(kind).color,
     );
     if (kind === "bramble") {
-      this.damageArea(sim, owner, x, y, 115, stats.damage * 3.4);
+      this.damageArea(sim, owner, x, y, 115, stats.damage * 3.4, 0, Math.PI, "bramble");
       for (const e of s.enemies)
         if (Math.hypot(e.x - x, e.y - y) < 130) e.rootUntil = sim.tick + 100;
     }
@@ -1255,7 +1329,7 @@ export class Adventure {
         this.place(p, other.x, other.y, sim);
         h.invulnerableUntil = sim.tick + 20;
         other.readyAt = Math.max(other.readyAt, sim.tick + 60);
-        this.damageArea(sim, owner, other.x, other.y, 115, stats.damage * 2.2);
+        this.damageArea(sim, owner, other.x, other.y, 115, stats.damage * 2.2, 0, Math.PI, "rift");
       }
     }
     if (!chained && s.recipe.combination?.from === kind && s.delayed.length < 40)
@@ -1334,7 +1408,18 @@ export class Adventure {
               54,
               5,
             );
-          else this.damageArea(sim, effect.owner, effect.x, effect.y, effect.radius, effect.damage);
+          else
+            this.damageArea(
+              sim,
+              effect.owner,
+              effect.x,
+              effect.y,
+              effect.radius,
+              effect.damage,
+              0,
+              Math.PI,
+              effect.kind,
+            );
           this.emit(
             sim,
             effect.ability ?? "nova",

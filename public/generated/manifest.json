@@ -125,6 +125,15 @@
     "slash.wav",
     "hit.wav",
     "hurt.wav",
-    "level.wav"
+    "level.wav",
+    "wood.wav",
+    "stone.wav",
+    "metal.wav",
+    "glass.wav",
+    "cloth.wav",
+    "vegetation.wav",
+    "ceramic.wav",
+    "volatile.wav",
+    "crumble.wav"
   ]
 }

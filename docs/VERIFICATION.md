@@ -148,3 +148,18 @@ On 2026-10-04, `npm run check` passed all 48 headless tests, `npm run build` pro
 `node tools/physics.ts` reproduces `examples/physics-playground.jsonl` with seed 142 and no ambient population. Its 150-tick scene records 13 contact starts. The wheel moves from x=-140 to x=60.588676 and rotates to -2.155276 radians; the snapshot/replay checks pass. These observations demonstrate mechanics, not balance or performance. The lab exposes its own 4,096-body/4 MB binary-checkpoint safety limits. Adventure actor physics, regional policies and physical co-op remain future milestones.
 
 The former `fps > 20` browser assertion is removed. Entity coverage, visible drawing, interaction and error assertions remain. Build emits an informational size warning for the embedded-WASM Rapier chunk (approximately 3.40 MB minified, 1.30 MB gzip); no FPS or package-size target gates this milestone. CI, merged commit and affected production verification must be inspected through the milestone PR's final receipt, not inferred from these local results.
+
+## M05 materials and destruction evidence
+
+On 2026-10-05, `npm run check` passed **86 headless tests**, `npm run build` produced the bundle and `npm run test:e2e` passed **E2E_COUNT browser scenarios**, including the preserved eight-client WebRTC stories. `npm run verify:run` cleared all nine areas.
+
+| M05 acceptance | Evidence |
+| --- | --- |
+| Crate splinters, pylon shatters, stone resists, tree leaves stump + pushable log | `tests/physics-materials.test.ts`; [receipt](evidence/physics-m05.json): crate 30-damage hits leave 25% then break into 4 planks (reward 3); pylon breaks in one 20-damage hit into 5 glass shards; a 15-damage hit on stone is resisted at 100%, a 60-damage hit leaves 73.1%; a tree breaks on the fourth 40-damage hit into a fixed stump and a dynamic log that moves 41.5 units under a push |
+| Destruction off / dynamics off | Destruction off keeps 37.5% durability through five 200-damage hits; breaking all 19 area-1 parents while dynamics are off spawns 62 pieces (60 frozen, 2 fixed stumps), all wake with 0 blocked, and no parent is rebuilt |
+| No repeated destruction/reward | Real slash input breaks a barrel, then 20 more swings at the site: unique records, unique pieces, gold rises by recorded rewards once; 300 ticks of resting contact add nothing |
+| Save/load, recall, late join | Raw and portable restore, agent replay (hash equal), recall to another land and back, and a late-join replica all reproduce the same destroyed records and pieces. In the browser, a real mouse attack breaks a pylon; a connected guest and a late joiner over actual WebRTC see the host's destruction and partial durability (`e2e/physics-materials.spec.ts`) |
+| Readable silhouettes and recipe export | [Verdant](evidence/physics-m05-verdant.png), [broken](evidence/physics-m05-broken.png), [Cinderwild](evidence/physics-m05-cinderwild.png), [Pale Orchard](evidence/physics-m05-orchard.png); `actors/recipes` is byte-identical across calls (SHA-256 in the receipt) |
+| M04 migration | Real M04 checkpoints from `main` 9bd16f0 (raw and portable, with an archived land) restore with exact legacy crate/wheel bodies and gain M05 scenery once (20 → 84 props per land) |
+
+Scenery rewards raise route gold (area 9: 3,047 against M04's recorded 2,424; level 19 against 18); combat tuning is unchanged. These are mechanics observations, not performance claims.

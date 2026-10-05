@@ -1,6 +1,7 @@
 import type { EventQueue, RigidBody, World } from "@dimforge/rapier2d-compat";
 import { checksum } from "../engine/math.ts";
 import { WORLD_LIMIT } from "../engine/world.ts";
+import { validateBlueprint } from "./blueprints.ts";
 import { rapier } from "./bootstrap.ts";
 import {
   compareIds,
@@ -88,6 +89,7 @@ export function validateBody(recipe: BodyRecipe, adventure = false): void {
     if (state.durability !== undefined && finite(state.durability, "durability", 1_000_000) < 0)
       throw new Error("Negative durability");
   }
+  validateBlueprint(recipe);
 }
 export const bodyRole = (recipe: BodyRecipe) =>
   recipe.role ?? (recipe.motion === "fixed" ? "terrain" : "prop");
@@ -168,6 +170,14 @@ export class PhysicsWorld {
   }
   has(id: string): boolean {
     return this.registry.has(id);
+  }
+  /** Material damage and claims change semantic consequences only; colliders are untouched. */
+  setConsequences(id: string, consequences: NonNullable<BodyRecipe["consequences"]>): void {
+    const entry = this.registry.get(id);
+    if (!entry) throw new Error(`Unknown physics body: ${id}`);
+    const next = { ...entry.recipe, consequences: structuredClone(consequences) };
+    validateBody(next, this.scene === "adventure");
+    entry.recipe = next;
   }
   motion(id: string, vx: number, vy: number, angularVelocity = 0): void {
     const body = this.body(id);
@@ -687,7 +697,7 @@ export class PhysicsWorld {
     if (this.scene === "lab" && bytes.length > MAX_SNAPSHOT_BYTES)
       throw new Error("Playground checkpoint exceeds its 4 MB binary bound");
     return {
-      version: 4,
+      version: 5,
       scene: this.scene,
       backend: RAPIER_VERSION,
       continuation: portable ? "rebuild" : "snapshot",
@@ -705,9 +715,10 @@ export class PhysicsWorld {
     };
   }
   static restore(snapshot: PhysicsSnapshot): PhysicsWorld {
+    snapshot = upgradePolicySamples(snapshot);
     validatePhysicsSnapshot(snapshot);
     if (
-      snapshot.version === 4 &&
+      snapshot.version >= 4 &&
       (snapshot.backend !== RAPIER_VERSION || snapshot.continuation === "rebuild")
     )
       return PhysicsWorld.rebuild(snapshot);
@@ -934,15 +945,48 @@ export class PhysicsWorld {
   }
 }
 
-export function validatePhysicsSnapshot(snapshot: PhysicsSnapshot): void {
+const M05_POLICY_FIELDS = ["destruction", "materialDurability", "debrisLifetime"] as const;
+/** M03/M04 checkpoints predate M05's registered fields. Recompute each applied sample and
+ * prove every older field is unchanged before accepting the added defaults. */
+export function upgradePolicySamples(snapshot: PhysicsSnapshot): PhysicsSnapshot {
   if (
     !snapshot ||
-    ![1, 2, 3, 4].includes(snapshot.version) ||
+    (snapshot.version !== 3 && snapshot.version !== 4) ||
+    !Array.isArray(snapshot.bodies) ||
+    !snapshot.bodies.some((b) => b?.policy?.values && !("destruction" in b.policy.values))
+  )
+    return snapshot;
+  const upgraded = structuredClone(snapshot),
+    controller = new PolicyController(upgraded.policies);
+  for (const entry of upgraded.bodies) {
+    const saved = entry?.policy;
+    if (!saved || !entry.policySample || "destruction" in saved.values) continue;
+    const resolved = structuredClone(
+      controller.resolve(saved.areaId, entry.policySample.x, entry.policySample.y, saved.regions),
+    );
+    const legacy = structuredClone(resolved);
+    for (const key of M05_POLICY_FIELDS) {
+      delete (legacy.values as Partial<typeof legacy.values>)[key];
+      delete (legacy.effective as Partial<typeof legacy.effective>)[key];
+      delete (legacy.provenance as Partial<typeof legacy.provenance>)[key];
+    }
+    if (JSON.stringify(legacy) !== JSON.stringify(saved))
+      throw new Error("Invalid physics snapshot: legacy applied policy mismatch");
+    entry.policy = resolved;
+    if (entry.state) entry.state.policy = structuredClone(resolved);
+  }
+  return upgraded;
+}
+export function validatePhysicsSnapshot(snapshot: PhysicsSnapshot): void {
+  snapshot = upgradePolicySamples(snapshot);
+  if (
+    !snapshot ||
+    ![1, 2, 3, 4, 5].includes(snapshot.version) ||
     (snapshot.version === 3 && snapshot.scene !== "adventure") ||
     (snapshot.version < 3 && snapshot.scene !== undefined) ||
-    (snapshot.version === 4 && !["adventure", "lab"].includes(snapshot.scene!)) ||
+    (snapshot.version >= 4 && !["adventure", "lab"].includes(snapshot.scene!)) ||
     (snapshot.version < 4 && snapshot.backend !== RAPIER_VERSION) ||
-    (snapshot.version === 4 &&
+    (snapshot.version >= 4 &&
       (!/^\d+\.\d+\.\d+$/.test(snapshot.backend) ||
         !["snapshot", "rebuild"].includes(snapshot.continuation!))) ||
     snapshot.units !== UNITS ||
@@ -1025,7 +1069,7 @@ export function validatePhysicsSnapshot(snapshot: PhysicsSnapshot): void {
     handles.add(entry.handle);
     colliders.add(entry.collider);
   }
-  if (snapshot.version === 4) {
+  if (snapshot.version >= 4) {
     const controller = new PolicyController(snapshot.policies);
     const projected = new PolicyController(snapshot.policies);
     projected.apply();
@@ -1055,6 +1099,8 @@ export function validatePhysicsSnapshot(snapshot: PhysicsSnapshot): void {
         "actorKind",
         "areaId",
         "consequences",
+        "material",
+        "blueprint",
       ];
       if (
         recipeKeys.some(

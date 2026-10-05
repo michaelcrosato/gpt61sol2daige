@@ -141,7 +141,9 @@ export interface CombatEvent {
     | "mechanic"
     | "death"
     | "potion"
-    | "boss";
+    | "boss"
+    | "impact"
+    | "break";
   x: number;
   y: number;
   owner: string;

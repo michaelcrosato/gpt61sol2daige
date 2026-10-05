@@ -279,9 +279,9 @@ window.fern.command({op: "actors", action: "body", id: "crate-1-0"});
 window.fern.network.status(); // baselineReady, physicalRevision, population, byte counters
 ```
 
-A guest must finish its complete baseline before interacting. Requests accept a prop within 96 units, ±120 impulse components and optional paired application coordinates within 32 units of that prop. The host supplies identity and rejects policy fields, actor targets, unknown objects and excessive/far interactions. Frozen props discard impulses. Host `actors/configure` uses the same expectedRevision/atomic edits as solo; guests can read `inspect`, `body` and `policy` but cannot edit shared physics. The host lab's Playable adventure controls remain available online; explicit paused apply requires a solo pause.
+A guest must finish its complete baseline before interacting. Requests accept a prop within 96 units, ±120 impulse components and optional paired application coordinates within 32 units of that prop. The host supplies identity and rejects policy fields, actor targets, unknown objects and excessive/far interactions. Frozen props discard impulses. Host `actors/configure` uses the same expectedRevision/atomic edits as solo; guests can read `inspect`, `body`, `policy`, `props` and `recipes` but cannot edit or damage shared physics. The host lab's Playable adventure controls remain available online; explicit paused apply requires a solo pause.
 
-Physical wire 2 uses protocol-5 rooms and reliable 48,000-byte chunks with a checked manifest, complete portable scene and lifecycle events. Its 256 MB total bound is separate from the observational packet's 512 KB header. Missing/duplicate/reversed/stale chunks never publish partial state. All selected ambient creatures and physical bodies remain in the replica even when local draw settings show fewer. Lossless gzip, one shared cost-spaced frame build, staged receipts and buffer-paced immutable retries carry the whole scene; a progressing baseline can outlast the initial handshake timer. A 1 Hz host heartbeat keeps guests of a loaded host connected while their acknowledgements wait. Compressed and expanded lengths are bounded, and inflation is validated before publication. Large scene transmission can take longer; it never cuts physical eligibility. Portal/land transitions snap interpolation, and leaving/host loss retains the received scene and each guest's build for solo play.
+Physical wire 2 uses protocol-5 rooms (protocol 6 from M05) and reliable 48,000-byte chunks with a checked manifest, complete portable scene and lifecycle events. Its 256 MB total bound is separate from the observational packet's 512 KB header. Missing/duplicate/reversed/stale chunks never publish partial state. All selected ambient creatures and physical bodies remain in the replica even when local draw settings show fewer. Lossless gzip, one shared cost-spaced frame build, staged receipts and buffer-paced immutable retries carry the whole scene; a progressing baseline can outlast the initial handshake timer. A 1 Hz host heartbeat keeps guests of a loaded host connected while their acknowledgements wait. Compressed and expanded lengths are bounded, and inflation is validated before publication. Large scene transmission can take longer; it never cuts physical eligibility. Portal/land transitions snap interpolation, and leaving/host loss retains the received scene and each guest's build for solo play.
 
 ```bash
 node tools/agent.ts --count 0 <<'JSONL'
@@ -291,3 +291,26 @@ JSONL
 ```
 
 This file path supports expanded saves exceeding the unchanged 8 MB JSONL line limit. `describe` lists `restore-file` as CLI-only. Save 2 includes world-4 semantics, motor/knockback, policies/queues, stable IDs, terrain/land mutations, builds/progression and backend bytes; incompatible-backend restore rebuilds those facts. Original M01–M03 checkpoints migrate explicitly. See [save/transport contracts](ARCHITECTURE.md#m04-saves-replication-and-recovery).
+
+## M05 materials and destructible scenery
+
+Every clearing now holds crates, barrels (one volatile), pots, a log, loose stones, a wheel, a wagon, a three-segment fence, a glass pylon, a lantern and three trees. Each prop carries a registered `material` and a `blueprint` `{family, palette, piece?, parent?, expiresAt?}`; `consequences.durability` is the percentage remaining (100 intact, absent for stumps and debris). Authored attacks (slash, Whorl, Nova, Bloom, Bramble, Rift and delayed effects) damage props in their reach through the same material rules. A destroyed parent is replaced by authored gameplay-solid pieces and recorded once.
+
+| Action | Fields and behavior |
+| --- | --- |
+| `props` | Every scenery body (material, blueprint, durability, solved pose, effective policy) plus `destroyed` parent records. Works on guests' received scenes. |
+| `recipes` | Reproducible export: materials, families (variants, toughness, reward, pieces), stage thresholds and clearing layout. Works on guests. |
+| `damage` | Host/solo only. `id`, `damage` 0–10,000, optional `angle` (fall/burst direction). Runs the attack path's material resistance, durability stage, fracture, one-time reward drop and feedback events; returns the `PropHit` list. |
+
+```json
+{"op":"encounter","index":1}
+{"op":"actors","action":"damage","id":"prop-pylon-1-0","damage":20}
+{"op":"actors","action":"damage","id":"prop-stone-1-0","damage":15}
+{"op":"actors","action":"configure","expectedRevision":0,"edits":[{"type":"override","scope":"area","id":"area-1","values":{"materialDurability":2,"debrisLifetime":30}}]}
+{"op":"step","ticks":1}
+{"op":"actors","action":"props"}
+```
+
+New IDs: `prop-<family>-<area>-<n>` for clearing scenery and `<parent id>-<piece>` for fracture pieces (`plank0`, `shard3`, `chunk1`, `rim2`, `hub`, `hoop`, `canopy`, `wheel0`, `rail1`, `half0`, `frame`, `pane`, `stump`, `log`). Broken pieces that are themselves families (a tree's `log`, a wagon's `wheel0`) can break again; debris and stumps move but never break. `PropHit` reports `resisted` (material resistance absorbed a weak hit), `protectedByPolicy` (destruction off: damage is preserved, nothing new happens), `durability`, `stage` 0–3 and `broken {pieces, reward}`. Combat events add `impact` (`<material>:resisted|protected|stage<n>`) and `break` (`<family>:<material>`, amount = pieces); they are bounded observations outside replay hashes.
+
+Policy values add `destruction` (boolean), `materialDurability` (0.05–20, divides material damage) and `debrisLifetime` (0–3,600 s; 0 keeps debris for the scene). Saves write adventure envelope 3 / world 5; rooms use protocol 6. Real M04 checkpoints migrate with exact legacy bodies. Guests read `props`/`recipes` but cannot `damage`. See [the M05 contract](ARCHITECTURE.md#m05-materials-and-destructible-scenery).

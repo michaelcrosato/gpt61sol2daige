@@ -15,6 +15,7 @@ import {
 import { THEMES, themeOf } from "../game/content.ts";
 import type { BodyPose } from "../physics/types.ts";
 import { type AdventureActor, CombatRenderer } from "./combat.ts";
+import { PropRenderer } from "./props.ts";
 import { PALETTE, type SpriteRecipe, spritePixels } from "./sprites.ts";
 
 const GROUND = ["#304f39", "#486747", "#818164", "#34666a", "#294f59", "#8a8766", "#6a7662"];
@@ -62,6 +63,7 @@ export class Renderer {
   private readonly terrainCache = new Map<string, HTMLCanvasElement>();
   private readonly spriteCache = new Map<string, HTMLCanvasElement>();
   private readonly combat = new CombatRenderer();
+  private readonly props = new PropRenderer();
   private ground: readonly string[] = GROUND;
   private shades: readonly string[] = SHADES;
   private theme = "";
@@ -440,53 +442,16 @@ export class Renderer {
         variant: 0,
         player: p,
       });
+    this.props.beginFrame();
     for (const prop of sim.physicalProps(alpha))
-      if (prop.x > left - 40 && prop.x < right + 40 && prop.y > top - 40 && prop.y < bottom + 40)
+      if (prop.x > left - 40 && prop.x < right + 40 && prop.y > top - 40 && prop.y < bottom + 70)
         items.push({ kind: "physical", x: prop.x, y: prop.y, type: 0, variant: 0, physical: prop });
     items.sort((a, b) => a.y - b.y || a.x - b.x);
     const frame = Math.floor(time * 9);
     for (const item of items) {
       if (item.kind === "decor") this.drawDecor(item, player, time);
-      else if (item.kind === "physical") {
-        const prop = item.physical!;
-        ctx.save();
-        ctx.translate(prop.x, prop.y);
-        ctx.fillStyle = "#10201966";
-        ctx.beginPath();
-        ctx.ellipse(0, 5, 14, 7, 0, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.rotate(prop.angle);
-        ctx.lineWidth = 2;
-        if (prop.shape.kind === "circle") {
-          const r = prop.shape.radius;
-          ctx.fillStyle = "#536257";
-          ctx.strokeStyle = "#b0b6a0";
-          ctx.beginPath();
-          ctx.arc(0, 0, r, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.stroke();
-          ctx.beginPath();
-          ctx.moveTo(-r, 0);
-          ctx.lineTo(r, 0);
-          ctx.moveTo(0, -r);
-          ctx.lineTo(0, r);
-          ctx.stroke();
-        } else {
-          const w = prop.shape.width,
-            h = prop.shape.height;
-          ctx.fillStyle = prop.frozen ? "#646e60" : "#946e45";
-          ctx.strokeStyle = "#d1b582";
-          ctx.fillRect(-w / 2, -h / 2, w, h);
-          ctx.strokeRect(-w / 2, -h / 2, w, h);
-          ctx.beginPath();
-          ctx.moveTo(-w / 2 + 3, -h / 2 + 3);
-          ctx.lineTo(w / 2 - 3, h / 2 - 3);
-          ctx.moveTo(w / 2 - 3, -h / 2 + 3);
-          ctx.lineTo(-w / 2 + 3, h / 2 - 3);
-          ctx.stroke();
-        }
-        ctx.restore();
-      } else if (item.kind === "adventure")
+      else if (item.kind === "physical") this.props.draw(ctx, item.physical!, time, sim.tick);
+      else if (item.kind === "adventure")
         this.combat.actor(ctx, item.adventure!, sim, alpha, time, this.zoom);
       else if (item.kind === "landmark") this.drawLandmark(item, sim, time);
       else if (item.kind === "npc") {

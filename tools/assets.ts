@@ -1,6 +1,6 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import { type SoundName, synthesize, wav } from "../src/audio/synth.ts";
+import { MATERIAL_SOUNDS, type SoundName, synthesize, wav } from "../src/audio/synth.ts";
 import { CHUNK_TILES, World } from "../src/engine/world.ts";
 import { type SpriteRecipe, spriteSvg, validateRecipe } from "../src/render/sprites.ts";
 
@@ -99,6 +99,8 @@ if (args[0] === "sprite") {
     "hit",
     "hurt",
     "level",
+    ...MATERIAL_SOUNDS,
+    "crumble",
   ];
   for (const sound of sounds) await writeFile(resolve(out, `${sound}.wav`), wav(synthesize(sound)));
   await writeFile(

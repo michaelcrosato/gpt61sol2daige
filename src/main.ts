@@ -15,6 +15,7 @@ import { hasCheckpoint, loadCheckpoint, saveCheckpoint } from "./app/save-store.
 import { mountSettingsUI } from "./app/settings-ui.ts";
 import { icon, mountUI } from "./app/ui.ts";
 import { AudioEngine } from "./audio/audio.ts";
+import { MATERIAL_SOUNDS, type MaterialSound } from "./audio/synth.ts";
 import { AgentRuntime, type Command } from "./engine/agent.ts";
 import { clamp } from "./engine/math.ts";
 import { type Input, idleInput, type SaveState, Simulation, STEP } from "./engine/simulation.ts";
@@ -341,7 +342,9 @@ function execute(command: Command): unknown {
     !["observe", "describe", "inspect", "save", "catalog"].includes(command.op) &&
     !(
       command.op === "actors" &&
-      ["inspect", "body", "policy"].includes(String(command.action ?? "inspect"))
+      ["inspect", "body", "policy", "props", "recipes"].includes(
+        String(command.action ?? "inspect"),
+      )
     ) &&
     !(command.op === "adventure" && !command.action)
   )
@@ -1067,6 +1070,13 @@ function processEvents(): void {
     else if (event.type === "whorl" || event.type === "nova") audio.play("pulse");
     else if (event.type === "loot") audio.play("shard");
     else if (event.type === "portal" || event.type === "boss") audio.play("beacon");
+    else if (event.type === "impact" || event.type === "break") {
+      const [first, second] = event.text.split(":");
+      const material = event.type === "break" ? second : first;
+      if ((MATERIAL_SOUNDS as readonly string[]).includes(material))
+        audio.play(material as MaterialSound);
+      if (event.type === "break") audio.play("crumble");
+    }
   }
   if (runtime.sim.adventure.state.events.length)
     latestCombatEvent = runtime.sim.adventure.state.events.at(-1)!.id;

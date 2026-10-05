@@ -623,7 +623,79 @@ remain. Build emits an informational size warning for the embedded-WASM
 Rapier chunk (approximately 3.40 MB minified, 1.30 MB gzip); no FPS or
 package-size target gates this milestone. CI, merged commit and affected
 production verification must be inspected through the milestone PR’s
-final receipt, not inferred from these local results.</p></main>
+final receipt, not inferred from these local results.</p>
+<h2 id="m05-materials-and-destruction-evidence">M05 materials and
+destruction evidence</h2>
+<p>On 2026-10-05, <code>npm run check</code> passed <strong>86 headless
+tests</strong>, <code>npm run build</code> produced the bundle and
+<code>npm run test:e2e</code> passed <strong>E2E_COUNT browser
+scenarios</strong>, including the preserved eight-client WebRTC stories.
+<code>npm run verify:run</code> cleared all nine areas.</p>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr>
+<th>M05 acceptance</th>
+<th>Evidence</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Crate splinters, pylon shatters, stone resists, tree leaves stump +
+pushable log</td>
+<td><code>tests/physics-materials.test.ts</code>; <a
+href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/evidence/physics-m05.json">receipt</a>: crate 30-damage hits leave
+25% then break into 4 planks (reward 3); pylon breaks in one 20-damage
+hit into 5 glass shards; a 15-damage hit on stone is resisted at 100%, a
+60-damage hit leaves 73.1%; a tree breaks on the fourth 40-damage hit
+into a fixed stump and a dynamic log that moves 41.5 units under a
+push</td>
+</tr>
+<tr>
+<td>Destruction off / dynamics off</td>
+<td>Destruction off keeps 37.5% durability through five 200-damage hits;
+breaking all 19 area-1 parents while dynamics are off spawns 62 pieces
+(60 frozen, 2 fixed stumps), all wake with 0 blocked, and no parent is
+rebuilt</td>
+</tr>
+<tr>
+<td>No repeated destruction/reward</td>
+<td>Real slash input breaks a barrel, then 20 more swings at the site:
+unique records, unique pieces, gold rises by recorded rewards once; 300
+ticks of resting contact add nothing</td>
+</tr>
+<tr>
+<td>Save/load, recall, late join</td>
+<td>Raw and portable restore, agent replay (hash equal), recall to
+another land and back, and a late-join replica all reproduce the same
+destroyed records and pieces. In the browser, a real mouse attack breaks
+a pylon; a connected guest and a late joiner over actual WebRTC see the
+host’s destruction and partial durability
+(<code>e2e/physics-materials.spec.ts</code>)</td>
+</tr>
+<tr>
+<td>Readable silhouettes and recipe export</td>
+<td><a href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/evidence/physics-m05-verdant.png">Verdant</a>, <a
+href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/evidence/physics-m05-broken.png">broken</a>, <a
+href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/evidence/physics-m05-cinderwild.png">Cinderwild</a>, <a
+href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/evidence/physics-m05-orchard.png">Pale Orchard</a>;
+<code>actors/recipes</code> is byte-identical across calls (SHA-256 in
+the receipt)</td>
+</tr>
+<tr>
+<td>M04 migration</td>
+<td>Real M04 checkpoints from <code>main</code> 9bd16f0 (raw and
+portable, with an archived land) restore with exact legacy crate/wheel
+bodies and gain M05 scenery once (20 → 84 props per land)</td>
+</tr>
+</tbody>
+</table>
+<p>Scenery rewards raise route gold (area 9: 3,047 against M04’s
+recorded 2,424; level 19 against 18); combat tuning is unchanged. These
+are mechanics observations, not performance claims.</p></main>
 <footer>Fern · A world engine built for agents · <a href="https://github.com/michaelcrosato/gpt61sol2daige">Source on GitHub</a></footer>
 </body>
 </html>

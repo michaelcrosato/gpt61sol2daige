@@ -2,6 +2,7 @@ import { ARCHETYPES, type AreaRecipe, areaRecipe, MECHANICS, THEMES } from "../g
 import { SKILLS } from "../game/skills.ts";
 import type { AdventureAction } from "../game/types.ts";
 import { adventureAreaAt } from "../physics/adventure.ts";
+import { blueprintExport } from "../physics/blueprints.ts";
 import { interactPhysics } from "../physics/interaction.ts";
 import type { PolicyEdit } from "../physics/policies.ts";
 import { PolicyController } from "../physics/policies.ts";
@@ -35,13 +36,19 @@ export const COMMANDS = {
       "Separate solo Rapier playground; step/save/restore/replay include it. Use actors for the integrated adventure physical world.",
   },
   actors: {
-    action: "inspect (default), body, configure, apply, policy, impulse, place, spawn",
+    action:
+      "inspect (default), body, props, recipes, damage, configure, apply, policy, impulse, place, spawn",
     description:
-      "Host/solo adventure physical world; guests inspect received bodies and policies. Shared tuning is host-only.",
+      "Host/solo adventure physical world; guests inspect received bodies, props, destroyed records and policies. Shared tuning and damage are host-only.",
     values:
-      "worldReactions, dynamicProps, propBlocking, crowdContacts, ambientPhysics, sweptCollision: booleans; impulseStrength: 0..10",
-    id: "body/impulse/place: player-<player id>, enemy-<id>, ambient-<slot>-<generation>, crate-<area>-<ordinal>, wheel-<area>",
-    body: "spawn: prop BodyRecipe with id prefixed prop- and a current areaId",
+      "worldReactions, dynamicProps, propBlocking, crowdContacts, ambientPhysics, sweptCollision, destruction: booleans; impulseStrength: 0..10; materialDurability: 0.05..20 (x toughness); debrisLifetime: 0..3600 s (0 = scene lifetime)",
+    id: "body/impulse/place/damage: player-<player id>, enemy-<id>, ambient-<slot>-<generation>, crate-<area>-<ordinal>, wheel-<area>, prop-<family>-<area>-<n>, <parent id>-<piece>",
+    props:
+      "props: every scenery body with material, blueprint {family, palette, piece?, parent?, expiresAt?} and durability %, plus destroyed-parent records",
+    recipes: "recipes: reproducible material/blueprint/fracture/layout export",
+    damage:
+      "damage: id, damage 0..10000, optional angle; the attack path's material resistance, stages, fracture, one-time reward and feedback",
+    body: "spawn: prop BodyRecipe with id prefixed prop- and a current areaId; optional material+blueprint",
   },
   "interact-physics": {
     description:
@@ -167,6 +174,9 @@ export class AgentRuntime {
               props: this.sim.physicalProps(),
               policies: new PolicyController(snapshot.world.policies).inspect(),
             };
+          if (action === "props")
+            return { props: this.sim.physicalProps(), destroyed: snapshot.destroyed ?? [] };
+          if (action === "recipes") return blueprintExport();
           if (action === "body") {
             const entry = snapshot.world.bodies.find((b) => b.recipe.id === command.id);
             if (!entry) throw new Error("Unknown physical body");
@@ -186,6 +196,9 @@ export class AgentRuntime {
         const action = command.action ?? "inspect",
           world = physical.world;
         if (action === "inspect") return physical.inspect();
+        if (action === "props")
+          return { props: physical.props(), destroyed: physical.destroyedRecords() };
+        if (action === "recipes") return blueprintExport();
         if (action === "body") {
           if (typeof command.id !== "string") throw new Error("Body id required");
           return world.pose(command.id);
@@ -206,10 +219,23 @@ export class AgentRuntime {
         else if (action === "apply") {
           world.applyPolicies(num("expectedRevision"));
           physical.begin(this.sim);
+        } else if (action === "damage") {
+          if (typeof command.id !== "string") throw new Error("Body id required");
+          const damage = num("damage");
+          if (damage < 0 || damage > 10_000) throw new Error("damage must be 0..10000");
+          result = this.sim.adventure.strikeProp(
+            this.sim,
+            player,
+            command.id,
+            damage,
+            num("angle", 0),
+          );
         } else if (action === "spawn") {
           const body = command.body as BodyRecipe;
           if (body?.role !== "prop" || !body.id?.startsWith("prop-"))
             throw new Error("Adventure spawns require prop- identity and prop role");
+          if (physical.isDestroyed(body.id))
+            throw new Error("A destroyed parent's ID stays retired; spawn a new prop ID");
           world.spawn(body);
         } else if (action === "impulse" || action === "place") {
           if (typeof command.id !== "string") throw new Error("Body id required");

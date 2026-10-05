@@ -1004,7 +1004,7 @@ export function validateSave(state: SaveState): void {
       snapshot.landId !== `land-${state.adventure.run}-${state.adventure.townLand}`
     )
       throw new Error("Physical land identity mismatch");
-    if (snapshot.world.version === 4) {
+    if (snapshot.world.version >= 4) {
       const game = new Adventure(state.adventure.seed);
       game.restore(state.adventure);
       const terrain = game.configureTerrain(new World(state.seed));
@@ -1015,7 +1015,7 @@ export function validateSave(state: SaveState): void {
     for (const sample of snapshot.ambient)
       if (sample.slot >= state.count || sample.generation !== state.npcs.generation[sample.slot])
         throw new Error("Ambient identity mismatch");
-    if (snapshot.world.version === 4 && snapshot.appliedTransition === state.adventure.transition) {
+    if (snapshot.world.version >= 4 && snapshot.appliedTransition === state.adventure.transition) {
       const expected = new Map<string, { x: number; y: number; radius: number; boss?: boolean }>();
       for (const p of state.players) expected.set(playerBodyId(p.id), p);
       for (const e of state.adventure.enemies) if (e.hp > 0) expected.set(enemyBodyId(e.id), e);
