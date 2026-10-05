@@ -745,10 +745,12 @@ with a checked manifest, complete portable scene and lifecycle events.
 Its 256 MB total bound is separate from the observational packet’s 512
 KB header. Missing/duplicate/reversed/stale chunks never publish partial
 state. All selected ambient creatures and physical bodies remain in the
-replica even when local draw settings show fewer. Lossless gzip and
-buffer-paced immutable retries carry the whole scene; a progressing
-baseline can outlast the initial handshake timer. Compressed and
-expanded lengths are bounded, and inflation is validated before
+replica even when local draw settings show fewer. Lossless gzip, one
+shared cost-spaced frame build, staged receipts and buffer-paced
+immutable retries carry the whole scene; a progressing baseline can
+outlast the initial handshake timer. A 1 Hz host heartbeat keeps guests
+of a loaded host connected while their acknowledgements wait. Compressed
+and expanded lengths are bounded, and inflation is validated before
 publication. Large scene transmission can take longer; it never cuts
 physical eligibility. Portal/land transitions snap interpolation, and
 leaving/host loss retains the received scene and each guest’s build for

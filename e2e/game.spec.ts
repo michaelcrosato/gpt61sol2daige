@@ -290,8 +290,14 @@ test("real WebRTC joins eight clients, syncs builds, combat and world, rejects n
     await guest.page.evaluate(() =>
       window.fern.settings.set({ drawDistance: 256, entityLimit: 512 }),
     );
+    // A complete 32,768-creature frame is about 2 MB compressed. With nine browsers on a
+    // four-core runner it measured 10-14 s from the population change to a guest's replica.
+    const completeScene = { timeout: 45_000 };
     await expect
-      .poll(async () => (await guest.page.evaluate(() => window.fern.observe())).network.population)
+      .poll(
+        async () => (await guest.page.evaluate(() => window.fern.observe())).network.population,
+        completeScene,
+      )
       .toBe(32768);
     await expect
       .poll(async () => (await guest.page.evaluate(() => window.fern.observe())).render.drawn)
@@ -327,8 +333,12 @@ test("real WebRTC joins eight clients, syncs builds, combat and world, rejects n
     }, room);
     expect(rejection).toContain("full");
     await guest.page.evaluate(() => window.fern.network.leave());
+    // At this population the loaded host can process a channel close seconds late.
     await expect
-      .poll(async () => (await host.page.evaluate(() => window.fern.observe())).players.length)
+      .poll(
+        async () => (await host.page.evaluate(() => window.fern.observe())).players.length,
+        completeScene,
+      )
       .toBe(7);
     await ninth.page.evaluate((code) => window.fern.network.join(code), room);
     await expect

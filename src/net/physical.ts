@@ -4,6 +4,36 @@ import type { SaveState } from "../engine/simulation.ts";
 export const PHYSICAL_WIRE_VERSION = 2;
 export const BASELINE_CHUNK_BYTES = 48_000;
 export const MAX_BASELINE_BYTES = 256_000_000;
+/** Minimum spacing between complete frame builds (nominal 10 Hz). */
+export const MIN_FRAME_MS = 100;
+export interface BuiltFrame {
+  sequence: number;
+  /** Authoritative tick, world revision and membership when the frame was built. */
+  key: string;
+  builtAt: number;
+}
+/** Host frame selection shared by every guest; one population-sized build serves them all.
+ * `floor` is the newest sequence a guest has acknowledged or, after admission, cannot use
+ * because it predates that traveler. `stale` means an accepted action needs a newer build.
+ * Builds are spaced by twice their measured cost, so frame cadence (never participation) follows load.
+ */
+export function frameChoice(input: {
+  latest?: BuiltFrame;
+  floor: number;
+  key: string;
+  stale: boolean;
+  now: number;
+  buildStartedAt: number;
+  buildMs: number;
+}): "latest" | "build" | "wait" {
+  const { latest, stale, now } = input,
+    unsent = !!latest && latest.sequence > input.floor;
+  if (!stale && latest?.key === input.key) return unsent ? "latest" : "wait";
+  const due = stale || now - input.buildStartedAt >= Math.max(MIN_FRAME_MS, 2 * input.buildMs);
+  if (!due || (unsent && !stale && now - latest!.builtAt < MIN_FRAME_MS))
+    return unsent ? "latest" : "wait";
+  return "build";
+}
 export interface LifecycleEvent {
   type: "scene" | "spawn" | "remove" | "policy";
   id: string;
@@ -118,6 +148,13 @@ export class BaselineReceiver {
   private completed = -1;
   isComplete(sequence: number): boolean {
     return Number.isSafeInteger(sequence) && sequence >= 0 && sequence <= this.completed;
+  }
+  /** Every chunk of this sequence is held; only verification/decoding remains. */
+  isStaged(sequence: number): boolean {
+    const active = this.active;
+    return (
+      !!active && active.start.sequence === sequence && active.chunks.size === active.start.chunks
+    );
   }
   begin(start: BaselineStart): void {
     if (

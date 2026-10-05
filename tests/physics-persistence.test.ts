@@ -3,7 +3,12 @@ import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import test from "node:test";
 import { Simulation } from "../src/engine/simulation.ts";
-import { BaselineReceiver, frameTransfer, physicalScene } from "../src/net/physical.ts";
+import {
+  BaselineReceiver,
+  frameChoice,
+  frameTransfer,
+  physicalScene,
+} from "../src/net/physical.ts";
 import { initializePhysics } from "../src/physics/bootstrap.ts";
 import { interactPhysics } from "../src/physics/interaction.ts";
 import { physicsResources } from "../src/physics/runtime.ts";
@@ -140,11 +145,16 @@ test("atomic baselines handle missing, duplicate, reversed and stale chunks with
       assert.equal(await receiver.chunk(chunk), null);
     }
     assert.equal(replica.stateHash(), before);
-    const full = (await receiver.chunk({
+    assert.equal(receiver.isStaged(first.start.sequence), false);
+    const decoding = receiver.chunk({
       ...first.chunks[0],
       bytes: (first.chunks[0].bytes as Uint8Array).slice().buffer,
-    }))!;
+    });
+    // Every chunk is held before the decode finishes, so a guest can stop host resends early.
+    assert.equal(receiver.isStaged(first.start.sequence), true);
+    const full = (await decoding)!;
     assert.ok(full);
+    assert.equal(receiver.isStaged(first.start.sequence), false);
     assert.equal(receiver.isComplete(first.start.sequence), true);
     assert.equal(receiver.isComplete(first.start.sequence + 1), false);
     replica.applyReplica(full.state);
@@ -170,6 +180,31 @@ test("atomic baselines handle missing, duplicate, reversed and stale chunks with
     sim.dispose();
     replica.dispose();
   }
+});
+test("shared frame scheduling respects admission floors, pending actions and build spacing", () => {
+  const latest = { sequence: 7, key: "40:2:local,a", builtAt: 1000 },
+    base = { latest, key: "41:2:local,a", stale: false, buildStartedAt: 900, buildMs: 80 };
+  // A guest that has not received the newest frame gets it without another build.
+  assert.equal(frameChoice({ ...base, floor: 6, now: 1020 }), "latest");
+  // A traveler admitted after that build started cannot use it: the frame predates its body.
+  assert.equal(frameChoice({ ...base, floor: 7, now: 1020 }), "wait");
+  assert.equal(frameChoice({ ...base, floor: 7, now: 1100 }), "build");
+  // Nothing new exists while the authoritative key is unchanged.
+  assert.equal(frameChoice({ ...base, key: latest.key, floor: 7, now: 5000 }), "wait");
+  // Builds are spaced by twice their measured cost; older unsent frames still flow meanwhile.
+  const costly = { ...base, buildMs: 600 };
+  assert.equal(frameChoice({ ...costly, floor: 7, now: 1500 }), "wait");
+  assert.equal(frameChoice({ ...costly, floor: 6, now: 1500 }), "latest");
+  assert.equal(frameChoice({ ...costly, floor: 7, now: 2100 }), "build");
+  // An accepted action needs a frame built after it, even when the newest frame is fresh.
+  assert.equal(
+    frameChoice({ ...base, key: latest.key, stale: true, floor: 6, now: 1001 }),
+    "build",
+  );
+  // The first frame builds immediately; later builds remain spaced.
+  const first = { ...base, latest: undefined, floor: -1 };
+  assert.equal(frameChoice({ ...first, buildStartedAt: -Infinity, buildMs: 0, now: 0 }), "build");
+  assert.equal(frameChoice({ ...first, now: 1000 }), "wait");
 });
 test("replicas allocate no Rapier resources and snap angular/position interpolation across lands", () => {
   const sim = scene(),

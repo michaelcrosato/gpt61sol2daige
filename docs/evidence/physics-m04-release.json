@@ -1,0 +1,32 @@
+{
+  "scenario": "e2e/game.spec.ts real WebRTC eight clients at 32,768 ambient creatures, ninth rejection and late join",
+  "environment": "4 vCPU Linux container, Node 24.21.0, Chromium 141, nine isolated browser contexts plus local signaling",
+  "before": {
+    "commit": "c60cd794d07d84203b6aed2146f559a1c9d72610",
+    "ci": ["37250067641 failure", "37251631581 failure", "main 37245266580 failure"],
+    "localReproduction": "6 of 7 guests 'Host stopped responding. Continuing solo.'; ninth 'Could not reach the host' after three attempts",
+    "hostFrameIntervalMs": [700, 2200],
+    "frameBuildMs": [400, 1900],
+    "chunksPerHostFrame": 4,
+    "repeatedWelcomeBeginMs": [150, 543],
+    "nativeBufferedStallSeconds": [8, 18]
+  },
+  "diagnosis": {
+    "ackProcessingMedianMs": [56, 87],
+    "ackProcessingSpikeSeconds": [3, 10],
+    "note": "A loaded host processed incoming DataChannel messages seconds late for every guest at once. Stop-and-wait guests then received nothing and their 10 s watchdog fired although the host was alive."
+  },
+  "after": {
+    "eightClientRuns": "3 of 3 isolated passes with the heartbeat; final code passed 2 consecutive full suites, 24 of 24 scenarios each",
+    "guestTimeouts": 0,
+    "unstagedResends": 0,
+    "firstCompleteSceneAtPolledGuestSeconds": [12.5, 14.1],
+    "maxGuestFrameIntervalSeconds": [13, 18],
+    "hostHeartbeatHz": 1,
+    "hostSilenceLimitSeconds": 10
+  },
+  "rejectedAlternatives": {
+    "oneMiBRefill": "3 of 3 runs failed: the loaded host never processed the ninth client's admission, so it was not told the room was full",
+    "columnarFrameEncoding": "Node prototype: stringify+gzip 197 ms -> 76 ms, 1,627,182 -> 1,202,736 compressed bytes. Deferred: wire format change not needed for correctness."
+  }
+}
