@@ -85,7 +85,15 @@ export interface JointEntry {
   brokenAt?: number;
   cause?: string;
 }
-export type AssemblyKind = "gate" | "chain" | "vine" | "launcher" | "vane" | "bridge" | "lab";
+export type AssemblyKind =
+  | "gate"
+  | "chain"
+  | "vine"
+  | "launcher"
+  | "vane"
+  | "bridge"
+  | "lab"
+  | "remains";
 export interface AssemblyRecipe {
   id: string;
   kind: AssemblyKind;
@@ -150,7 +158,7 @@ export interface ContactEvent {
   started: boolean;
 }
 export interface PhysicsSnapshot {
-  version: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
+  version: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
   scene?: "adventure" | "lab";
   backend: string;
   continuation?: "snapshot" | "rebuild";

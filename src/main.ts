@@ -68,6 +68,8 @@ let activePage = true;
 const renderer = new Renderer(canvas, el<HTMLCanvasElement>("minimap"));
 renderer.drawDistance = preferences.drawDistance;
 renderer.entityLimit = preferences.entityLimit;
+renderer.shake = preferences.cameraShake;
+renderer.flash = preferences.hitFlash;
 const audio = new AudioEngine();
 let started = false,
   paused = false,
@@ -260,6 +262,8 @@ function setQuality(patch: Partial<Settings>): Settings {
   };
   renderer.drawDistance = next.drawDistance;
   renderer.entityLimit = next.entityLimit;
+  renderer.shake = next.cameraShake;
+  renderer.flash = next.hitFlash;
   try {
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(preferences));
   } catch {
@@ -291,6 +295,9 @@ function fillSettings(values: Settings): void {
     el<HTMLInputElement>(`setting-${field}-value`).value = String(values[key]);
   }
   el<HTMLInputElement>("setting-performance").checked = values.showPerformance;
+  el<HTMLInputElement>("setting-shake").value = String(Math.round(values.cameraShake * 100));
+  el<HTMLInputElement>("setting-shake-value").value = String(Math.round(values.cameraShake * 100));
+  el<HTMLInputElement>("setting-flash").checked = values.hitFlash;
   el("settings-error").hidden = true;
   for (const button of document.querySelectorAll<HTMLButtonElement>("[data-quality]"))
     button.setAttribute("aria-pressed", "false");
@@ -307,6 +314,16 @@ for (const id of ["settings-open", "game-settings"]) el(id).addEventListener("cl
 for (const [field] of settingFields) {
   const slider = el<HTMLInputElement>(`setting-${field}`),
     number = el<HTMLInputElement>(`setting-${field}-value`);
+  slider.addEventListener("input", () => {
+    number.value = slider.value;
+  });
+  number.addEventListener("input", () => {
+    if (number.validity.valid && number.value !== "") slider.value = number.value;
+  });
+}
+{
+  const slider = el<HTMLInputElement>("setting-shake"),
+    number = el<HTMLInputElement>("setting-shake-value");
   slider.addEventListener("input", () => {
     number.value = slider.value;
   });
@@ -337,6 +354,8 @@ el("settings-form").addEventListener("submit", (event) => {
       drawDistance: Number(el<HTMLInputElement>("setting-distance-value").value),
       entityLimit: Number(el<HTMLInputElement>("setting-entities-value").value),
       showPerformance: el<HTMLInputElement>("setting-performance").checked,
+      cameraShake: Number(el<HTMLInputElement>("setting-shake-value").value) / 100,
+      hitFlash: el<HTMLInputElement>("setting-flash").checked,
     };
     if (net.status.role !== "guest")
       patch.population = Number(el<HTMLInputElement>("setting-population-value").value);
@@ -1199,6 +1218,16 @@ function processEvents(): void {
       else if (rule === "field") audio.play("gust");
       else if (rule === "detonate") audio.play("metal");
       else if (event.text === "burnout:ash") audio.play("crumble");
+    } else if (event.type === "rig") {
+      // M09: bodies hit the ground, armor and bark clatter by material, shrouds unravel.
+      const [kind, , material] = event.text.split(":");
+      if (kind === "fall") {
+        if (material === "cloth") audio.play("flutter");
+        else audio.play("thud");
+      } else if (kind === "topple") audio.play("thud");
+      else if (kind === "shed" && (MATERIAL_SOUNDS as readonly string[]).includes(material))
+        audio.play(material as MaterialSound);
+      else if (kind === "npc") audio.play("cloth");
     }
   }
   if (runtime.sim.adventure.state.events.length)
@@ -1293,6 +1322,8 @@ const api = {
       simulationHz: tickRate,
       cameraX: renderer.x,
       cameraY: renderer.y,
+      /** M09 local screen feedback of the last frame (presentation only). */
+      feedback: { ...renderer.feedback },
     },
     settings: quality(),
     display: display.observe(),

@@ -7,8 +7,9 @@ import {
   WORLD_LIMIT,
   World,
 } from "../engine/world.ts";
-import { areaRecipe } from "../game/content.ts";
+import { areaRecipe, npcPosition, TOWN_NPCS } from "../game/content.ts";
 import type { AttackTeam } from "../game/interactions.ts";
+import { enemyPose, rigOf } from "../game/rigs.ts";
 import type { AdventureState, Enemy } from "../game/types.ts";
 import {
   clearingProps,
@@ -46,6 +47,14 @@ import {
   validateReactions,
 } from "./reactions.ts";
 import {
+  FOLIAGE_FAMILIES,
+  RigPhysics,
+  type RigState,
+  remainsRecipes,
+  validateRigState,
+} from "./rigs.ts";
+import {
+  isRemains,
   jointAnchors,
   PhysicsWorld,
   passesActors,
@@ -74,6 +83,8 @@ import {
 export const playerBodyId = (id: string) => `player-${id}`;
 export const enemyBodyId = (id: number) => `enemy-${id}`;
 export const ambientBodyId = (slot: number, generation: number) => `ambient-${slot}-${generation}`;
+/** M09 townsfolk bodies (town mode only). */
+export const npcBodyId = (id: string) => `npc-${id}`;
 interface AmbientSample {
   slot: number;
   generation: number;
@@ -176,7 +187,7 @@ interface NavigationState {
   turn: number;
 }
 export interface AdventurePhysicsSnapshot {
-  version: 1 | 2 | 3 | 4 | 5 | 6;
+  version: 1 | 2 | 3 | 4 | 5 | 6 | 7;
   backend: string;
   landId: string;
   run: number;
@@ -196,6 +207,8 @@ export interface AdventurePhysicsSnapshot {
   mechanisms?: MechanismState;
   /** Envelope 6 (M08): material statuses, surfaces, fields, delayed reactions and chains. */
   reactions?: ReactionState;
+  /** Envelope 7 (M09): ragdoll remains records, foliage bend and pending rig events. */
+  rigs?: RigState;
 }
 function layout(sim: Simulation): PolicyLayout {
   const s = sim.adventure.state,
@@ -321,6 +334,10 @@ export class AdventurePhysics {
   readonly mechanisms = new MechanismPhysics();
   /** M08 material reactions, surfaces, fields and causal chains. */
   readonly reactions = new ReactionPhysics();
+  /** M09 ragdoll remains, landing events and foliage bend. */
+  readonly rigs = new RigPhysics();
+  /** Foliage props of this land (trees and brush), rebuilt when scenery changes. */
+  private plants: string[] | null = null;
   /** Debris with an explicit lifetime: id -> cleanup tick. Derived from recipes on restore. */
   private expiring = new Map<string, number>();
   private actors = new Set<string>();
@@ -497,20 +514,25 @@ export class AdventurePhysics {
     if (id === this.landId && this.seed === sim.world.seed) return;
     this.world.boundary();
     const previous = this.world.policyState();
-    const props = this.props();
-    if (sim.adventure.state.run === this.run)
+    // Remains are transient (M09): they never travel with an archived land.
+    const props = this.props().filter((p) => !isRemains(p));
+    if (sim.adventure.state.run === this.run) {
+      const reactions = this.reactions.archive(sim.tick);
+      reactions.statuses = reactions.statuses.filter((status) =>
+        props.some((p) => p.id === status.id),
+      );
       this.archives.set(this.landId, {
         id: this.landId,
         policies: { state: previous.state, pending: previous.pending },
         props,
         patches: [...this.sourceWorld.patches.values()].map((p) => [...p]),
         destroyed: [...this.destroyed.values()],
-        assemblies: this.world.assemblyList(),
-        joints: this.world.jointList(),
+        assemblies: this.world.assemblyList().filter((a) => a.kind !== "remains"),
+        joints: this.world.jointList().filter((j) => !j.recipe.assembly.startsWith("remains-")),
         mechanisms: this.mechanisms.save(),
-        reactions: this.reactions.archive(sim.tick),
+        reactions,
       });
-    else this.archives.clear();
+    } else this.archives.clear();
     const archive = this.archives.get(id);
     this.archives.delete(id);
     if (archive) {
@@ -535,6 +557,8 @@ export class AdventurePhysics {
     this.combat.clear();
     this.mechanisms.restore(archive?.mechanisms);
     this.reactions.unarchive(archive?.reactions, sim.tick);
+    this.rigs.clear();
+    this.plants = null;
     this.spawnProps(sim, archive);
   }
   private actor(
@@ -574,13 +598,23 @@ export class AdventurePhysics {
   }
   begin(sim: Simulation): void {
     this.synchronizeLand(sim);
-    // Debris cleanup follows its explicit lifetime, recorded when it was created.
-    if (this.expiring.size)
+    // Debris cleanup follows its explicit lifetime, recorded when it was created. Ragdoll
+    // remains (M09) leave together with their joints.
+    if (this.expiring.size) {
       for (const [id, tick] of [...this.expiring].sort((a, b) => (a[0] < b[0] ? -1 : 1)))
         if (tick <= sim.tick) {
-          if (this.world.has(id)) this.world.remove(id);
+          if (this.world.has(id)) {
+            const assembly = this.world.recipeOf(id).assembly;
+            if (assembly !== undefined) this.world.removeAssembly(assembly);
+            else this.world.remove(id);
+          }
           this.expiring.delete(id);
         }
+      this.rigs.prune((id) => this.world.has(id));
+    }
+    // A monster that died since the last solve (an agent strike) becomes remains first.
+    for (const e of sim.adventure.state.enemies) if (e.hp <= 0) this.retire(sim, e);
+    this.townsfolk(sim);
     this.world.boundary();
     const wanted = new Set<string>();
     for (const p of sim.players.values()) {
@@ -699,6 +733,196 @@ export class AdventurePhysics {
     this.world.remove(id);
     this.actors.delete(id);
   }
+  /**
+   * M09 death transfer. The dead monster's actor body leaves the solver and, in the same tick,
+   * its drawn pose becomes a jointed ragdoll that keeps the body's momentum and the killing
+   * blow (where ragdolls are on); armor, bark and lantern cores come loose as material props.
+   * Burning, wet, oiled or charged monsters pass that status to their remains. Where ragdolls
+   * are off, the game draws its authored death pose instead and no body remains.
+   */
+  private retire(sim: Simulation, e: Enemy): void {
+    const id = enemyBodyId(e.id);
+    if (!this.world.has(id)) return;
+    const body = this.world.motionOf(id);
+    this.removeActor(id);
+    this.navigation.delete(e.id);
+    const areaId = this.areaAt(sim, body.x, body.y),
+      policy = this.world.policyAt(areaId, body.x, body.y);
+    if (this.rigs.has(e.id) || !policy.effective.ragdolls) {
+      this.reactions.transfer(id, []);
+      return;
+    }
+    const spawn = remainsRecipes({
+      enemy: e,
+      pose: enemyPose(e, sim.tick),
+      x: body.x,
+      y: body.y,
+      vx: body.vx,
+      vy: body.vy,
+      areaId,
+      palette: sim.adventure.state.townLand % PALETTES,
+      tick: sim.tick,
+      flip: Math.cos(e.facing) < 0,
+    });
+    for (const b of spawn.bodies) this.world.spawn(b.recipe);
+    if (spawn.assembly) this.world.addAssembly(spawn.assembly, spawn.joints);
+    for (const b of spawn.bodies) {
+      const m = this.world.motionOf(b.recipe.id);
+      if (m.dynamic && !m.frozen) this.world.motion(b.recipe.id, b.vx, b.vy, b.spin);
+      this.track(b.recipe);
+    }
+    this.reactions.transfer(id, spawn.assembly ? [spawn.assembly.root] : []);
+    const bp = rigOf(e.rig);
+    this.rigs.add({
+      enemy: e.id,
+      rig: e.rig,
+      born: sim.tick,
+      lands: sim.tick + bp.fallTicks,
+      owner: "",
+      boss: e.boss,
+      fall: spawn.fall,
+      bodies: spawn.bodies.map((b) => b.recipe.id),
+    });
+  }
+  /** A heavy blow knocks a detachable part off a living monster as a loose material prop. */
+  shed(sim: Simulation, e: Enemy, index: number): string | null {
+    const id = enemyBodyId(e.id);
+    if (!this.world.has(id)) return null;
+    const part = rigOf(e.rig).parts.filter((p) => p.detach !== undefined)[index];
+    if (!part) return null;
+    const body = this.world.motionOf(id),
+      spawn = remainsRecipes({
+        enemy: e,
+        pose: enemyPose(e, sim.tick),
+        x: body.x,
+        y: body.y,
+        vx: body.vx,
+        vy: body.vy,
+        areaId: this.areaAt(sim, body.x, body.y),
+        palette: sim.adventure.state.townLand % PALETTES,
+        tick: sim.tick,
+        flip: Math.cos(e.facing) < 0,
+        pieces: [part.id],
+      });
+    for (const b of spawn.bodies) {
+      if (this.world.has(b.recipe.id)) continue;
+      this.world.spawn(b.recipe);
+      const m = this.world.motionOf(b.recipe.id);
+      if (m.dynamic && !m.frozen) this.world.motion(b.recipe.id, b.vx, b.vy, b.spin);
+      this.track(b.recipe);
+    }
+    return part.material;
+  }
+  /**
+   * M09 townsfolk: physical bodies in town that travelers shove (they never block anyone) and
+   * that walk back to their posts. Their services follow them, so harmless motion never makes
+   * an essential service unavailable.
+   */
+  private townsfolk(sim: Simulation): void {
+    const town = sim.adventure.state.mode === "town";
+    for (const npc of TOWN_NPCS) {
+      const id = npcBodyId(npc.id);
+      if (!town) {
+        if (this.world.has(id)) this.world.remove(id);
+        continue;
+      }
+      const home = npcPosition(npc, sim.tick);
+      if (!this.world.has(id)) {
+        this.world.spawn({
+          id,
+          motion: "dynamic",
+          role: "actor",
+          actorKind: "npc",
+          shape: { kind: "circle", radius: 6 },
+          x: home.x,
+          y: home.y,
+          // Light enough that a traveler's shove moves them without slowing the traveler much.
+          mass: 0.8,
+          areaId: this.areaAt(sim, home.x, home.y),
+          friction: 0,
+          restitution: 0,
+          damping: 0,
+        });
+        this.world.motor(id, 0, 0, 0.08);
+      }
+      const at = this.world.motionOf(id),
+        dx = home.x - at.x,
+        dy = home.y - at.y,
+        d = Math.hypot(dx, dy),
+        speed = Math.min(45, d * 3);
+      this.world.motor(id, d > 0.01 ? (dx / d) * speed : 0, d > 0.01 ? (dy / d) * speed : 0, 0.08);
+    }
+  }
+  /** Where a townsperson stands now (their service is offered there). */
+  npcPoint(id: string): { x: number; y: number } | null {
+    const body = npcBodyId(id);
+    return this.world.has(body) ? this.world.motionOf(body) : null;
+  }
+  private plantList(): string[] {
+    this.plants ??= this.world.ids().filter((id) => {
+      const family = isPropId(id) ? this.world.recipeOf(id).blueprint?.family : undefined;
+      return family !== undefined && FOLIAGE_FAMILIES.has(family);
+    });
+    return this.plants;
+  }
+  /** After the solve: remains landing, travelers bumping townsfolk, and foliage bend. */
+  private updateRigs(sim: Simulation): void {
+    for (const contact of this.world.stepStarted) {
+      const npc = contact.a.startsWith("npc-")
+        ? contact.a
+        : contact.b.startsWith("npc-")
+          ? contact.b
+          : "";
+      const other = npc === contact.a ? contact.b : contact.a;
+      if (!npc || !other.startsWith("player-")) continue;
+      const at = this.world.motionOf(npc);
+      this.rigs.emit({
+        tick: sim.tick,
+        text: `npc:bump:${npc.slice(4)}`,
+        x: at.x,
+        y: at.y,
+        owner: other.slice(7),
+        amount: 1,
+      });
+    }
+    const plants: Parameters<RigPhysics["update"]>[1] = [];
+    for (const id of this.plantList()) {
+      if (!this.world.has(id)) continue;
+      const recipe = this.world.recipeOf(id),
+        m = this.world.motionOf(id),
+        policy = this.world.policyOf(id).effective;
+      plants.push({
+        id,
+        family: recipe.blueprint!.family as "tree" | "brush",
+        x: m.x,
+        y: m.y,
+        foliage: policy.foliage,
+        fields: policy.environmentalForces ? policy.fieldStrength : 0,
+      });
+    }
+    const movers: Parameters<RigPhysics["update"]>[2] = [];
+    for (const p of sim.players.values()) movers.push({ x: p.x, y: p.y, vx: p.vx, reach: 22 });
+    for (const e of sim.adventure.state.enemies)
+      if (e.hp > 0) movers.push({ x: e.x, y: e.y, vx: e.vx, reach: 16 + e.radius });
+    for (const record of this.rigs.list())
+      for (const id of record.bodies)
+        if (this.world.has(id)) {
+          const m = this.world.motionOf(id);
+          if (Math.abs(m.vx) > 4) movers.push({ x: m.x, y: m.y, vx: m.vx, reach: 14 });
+        }
+    this.rigs.update(
+      sim.tick,
+      plants,
+      movers,
+      (x, y) => this.reactions.accelerationAt(x, y, sim.tick, MATERIALS.vegetation.knockback).x,
+      (record) => {
+        const root = record.bodies.find((id) => this.world.has(id));
+        if (!root) return null;
+        const m = this.world.motionOf(root);
+        return { x: m.x, y: m.y, material: this.world.recipeOf(root).material ?? "wood" };
+      },
+    );
+  }
   ambientIntent(sim: Simulation, slot: number, x: number, y: number): void {
     this.world.motor(ambientBodyId(slot, sim.generation[slot]), x, y, 0.035);
   }
@@ -775,7 +999,12 @@ export class AdventurePhysics {
       x,
       y,
       enemy.phase === "charge" ? 1 : 0.1,
-      this.world.tick + Math.max(0, enemy.hurtUntil - sim.tick),
+      this.world.tick +
+        Math.max(
+          0,
+          Math.max(enemy.hurtUntil, enemy.reaction.staggerUntil, enemy.reaction.toppleUntil) -
+            sim.tick,
+        ),
     );
   }
   recycleAmbient(sim: Simulation, slot: number, oldGeneration: number): void {
@@ -820,7 +1049,7 @@ export class AdventurePhysics {
         );
         this.actors.add(enemyBodyId(e.id));
       }
-    for (const e of sim.adventure.state.enemies) if (e.hp <= 0) this.removeActor(enemyBodyId(e.id));
+    for (const e of sim.adventure.state.enemies) if (e.hp <= 0) this.retire(sim, e);
     this.synchronizeTerrain(sim);
     const solid = this.solidAt(sim);
     this.combat.syncLoot(sim, this.world, (x, y) => this.areaAt(sim, x, y), solid);
@@ -833,6 +1062,7 @@ export class AdventurePhysics {
     this.combat.afterStep(sim, this.world);
     this.mechanisms.update(sim.tick, this.world, this.combat);
     this.reactions.update(this.reactionHost(sim));
+    this.updateRigs(sim);
     this.combat.afterLoot(sim, this.world, solid);
     for (const p of sim.players.values())
       if (this.world.has(playerBodyId(p.id))) {
@@ -999,8 +1229,17 @@ export class AdventurePhysics {
         }
       }
       // Mechanism parts are not destroyed: a striking attack cuts the nearest joint instead.
-      if (pose.assembly !== undefined && attack.damage > 0 && attack.material !== 0)
+      // Ragdoll remains (M09) only move: their joints cannot be cut.
+      if (
+        pose.assembly !== undefined &&
+        !isRemains(pose) &&
+        attack.damage > 0 &&
+        attack.material !== 0
+      )
         this.cutJoint(sim, pose, attack);
+      // A blow shakes foliage away from the attacker (M09).
+      if (FOLIAGE_FAMILIES.has(pose.blueprint.family) && attack.damage > 0)
+        this.rigs.kick(id, Math.cos(away) * Math.min(6, 1 + attack.damage * 0.08));
       // M08 devices and elemental strikes. A reaction's own damage never re-triggers them.
       if (attack.damage > 0 && attack.material !== 0 && attack.chain === undefined) {
         host ??= this.reactionHost(sim);
@@ -1202,6 +1441,7 @@ export class AdventurePhysics {
       pieces: pieces.map((p) => p.recipe.id),
     };
     this.destroyed.set(record.id, record);
+    this.plants = null;
     // Containers spill, sources release, volatiles detonate, fire carries into the pieces.
     this.reactions.broke(
       this.reactionHost(sim),
@@ -1258,7 +1498,7 @@ export class AdventurePhysics {
   }
   save(portable = false): AdventurePhysicsSnapshot {
     return {
-      version: 6,
+      version: 7,
       backend: RAPIER_VERSION,
       landId: this.landId,
       run: this.run,
@@ -1277,10 +1517,11 @@ export class AdventurePhysics {
       combat: this.combat.save(),
       mechanisms: this.mechanisms.save(),
       reactions: this.reactions.save(),
+      rigs: this.rigs.save(),
     };
   }
   static restore(sim: Simulation, snapshot: AdventurePhysicsSnapshot): AdventurePhysics {
-    const migrated = ![3, 4, 5, 6].includes(snapshot?.version);
+    const migrated = ![3, 4, 5, 6, 7].includes(snapshot?.version);
     snapshot = upgradeAdventurePhysics(snapshot, sim);
     validateAdventurePhysics(snapshot, sim);
     const result = new AdventurePhysics(sim);
@@ -1302,6 +1543,7 @@ export class AdventurePhysics {
       result.combat.restore(snapshot.combat);
       result.mechanisms.restore(snapshot.mechanisms);
       result.reactions.restore(snapshot.reactions);
+      result.rigs.restore(snapshot.rigs);
       for (const assembly of result.world.assemblyList()) result.mechanisms.track(assembly);
       for (const id of result.world.ids()) {
         const pose = result.world.pose(id);
@@ -1580,12 +1822,13 @@ export function validateAdventurePhysics(
 ): void {
   if (
     !snapshot ||
-    ![1, 2, 3, 4, 5, 6].includes(snapshot.version) ||
+    ![1, 2, 3, 4, 5, 6, 7].includes(snapshot.version) ||
     (snapshot.version === 2 && snapshot.world?.version !== 4) ||
     (snapshot.version === 3 && snapshot.world?.version !== 5) ||
     (snapshot.version === 4 && snapshot.world?.version !== 6) ||
     (snapshot.version === 5 && snapshot.world?.version !== 7) ||
     (snapshot.version === 6 && snapshot.world?.version !== 8) ||
+    (snapshot.version === 7 && snapshot.world?.version !== 9) ||
     snapshot.backend !== snapshot.world?.backend ||
     (snapshot.version === 1 && snapshot.backend !== RAPIER_VERSION) ||
     !/^land-\d+-\d+$/.test(snapshot.landId) ||
@@ -1624,6 +1867,16 @@ export function validateAdventurePhysics(
       if (!entries.has(status.id)) throw new Error("Reaction status for a missing body");
   } else if (snapshot.reactions !== undefined)
     throw new Error("Reaction state requires envelope 6");
+  if (snapshot.version >= 7) {
+    if (!snapshot.rigs) throw new Error("Missing rig state");
+    validateRigState(snapshot.rigs, (id) => entries.has(id));
+  } else if (snapshot.rigs !== undefined) throw new Error("Rig state requires envelope 7");
+  for (const entry of entries.values())
+    if (
+      entry.recipe.actorKind === "npc" &&
+      !TOWN_NPCS.some((n) => npcBodyId(n.id) === entry.recipe.id)
+    )
+      throw new Error("Unknown townsfolk body");
   // A loot body may outlive its drop until the next solve (collected between ticks); drop ids
   // are never reused, so the solve removes it without ambiguity.
   for (const entry of entries.values())

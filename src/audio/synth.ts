@@ -13,7 +13,8 @@ export type SoundName =
   | "level"
   | MaterialSound
   | "crumble"
-  | ReactionSound;
+  | ReactionSound
+  | RigSound;
 /** M05 material identity: one impact voice per registered material. */
 export const MATERIAL_SOUNDS = [
   "wood",
@@ -29,6 +30,9 @@ export type MaterialSound = (typeof MATERIAL_SOUNDS)[number];
 /** M08 reaction voices: ignition, a hissing quench, a discharge, a blast, a spill and a gust. */
 export const REACTION_SOUNDS = ["ignite", "hiss", "zap", "boom", "splash", "gust"] as const;
 export type ReactionSound = (typeof REACTION_SOUNDS)[number];
+/** M09 rig voices: a body hitting the ground and a shroud dissipating. */
+export const RIG_SOUNDS = ["thud", "flutter"] as const;
+export type RigSound = (typeof RIG_SOUNDS)[number];
 export const SAMPLE_RATE = 22050;
 export function synthesize(name: SoundName, seed = 142): Float32Array {
   const duration =
@@ -46,15 +50,17 @@ export function synthesize(name: SoundName, seed = 142): Float32Array {
                 ? 0.7
                 : name === "boom"
                   ? 1.1
-                  : name === "gust"
+                  : name === "gust" || name === "flutter"
                     ? 0.9
-                    : name === "ignite" || name === "hiss" || name === "splash"
-                      ? 0.6
-                      : name === "zap"
-                        ? 0.38
-                        : (MATERIAL_SOUNDS as readonly string[]).includes(name)
-                          ? 0.32
-                          : 0.2;
+                    : name === "thud"
+                      ? 0.5
+                      : name === "ignite" || name === "hiss" || name === "splash"
+                        ? 0.6
+                        : name === "zap"
+                          ? 0.38
+                          : (MATERIAL_SOUNDS as readonly string[]).includes(name)
+                            ? 0.32
+                            : 0.2;
   const data = new Float32Array(Math.floor(duration * SAMPLE_RATE));
   const frequencies = [130.81, 164.81, 196, 261.63, 329.63, 392, 523.25, 659.25];
   for (let i = 0; i < data.length; i++) {
@@ -185,6 +191,19 @@ export function synthesize(name: SoundName, seed = 142): Float32Array {
       // Low, smoothed noise swelling and falling away.
       sample =
         (random(Math.floor(i / 9), 113, seed) - 0.5) * 0.3 * Math.sin(Math.min(1, u) * Math.PI);
+    else if (name === "thud")
+      // A heavy body meeting the ground: a falling low tone with a short dusty burst.
+      sample =
+        (Math.sin(t * 2 * Math.PI * (58 - t * 34)) * 0.38 * Math.exp(-t * 9) +
+          (random(Math.floor(i / 6), 127, seed) - 0.5) * 0.2 * Math.exp(-t * 16)) *
+        Math.min(1, t * 500);
+    else if (name === "flutter")
+      // Cloth unravelling: soft noise trembling at a falling rate.
+      sample =
+        (random(Math.floor(i / 3), 131, seed) - 0.5) *
+        0.18 *
+        Math.sin(Math.min(1, u) * Math.PI) *
+        (0.55 + 0.45 * Math.sin(t * 2 * Math.PI * (34 - t * 22)));
     else if (name === "level")
       sample =
         (Math.sin(t * 2 * Math.PI * 659.25) + Math.sin(t * 2 * Math.PI * 987.77)) * 0.13 * envelope;

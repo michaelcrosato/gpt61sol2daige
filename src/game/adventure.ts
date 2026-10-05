@@ -7,18 +7,28 @@ import { LOOT_SETTLE_TICKS, type PendingImpact } from "../physics/combat.ts";
 import { MATERIALS } from "../physics/materials.ts";
 import { insidePen } from "../physics/mechanisms.ts";
 import { type FieldRecipe, REACTION_COLORS } from "../physics/reactions.ts";
-import type { AreaRecipe } from "./content.ts";
+import type { AreaRecipe, BehaviorId, RigKind } from "./content.ts";
 import {
   ARCHETYPES,
   areaRecipe,
   encounterPosition,
   mechanicOf,
   npcPosition,
+  RIGS,
   TOWN_NPCS,
   townName,
 } from "./content.ts";
 import { ATTACKS, attackRecipe, HARD_MATERIALS } from "./interactions.ts";
 import { type Item, rollItem, SLOTS, starterItems } from "./loot.ts";
+import {
+  freshReaction,
+  freshRecoil,
+  hitReaction,
+  recoilHit,
+  rigOf,
+  stepReaction,
+  stepRecoil,
+} from "./rigs.ts";
 import { SKILLS, type StatId, skillReason } from "./skills.ts";
 import {
   type AdventureAction,
@@ -76,6 +86,7 @@ export function freshHero(level = 1): Hero {
     bought: [],
     lastAbility: "slash",
     goldLost: 0,
+    recoil: freshRecoil(),
   };
 }
 function initialState(seed: number): AdventureState {
@@ -616,8 +627,9 @@ export class Adventure {
         this.action(sim, p.id, { type: "depart" });
         return true;
       }
+      // Services follow their townsperson, wherever a shove has moved them (M09).
       const npc = TOWN_NPCS.find((n) => {
-        const point = npcPosition(n, sim.tick);
+        const point = sim.physical?.npcPoint(n.id) ?? npcPosition(n, sim.tick);
         return Math.hypot(p.x - point.x, p.y - point.y) < 42;
       });
       if (npc) {
@@ -901,6 +913,63 @@ export class Adventure {
     this.propEffects(sim, owner, angle, hits);
     return hits;
   }
+  /**
+   * Agent/QA (M09): a monster with a chosen rig, uncounted for the area goal. `passive` keeps it
+   * planted and never attacking, so its hit, stagger and death can be inspected.
+   */
+  spawnMonster(
+    sim: Simulation,
+    rig: RigKind,
+    x: number,
+    y: number,
+    options: { hp?: number; passive?: boolean; boss?: boolean; clear?: boolean } = {},
+  ): Enemy {
+    if (this.state.mode !== "area") throw new Error("Monsters can only be placed in an area");
+    if (!RIGS.includes(rig)) throw new Error("Unknown rig");
+    // QA isolation: other live monsters leave (no kill, no reward) and no further waves come.
+    if (options.clear) {
+      this.state.enemies = this.state.enemies.filter((e) => e.hp <= 0);
+      this.state.spawned = Math.max(this.state.spawned, this.state.recipe.killGoal);
+      this.state.bossSpawned = true;
+    }
+    const behavior = (Object.keys(ARCHETYPES) as BehaviorId[]).find(
+      (b) => ARCHETYPES[b].rig === rig,
+    )!;
+    const before = this.state.enemies.length;
+    this.spawnEnemy(
+      sim,
+      this.state.spawned + this.state.enemies.length + 1000,
+      x,
+      y,
+      !!options.boss,
+      false,
+    );
+    if (this.state.enemies.length === before) throw new Error("The live monster budget is full");
+    const e = this.state.enemies.at(-1)!;
+    e.rig = rig;
+    if (!options.boss) {
+      e.behavior = behavior;
+      e.name = ARCHETYPES[behavior].name;
+      e.radius = behavior === "sentinel" || behavior === "charger" ? 11 : 7;
+    }
+    e.x = e.px = x;
+    e.y = e.py = y;
+    if (options.hp !== undefined) e.hp = e.maxHp = Math.max(1, options.hp);
+    if (options.passive) {
+      // Within the validated tick range (saves stay valid).
+      e.rootUntil = 1e11;
+      e.nextAttack = 1e11;
+    }
+    sim.physical?.teleport(enemyBodyId(e.id), x, y);
+    return e;
+  }
+  /** Agent/QA (M09): a blow to a monster through the ordinary hit path, credited to `owner`. */
+  strikeEnemy(sim: Simulation, owner: string, id: number, damage: number, angle: number): Enemy {
+    const e = this.state.enemies.find((enemy) => enemy.id === id && enemy.hp > 0);
+    if (!e) throw new Error("Unknown or defeated monster");
+    this.hit(sim, e, damage, owner, e.x - Math.cos(angle) * 30, e.y - Math.sin(angle) * 30);
+    return e;
+  }
   /** Gameplay-owned consequences of scenery hits: one-time party gold and readable feedback. */
   private propEffects(
     sim: Simulation,
@@ -1160,12 +1229,16 @@ export class Adventure {
       e.phase = "recover";
       e.timer = 12;
     }
-    const d = Math.hypot(e.x - fromX, e.y - fromY) || 1;
+    const d = Math.hypot(e.x - fromX, e.y - fromY) || 1,
+      rig = rigOf(e.rig),
+      dx = d > 1e-6 ? (e.x - fromX) / d : 0,
+      dy = d > 1e-6 ? (e.y - fromY) / d : 0;
     sim.actorImpulse(
       enemyBodyId(e.id),
-      ((e.x - fromX) / d) * (e.boss ? 12 : 65),
-      ((e.y - fromY) / d) * (e.boss ? 12 : 65),
+      dx * (e.boss ? 12 : 65) * rig.knockback,
+      dy * (e.boss ? 12 : 65) * rig.knockback,
     );
+    this.rigHit(sim, e, dx, dy, amount, secondary);
     this.emit(
       sim,
       "hit",
@@ -1211,6 +1284,57 @@ export class Adventure {
       }
     }
     if (e.hp <= 0 && e.phase !== "dead") this.kill(sim, e, owner);
+  }
+  /**
+   * M09 rig response to a blow: recoil, poise, stagger, knockdown and shed armor. Reaction
+   * strength comes from the monster's region; stagger, knockdown and shedding need effective
+   * world reactions. A stagger or knockdown interrupts the attack it was winding up.
+   */
+  private rigHit(
+    sim: Simulation,
+    e: Enemy,
+    dx: number,
+    dy: number,
+    amount: number,
+    secondary: boolean,
+  ): void {
+    const policy = sim.physical?.policyAt(sim, e.x, e.y),
+      strength = policy ? policy.values.reactionStrength : 1,
+      outcome = hitReaction(rigOf(e.rig), e.reaction, {
+        dx,
+        dy,
+        speed: 65 + Math.min(120, amount * 2),
+        percent: (amount / e.maxHp) * 100 * (secondary ? 0.6 : 1),
+        strength,
+        physical: policy ? policy.effective.worldReactions : true,
+        boss: e.boss,
+        tick: sim.tick,
+      });
+    if (outcome.toppled || outcome.staggered) {
+      if (e.phase === "windup" || e.phase === "charge") {
+        e.phase = "recover";
+        e.timer = outcome.toppled ? rigOf(e.rig).toppleTicks : 14;
+      } else if (outcome.toppled) {
+        e.phase = "recover";
+        e.timer = Math.max(e.timer, rigOf(e.rig).toppleTicks);
+      }
+      this.emit(
+        sim,
+        "rig",
+        e.x,
+        e.y,
+        "",
+        `${outcome.toppled ? "topple" : "stagger"}:${e.rig}`,
+        e.boss ? 3 : outcome.toppled ? 2 : 1,
+        Math.atan2(dy, dx),
+        "#efd9a6",
+      );
+    }
+    if (outcome.shed >= 0 && sim.physical) {
+      const material = sim.physical.shed(sim, e, outcome.shed);
+      if (material)
+        this.emit(sim, "rig", e.x, e.y, "", `shed:${e.rig}:${material}`, 1, Math.atan2(dy, dx));
+    }
   }
   private kill(sim: Simulation, e: Enemy, owner: string): void {
     const s = this.state;
@@ -1322,6 +1446,12 @@ export class Adventure {
     h.recallUntil = 0;
     const d = Math.hypot(p.x - x, p.y - y) || 1;
     sim.actorImpulse(playerBodyId(p.id), ((p.x - x) / d) * 80, ((p.y - y) / d) * 80);
+    // M09: a controlled lean and a swinging lantern; input and movement stay untouched.
+    recoilHit(
+      h.recoil,
+      (p.x - x) / d,
+      sim.physical?.policyAt(sim, p.x, p.y).values.reactionStrength ?? 1,
+    );
     this.emit(sim, "hurt", p.x, p.y - 20, p.id, "", damage, 0, "#ef9b8f");
     if (h.hp <= 0) {
       h.dead = true;
@@ -1427,6 +1557,7 @@ export class Adventure {
       attacks: 0,
       counted,
       tier: s.area,
+      reaction: freshReaction(),
     });
     if (boss) this.emit(sim, "boss", x, y, "", s.recipe.boss);
   }
@@ -1685,11 +1816,15 @@ export class Adventure {
       // Mechanism changes (latches, launches, snapped or cut links) from the previous solve.
       for (const e of sim.physical.mechanisms.take())
         this.emit(sim, "assembly", e.x, e.y, e.owner, e.text, 0, 0, "#e7d7a1");
+      // Remains reaching the ground and travelers bumping townsfolk (M09).
+      for (const e of sim.physical.rigs.take())
+        this.emit(sim, "rig", e.x, e.y, e.owner, e.text, e.amount, 0, "#d9cfa8");
       this.applyReactions(sim);
     }
     for (const p of sim.players.values()) {
       const h = this.hero(p.id),
         stats = this.stats(p.id, tick);
+      stepRecoil(h.recoil, p.vx, p.vy);
       h.hp = Math.min(stats.health, h.hp + (h.dead ? 0 : stats.regen / 60));
       p.energy = Math.min(100, p.energy + stats.spirit / 60);
       if (h.dead) continue;
@@ -1793,10 +1928,17 @@ export class Adventure {
     for (const e of s.enemies) {
       e.px = e.x;
       e.py = e.y;
+      stepReaction(rigOf(e.rig), e.reaction, e.vx);
       if (e.hp <= 0) continue;
       if (e.burnUntil > tick && tick % 30 === 0) {
         this.hit(sim, e, e.burnDamage, e.burnOwner, e.x, e.y, true);
         if (e.hp <= 0) continue;
+      }
+      // Knocked down (M09): no steering and no attack until it is back on its feet.
+      if (e.reaction.toppleUntil > tick) {
+        if (sim.physical) sim.physical.enemyIntent(sim, e, 0, 0, false);
+        else e.vx = e.vy = 0;
+        continue;
       }
       let target: Player | undefined,
         distance = Infinity;
@@ -2016,6 +2158,9 @@ export class Adventure {
   restore(state: AdventureState): void {
     validateAdventure(state);
     this.state = structuredClone(state);
+    // M09 state did not exist in older checkpoints: rigs start at rest.
+    for (const hero of Object.values(this.state.heroes)) hero.recoil ??= freshRecoil();
+    for (const enemy of this.state.enemies) enemy.reaction ??= freshReaction();
   }
   networkState(viewer: string): AdventureState {
     const state = this.save();

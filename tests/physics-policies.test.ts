@@ -223,7 +223,7 @@ test("invalid schemas and stale multi-edit transactions leave applied/queued/bod
         s.profiles.areas[0].landId = "missing";
       },
       (s: PolicyState) => {
-        s.profiles.regions[0].values = { ragdolls: true } as never;
+        s.profiles.regions[0].values = { fluidFlow: true } as never;
       },
       (s: PolicyState) => {
         s.profiles.regions[0].shape = {
@@ -506,6 +506,9 @@ test("working presets, numeric zero and scope resets preserve the scene", () => 
       "chainReactions",
       "environmentalForces",
       "fieldStrength",
+      "ragdolls",
+      "foliage",
+      "reactionStrength",
     ]);
   } finally {
     world.dispose();
@@ -612,7 +615,7 @@ test("applied/off and queued policies survive JSON save, replay, continuation; c
         delete body.state;
       }
       const migrated = PhysicsWorld.restore(snapshot);
-      assert.equal(migrated.save().version, 8);
+      assert.equal(migrated.save().version, 9);
       assert.equal(
         pose(migrated, "legacy-quiet").frozen,
         true,

@@ -18,7 +18,7 @@ import type {
  * a chained iron ball, a vine tether with a seed pod, a sprung launcher, a wind vane and a plank
  * causeway over the area's creek. Required travel never crosses one of them.
  */
-export type MechanismKind = Exclude<AssemblyKind, "lab">;
+export type MechanismKind = Exclude<AssemblyKind, "lab" | "remains">;
 export interface MechanismBlueprint {
   recipe: AssemblyRecipe;
   joints: JointRecipe[];

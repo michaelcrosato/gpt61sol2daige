@@ -14,7 +14,12 @@ export const PALETTE = {
 };
 
 /** A sprite is a recipe plus a frame number, shared by browser rendering and the CLI SVG atlas. */
-export function spritePixels(recipe: SpriteRecipe, frame = 0): Pixel[] {
+export function spritePixels(
+  recipe: SpriteRecipe,
+  frame = 0,
+  /** M09: the wayfarer's lantern can be drawn separately, as a swinging part. */
+  options: { lantern?: boolean } = {},
+): Pixel[] {
   const out: Pixel[] = [];
   const rect = (x: number, y: number, w: number, h: number, color: string) =>
     out.push({ x, y, w, h, color });
@@ -73,8 +78,10 @@ export function spritePixels(recipe: SpriteRecipe, frame = 0): Pixel[] {
     rect(-4, -22, 10, 5, c[2]);
     rect(-5, -20, 12, 2, c[2]);
     rect(6, -9, 3, 5, c[3]);
-    rect(8, -7, 4, 5, "#6e6349");
-    rect(9, -6, 2, 3, c[4]);
+    if (options.lantern !== false) {
+      rect(8, -7, 4, 5, "#6e6349");
+      rect(9, -6, 2, 3, c[4]);
+    }
   } else if (recipe.kind === "deer") {
     const walk = Math.round(Math.sin((frame * Math.PI) / 4) * 2);
     rect(-6, -7, 12, 7, "#987f57");

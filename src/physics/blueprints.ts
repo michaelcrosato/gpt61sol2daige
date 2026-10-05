@@ -1,4 +1,6 @@
 import { hash } from "../engine/math.ts";
+import { RIGS, type RigKind, THEMES, type ThemeId } from "../game/content.ts";
+import { RIG_BLUEPRINTS } from "../game/rigs.ts";
 import { isMaterial, MATERIALS, type MaterialId } from "./materials.ts";
 import type { BodyPose, BodyRecipe, ShapeRecipe } from "./types.ts";
 
@@ -40,6 +42,8 @@ export const PROP_FAMILIES = [
   "jar",
   "brush",
   "fan",
+  // M09 ragdoll remains: a dead monster's jointed parts and its loose armor, bark and lanterns.
+  "remains",
 ] as const;
 export type PropFamily = (typeof PROP_FAMILIES)[number];
 export const PALETTES = 5;
@@ -51,6 +55,28 @@ export interface PropBlueprint {
   parent?: string;
   /** Simulation tick at which this debris is cleaned up; absent means it lasts the scene. */
   expiresAt?: number;
+  /** M09: which monster part these remains are and how its body fell. */
+  rig?: RemainsTag;
+}
+/**
+ * M09: the drawn identity of one ragdoll part (or a loose detached piece) and the fall its body
+ * makes: `fall` is the screen angle the body toppled through at `born`, about the point
+ * (`px`,`py`) in its root part's frame. Replicas draw remains from these recipes alone.
+ */
+export interface RemainsTag {
+  kind: RigKind;
+  part: string;
+  theme: ThemeId;
+  variant: number;
+  scale: number;
+  flip: boolean;
+  enemy: number;
+  born: number;
+  fall: number;
+  px: number;
+  py: number;
+  /** A detached piece (armor, bark, a lantern core): a loose prop outside the ragdoll. */
+  loose: boolean;
 }
 interface PieceRecipe {
   kind: string;
@@ -569,6 +595,19 @@ export const FAMILIES: Record<PropFamily, FamilyRecipe> = {
     1,
     { motion: "fixed", trim: "cloth" },
   ),
+  // Each part's body carries its own material, shape and mass from the rig recipe (M09).
+  remains: {
+    name: "Remains",
+    variants: ["Meadow remains", "Ember remains", "Tide remains", "Dusk remains", "Frost remains"],
+    material: "vegetation",
+    motion: "dynamic",
+    shape: box(6, 6),
+    massScale: 1,
+    toughness: 0,
+    reward: 0,
+    pieces: [],
+    solid: "low: travelers walk through it",
+  },
 };
 const area = (shape: ShapeRecipe) =>
   shape.kind === "circle" ? Math.PI * shape.radius ** 2 : shape.width * shape.height;
@@ -617,6 +656,13 @@ export function propRecipe(
 export const damageStage = (durability: number) =>
   durability <= 0 ? 3 : durability <= 33.334 ? 2 : durability <= 66.667 ? 1 : 0;
 export function variantName(blueprint: PropBlueprint): string {
+  // M09 remains name their creature: "Thorn stalker remains", "Bark brute plate".
+  if (blueprint.rig) {
+    const name = RIG_BLUEPRINTS[blueprint.rig.kind].name;
+    return blueprint.rig.loose
+      ? `${name} ${blueprint.rig.part.replace(/\d+$/, "")}`
+      : `${name} remains`;
+  }
   return FAMILIES[blueprint.family].variants[blueprint.palette % PALETTES];
 }
 export interface FracturePiece {
@@ -764,7 +810,7 @@ export function validateBlueprint(recipe: BodyRecipe): void {
     typeof b !== "object" ||
     Array.isArray(b) ||
     Object.keys(b).some(
-      (key) => !["family", "palette", "piece", "parent", "expiresAt"].includes(key),
+      (key) => !["family", "palette", "piece", "parent", "expiresAt", "rig"].includes(key),
     ) ||
     !(PROP_FAMILIES as readonly string[]).includes(b.family) ||
     !Number.isInteger(b.palette) ||
@@ -774,13 +820,60 @@ export function validateBlueprint(recipe: BodyRecipe): void {
     (b.parent !== undefined &&
       (typeof b.parent !== "string" || !/^[\w-]{1,160}$/.test(b.parent))) ||
     (b.piece === undefined) !== (b.parent === undefined) ||
-    (b.expiresAt !== undefined && (!Number.isSafeInteger(b.expiresAt) || b.expiresAt < 0))
+    (b.expiresAt !== undefined && (!Number.isSafeInteger(b.expiresAt) || b.expiresAt < 0)) ||
+    (b.rig !== undefined) !== (b.family === "remains")
   )
     throw new Error("Invalid prop blueprint");
+  if (b.rig !== undefined) validateRemainsTag(b.rig);
   const toughness = FAMILIES[b.family].toughness,
     durability = recipe.consequences?.durability;
   if (toughness > 0 ? durability === undefined || durability > 100 : durability !== undefined)
     throw new Error("Prop durability does not match its blueprint");
+}
+export function validateRemainsTag(tag: RemainsTag): void {
+  const finite = (v: unknown, bound: number) =>
+    typeof v === "number" && Number.isFinite(v) && Math.abs(v) <= bound;
+  if (
+    !tag ||
+    typeof tag !== "object" ||
+    Array.isArray(tag) ||
+    Object.keys(tag).some(
+      (key) =>
+        ![
+          "kind",
+          "part",
+          "theme",
+          "variant",
+          "scale",
+          "flip",
+          "enemy",
+          "born",
+          "fall",
+          "px",
+          "py",
+          "loose",
+        ].includes(key),
+    ) ||
+    !(RIGS as readonly string[]).includes(tag.kind) ||
+    typeof tag.part !== "string" ||
+    !/^[a-zA-Z]+\d*$/.test(tag.part) ||
+    !THEMES.some((theme) => theme.id === tag.theme) ||
+    !Number.isInteger(tag.variant) ||
+    tag.variant < 0 ||
+    tag.variant > 3 ||
+    !finite(tag.scale, 4) ||
+    tag.scale < 0.2 ||
+    typeof tag.flip !== "boolean" ||
+    !Number.isSafeInteger(tag.enemy) ||
+    tag.enemy < 0 ||
+    !Number.isSafeInteger(tag.born) ||
+    tag.born < 0 ||
+    !finite(tag.fall, 7) ||
+    !finite(tag.px, 512) ||
+    !finite(tag.py, 512) ||
+    typeof tag.loose !== "boolean"
+  )
+    throw new Error("Invalid remains tag");
 }
 /** Reproducible registry export for agents, tools and documentation. */
 export function blueprintExport() {

@@ -140,6 +140,8 @@
     "zap.wav",
     "boom.wav",
     "splash.wav",
-    "gust.wav"
+    "gust.wav",
+    "thud.wav",
+    "flutter.wav"
   ]
 }

@@ -66,6 +66,9 @@ export function mountPhysicsUI(options: {
         <label>Chain reactions <select id="physics-chainReactions" aria-label="Chain reactions override"><option value="inherit">Inherited</option><option value="true">On</option><option value="false">Off</option></select></label>
         <label>Environmental forces <select id="physics-environmentalForces" aria-label="Environmental forces override"><option value="inherit">Inherited</option><option value="true">On</option><option value="false">Off</option></select></label>
         <label>Field strength × <input id="physics-fieldStrength" aria-label="Field strength override" type="number" min="0" max="10" step="0.05" placeholder="Inherited"></label>
+        <label>Physical ragdolls <select id="physics-ragdolls" aria-label="Physical ragdolls override"><option value="inherit">Inherited</option><option value="true">On</option><option value="false">Off</option></select></label>
+        <label>Foliage response <select id="physics-foliage" aria-label="Foliage response override"><option value="inherit">Inherited</option><option value="true">On</option><option value="false">Off</option></select></label>
+        <label>Reaction strength × <input id="physics-reactionStrength" aria-label="Reaction strength override" type="number" min="0" max="10" step="0.05" placeholder="Inherited"></label>
         <button class="secondary-button" id="physics-queue">Queue policy edit</button>
         <button class="secondary-button" id="physics-reset-scope">Reset this scope</button>
         <button class="secondary-button" id="physics-reset-authored">Reset to authored</button>
@@ -224,6 +227,8 @@ export function mountPhysicsUI(options: {
       "materialReactions",
       "chainReactions",
       "environmentalForces",
+      "ragdolls",
+      "foliage",
     ] as const) {
       const value = get<HTMLSelectElement>(`physics-${key}`).value;
       if (value !== "inherit") values[key] = value === "true";
@@ -235,6 +240,7 @@ export function mountPhysicsUI(options: {
       "impactStrength",
       "jointStrength",
       "fieldStrength",
+      "reactionStrength",
     ] as const) {
       const value = get<HTMLInputElement>(`physics-${key}`).value;
       if (value !== "") values[key] = Number(value);
@@ -363,6 +369,8 @@ export function mountPhysicsUI(options: {
         "materialReactions",
         "chainReactions",
         "environmentalForces",
+        "ragdolls",
+        "foliage",
       ] as const)
         get<HTMLSelectElement>(`physics-${key}`).value =
           override?.[key] === undefined ? "inherit" : String(override[key]);
@@ -373,6 +381,7 @@ export function mountPhysicsUI(options: {
         "impactStrength",
         "jointStrength",
         "fieldStrength",
+        "reactionStrength",
       ] as const)
         get<HTMLInputElement>(`physics-${key}`).value =
           override?.[key] === undefined ? "" : String(override[key]);

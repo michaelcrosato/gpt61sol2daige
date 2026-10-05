@@ -6,6 +6,9 @@ export interface Settings {
   entityLimit: number;
   population: number;
   showPerformance: boolean;
+  /** M09 local screen feedback: camera shake strength (0–1) and hit/blast flashes. */
+  cameraShake: number;
+  hitFlash: boolean;
 }
 export const SETTINGS_KEY = "fern:settings:v1";
 export const DEFAULT_SETTINGS: Readonly<Settings> = Object.freeze({
@@ -14,6 +17,8 @@ export const DEFAULT_SETTINGS: Readonly<Settings> = Object.freeze({
   entityLimit: 8192,
   population: 2400,
   showPerformance: true,
+  cameraShake: 1,
+  hitFlash: true,
 });
 export const PRESETS = {
   balanced: { drawDistance: 4096, entityLimit: 8192, population: 6000 },
@@ -36,12 +41,24 @@ export function updateSettings(current: Settings, patch: Partial<Settings>): Set
   }
   if (patch.showPerformance !== undefined && typeof patch.showPerformance !== "boolean")
     throw new Error("showPerformance must be a boolean");
+  if (
+    patch.cameraShake !== undefined &&
+    (typeof patch.cameraShake !== "number" ||
+      !Number.isFinite(patch.cameraShake) ||
+      patch.cameraShake < 0 ||
+      patch.cameraShake > 1)
+  )
+    throw new Error("cameraShake must be a number from 0 to 1");
+  if (patch.hitFlash !== undefined && typeof patch.hitFlash !== "boolean")
+    throw new Error("hitFlash must be a boolean");
   return {
     version: 1,
     drawDistance: patch.drawDistance ?? current.drawDistance,
     entityLimit: patch.entityLimit ?? current.entityLimit,
     population: patch.population ?? current.population,
     showPerformance: patch.showPerformance ?? current.showPerformance,
+    cameraShake: patch.cameraShake ?? current.cameraShake ?? DEFAULT_SETTINGS.cameraShake,
+    hitFlash: patch.hitFlash ?? current.hitFlash ?? DEFAULT_SETTINGS.hitFlash,
   };
 }
 export function parseSettings(raw: string | null): Settings {

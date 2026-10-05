@@ -202,6 +202,17 @@ export function validateAdventure(s: AdventureState): void {
       hero.bought.every((v) => id(v)),
       "stock ids",
     );
+    // M09 recoil (absent in older saves; restore adds it).
+    if (hero.recoil !== undefined)
+      check(
+        hero.recoil &&
+          typeof hero.recoil === "object" &&
+          Object.keys(hero.recoil).length === 6 &&
+          (["lean", "leanRate", "swing", "swingRate", "vx", "vy"] as const).every((key) =>
+            finite(hero.recoil[key], 1e6),
+          ),
+        "hero recoil",
+      );
   }
   list(s.enemies, 256);
   const enemies = new Set<number>();
@@ -252,7 +263,18 @@ export function validateAdventure(s: AdventureState): void {
       "enemy state",
     );
     check(
-      ["walk", "windup", "charge", "recover", "dead"].includes(enemy.phase) &&
+      (enemy.reaction === undefined ||
+        (enemy.reaction &&
+          typeof enemy.reaction === "object" &&
+          Object.keys(enemy.reaction).length === 12 &&
+          (["lean", "leanRate", "pitch", "pitchRate", "poise", "knockX", "knockY"] as const).every(
+            (key) => finite(enemy.reaction[key], 1e6),
+          ) &&
+          (["staggerUntil", "toppleAt", "toppleUntil", "shed"] as const).every((key) =>
+            integer(enemy.reaction[key], 0, 1e15),
+          ) &&
+          [-1, 1].includes(enemy.reaction.side))) &&
+        ["walk", "windup", "charge", "recover", "dead"].includes(enemy.phase) &&
         typeof enemy.boss === "boolean" &&
         typeof enemy.elite === "boolean" &&
         typeof enemy.counted === "boolean",
@@ -358,6 +380,7 @@ export function validateAdventure(s: AdventureState): void {
           "grab",
           "assembly",
           "reaction",
+          "rig",
         ].includes(e.type),
       "event",
     );
