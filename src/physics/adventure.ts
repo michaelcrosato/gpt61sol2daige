@@ -864,7 +864,10 @@ export class AdventurePhysics {
       seed: this.seed,
       world: this.world.save(portable),
       terrainChunks: this.terrain.save(),
-      ambient: structuredClone([...this.ambient.values()]),
+      ambient: [...this.ambient.values()].map((sample) => ({
+        ...sample,
+        regions: [...sample.regions],
+      })),
       archives: structuredClone([...this.archives.values()]),
       navigation: structuredClone([...this.navigation.values()]),
       appliedTransition: this.appliedTransition,

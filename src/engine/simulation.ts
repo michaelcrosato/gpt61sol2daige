@@ -716,13 +716,20 @@ export class Simulation {
     const adventure = JSON.stringify(this.adventure.state);
     for (let i = 0; i < adventure.length; i++)
       h = Math.imul(h ^ adventure.charCodeAt(i), 16777619) >>> 0;
+    // Raw Rapier bytes enter through the snapshot's own checksum field. Serializing the byte
+    // array as JSON dominated every observation of a large physical scene.
     if (this.playground) {
-      const physics = JSON.stringify(this.playground.save());
+      const saved = this.playground.save();
+      const physics = JSON.stringify({ ...saved, bytes: saved.bytes.length });
       for (let i = 0; i < physics.length; i++)
         h = Math.imul(h ^ physics.charCodeAt(i), 16777619) >>> 0;
     }
     if (this.physical) {
-      const physics = JSON.stringify(this.physical.save());
+      const saved = this.physical.save();
+      const physics = JSON.stringify({
+        ...saved,
+        world: { ...saved.world, bytes: saved.world.bytes.length },
+      });
       for (let i = 0; i < physics.length; i++)
         h = Math.imul(h ^ physics.charCodeAt(i), 16777619) >>> 0;
     }

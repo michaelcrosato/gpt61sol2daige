@@ -100,9 +100,29 @@ function cloneRecipe(recipe: BodyRecipe): BodyRecipe {
   if (recipe.blueprint) copy.blueprint = { ...recipe.blueprint };
   return copy;
 }
-/** Memoized policies are deeply frozen and shareable; others belong to a body and are copied. */
-const clonePolicy = (policy: ResolvedPolicy): ResolvedPolicy =>
-  Object.isFrozen(policy) ? policy : structuredClone(policy);
+/** Same keys and order as structuredClone(entry), without its per-call cost on every save. */
+function cloneEntry(entry: BodyEntry): BodyEntry {
+  const copy: BodyEntry = { ...entry, recipe: cloneRecipe(entry.recipe) };
+  if (entry.policy) copy.policy = clonePolicy(entry.policy);
+  if (entry.policySample) copy.policySample = { ...entry.policySample };
+  if (entry.drive) copy.drive = { ...entry.drive };
+  if (entry.motor) copy.motor = { ...entry.motor };
+  if (entry.state)
+    copy.state = {
+      ...cloneRecipe(entry.state),
+      policy: clonePolicy(entry.state.policy),
+    } as BodyPose;
+  return copy;
+}
+/** A resolved policy holds three flat records, two strings and a list; copying them directly
+ * keeps key order and gives every caller (and every save) an object it owns. */
+const clonePolicy = (policy: ResolvedPolicy): ResolvedPolicy => ({
+  ...policy,
+  values: { ...policy.values },
+  effective: { ...policy.effective },
+  provenance: { ...policy.provenance },
+  regions: [...policy.regions],
+});
 export const bodyRole = (recipe: BodyRecipe) =>
   recipe.role ?? (recipe.motion === "fixed" ? "terrain" : "prop");
 const collisionGroups = (entry: BodyEntry) => {
@@ -725,7 +745,7 @@ export class PhysicsWorld {
       contacts: this.contacts,
       events: structuredClone(this.events),
       bodies: [...this.registry.values()].map((entry) => ({
-        ...structuredClone(entry),
+        ...cloneEntry(entry),
         state: this.pose(entry.recipe.id),
       })),
       bytes,
