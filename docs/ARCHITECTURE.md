@@ -224,3 +224,39 @@ Adventure envelope **4** adds the combat state. Physical world **6** changes pro
 
 **Versions.** Physical world **7** adds `assemblies` and `joints`; adventure envelope **5** adds mechanism state and archives a land's assemblies, joints and mechanisms with its props. Room protocol **8**. Real M06 checkpoints migrate: mechanisms join the active land once, and an archived pre-M07 land gains them when it is entered again; destruction is kept.
 
+
+## M08 material reactions and environmental fields
+
+`ReactionPhysics` (`src/physics/reactions.ts`) belongs to the host's adventure physics beside `CombatPhysics` and `MechanismPhysics`. It owns:
+- **Statuses** per body (props and `enemy-<id>`): remaining ticks of `burning`, `wet`, `oiled`, `charged` and a volatile's `fuse`, brazier `heat`, a `charred` (burnt-out or spent) flag, and the chain, depth and owner that last changed it.
+- **Surfaces**: water puddles and oil slicks (an oil slick can burn) with a centre, radius and remaining ticks.
+- **Fields**: `wind` lanes and circular `pressure`, `attract`, `repel` and `vortex` fields with a strength, remaining ticks (−1 for authored lanes), gust amplitude and owner.
+- **Delayed reactions** (fuses, spreading fire and discharge hops), **chains** and a bounded event history.
+
+**Rules.** `RULES` is the data registry: each row names its trigger (`fire`, `water`, `oil`, `shock`, `blast`, contact, timer or break), whether it is propagation, and every parameter the resolver reads. Ignite (flammable material or any oil coat, dry), steam (fire on a wet body boils off 300 ticks of wetness instead), extinguish, soak, coat, flare (oil slicks burn), spread, burn (9 durability or 6 health per half second; ×1.5 oiled), burnout (dry brush and cloth crumble to ash where destruction is allowed; everything else chars), dry, conduct, detonate, spill, release, field and heat. `REACTIVITY` gives each material's fuel and windage: flammable means `flammability > 0`, conductive means `conductivity ≥ 0.5` or wet or standing in a puddle. Water casks spill water, oil jars spill oil (fire bursts a jar into a burning slick), lanterns release fire and Stormglass pylons release a discharge.
+
+**Chains** (D55, D56). Every primary stimulus starts a chain with an owner. A rule applies to a target once per chain (`rule|target` keys). Discharges hop from conductor to conductor within 72 units (anything touching a conductor, creatures and volatile or brittle props, is shocked but does not carry it on), losing 15% per hop down to a 0.2 floor. Fuses (50 ticks lit, 8 sparked, 12 sympathetic) end in an explosion: a 4-tick pressure field (2,400 units/s²), blast damage with falloff (42 to monsters, 60 to props within 100 units), then fire within 70 and sympathetic detonations as propagation. Direct effects ignore `chainReactions`; propagation (depth + 1) is gated at its source when queued and every tick while pending.
+
+**Order.** `AdventurePhysics.solve` applies fields as velocity changes before the solve (`PhysicsWorld.fieldPush`), then after the solve, impacts and mechanisms, runs `ReactionPhysics.update`:
+1. Retire bodies that left and spent transient fields.
+2. Wading: water terrain keeps bodies soaked and puts out what burns.
+3. Brazier contact: 18 ticks of contact build heat to ignition; oil touching a lit brazier flares.
+4. Status timers in id order, skipping paused bodies: burn pulses, spread queues and fuses that reach zero explode.
+5. Surfaces: soak or oil what stands in them; burning slicks light it; water puts slicks out.
+6. Due delayed events in `(due, id)` order.
+
+Reaction damage and events wait for `Adventure.step`, which applies monster damage through the ordinary hit path (credited to the chain owner, never a team-`enemy` reaction against monsters) and scenery damage through `damageProps` with the chain id, so breaks, spills and rewards follow the M05/M06 paths. Reaction events become `reaction` combat events (`ignite:<material>`, `spread:<material>`, `steam`, `extinguish`, `flare`, `conduct:source|arc`, `discharge`, `detonate:fuse|spark|sympathetic`, `blast`, `spill:water|oil`, `release:fire|shock`, `burnout:ash|char`, `field:fan`, `heat`). Soak and coat stay in the reaction history only.
+
+**Sources in play.**
+- Burning strikes (a hero with Cinderwake's buff or a burn skill) ignite the flammable scenery they hit.
+- Struck storm coils discharge (120-tick cooldown).
+- Struck fans blow a 230 × 84 lane at 900 units/s² for 240 ticks.
+- Stormglass activations also discharge.
+- Gravity Knots add a 170-unit attraction field for props, debris and loot.
+- Riftstep arrivals add an 8-tick repelling field.
+- Slipstream activations add a 90-unit vortex.
+- Each area has a reaction yard (D59) and a gusting wind lane over its meadow vane; wind turns the vane.
+
+**Versions.** Physical world **8**: policy samples carry `materialReactions`, `chainReactions`, `environmentalForces` and `fieldStrength`, and older samples are recomputed and proven unchanged. Adventure envelope **6**: `reactions`. Land archives keep a land's reactions with relative fuse and cooldown timers and drop monster statuses. Room protocol **9**. Real M07 checkpoints migrate: yards and wind lanes join the active land once, and an archived pre-M08 land gains them on return.
+
+**Presentation** (`src/render/reactions.ts`): flames, drips, oil sheen, crackle, fuse sparks and char on props and monsters; puddles and slicks under everything; wind streaks, swirls and rings; arcs, blasts, splashes, steam puffs and short labels; six new synthesized voices (ignite, hiss, zap, boom, splash, gust).

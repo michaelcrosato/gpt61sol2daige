@@ -57,6 +57,8 @@ Reaction rules are explicit transformations such as `hot + dry wood -> burning`,
 
 Base combat damage, skill unlocks and the original mechanic benefits remain gameplay-owned. Turning environmental reactions off does not turn off the player's sword, Cinderwake's established combat benefit or the exit portal. See [POLICIES.md](POLICIES.md) for the distinction.
 
+M08 delivers this as `ReactionPhysics`: a rule registry, statuses, surfaces, fields and causal chains (D54–D60). See the [M08 contract](../ARCHITECTURE.md#m08-material-reactions-and-environmental-fields) and [handoff](handoffs/M08.md).
+
 ## Terrain and persistence
 
 Build physical obstacles from terrain/decoration recipes near occupied or explicitly loaded regions, independently of camera visibility. A collider's stable key includes land identity and tile/object identity. Region unloading removes runtime handles but retains meaningful mutations: broken tree, moved reward container, destroyed wall or claimed loot. Cosmetic transients may have an authored lifetime; expiry must be declared rather than silently tied to performance.
