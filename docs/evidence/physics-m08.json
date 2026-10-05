@@ -4,23 +4,9 @@
   "date": "2026-10-05",
   "yard": {
     "perArea": 15,
-    "families": [
-      "brazier",
-      "jar",
-      "brush",
-      "barrel",
-      "cask",
-      "rod",
-      "coil",
-      "fan"
-    ],
+    "families": ["brazier", "jar", "brush", "barrel", "cask", "rod", "coil", "fan"],
     "minimumRouteOffset": 104,
-    "authoredFields": [
-      "wind-1",
-      "wind-2",
-      "wind-3",
-      "wind-4"
-    ]
+    "authoredFields": ["wind-1", "wind-2", "wind-3", "wind-4"]
   },
   "registry": {
     "rules": 16,
@@ -30,12 +16,7 @@
   "fire": {
     "burnTicks": 540,
     "durabilityAfter65Ticks": 32.5,
-    "spreadTo": [
-      "crate-1-1",
-      "crate-1-2",
-      "crate-1-3",
-      "wheel-1"
-    ],
+    "spreadTo": ["crate-1-1", "crate-1-2", "crate-1-3", "wheel-1"],
     "extinguished": true,
     "wetTicks": 900,
     "durabilityAfterDousing60Ticks": 32.5,
@@ -96,23 +77,13 @@
       "soak|prop-barrel-1-2-plank2"
     ],
     "arcs": 16,
-    "rules": [
-      "conduct",
-      "detonate",
-      "spill",
-      "soak",
-      "ignite",
-      "steam",
-      "extinguish"
-    ],
+    "rules": ["conduct", "detonate", "spill", "soak", "ignite", "steam", "extinguish"],
     "owner": "local"
   },
   "explosion": {
     "fuseTicks": 50,
     "victimKilled": true,
-    "killCredit": [
-      "local"
-    ],
+    "killCredit": ["local"],
     "bystanderDamage": 36,
     "bystanderPushed": 20.91,
     "dynamicPropsInRange": 3,
@@ -129,10 +100,7 @@
       "prop-fence-1-2:local:blast",
       "prop-barrel-1-2:local:blast"
     ],
-    "surfaces": [
-      "water-prop-cask-1-0",
-      "water-prop-cask-1-1"
-    ]
+    "surfaces": ["water-prop-cask-1-0", "water-prop-cask-1-1"]
   },
   "chain": {
     "events": [
@@ -174,15 +142,7 @@
       "150 extinguish extinguish prop-barrel-1-2-plank2 d5",
       "150 soak soak prop-barrel-1-2-plank2 d5"
     ],
-    "rules": [
-      "ignite",
-      "spread",
-      "detonate",
-      "spill",
-      "soak",
-      "steam",
-      "extinguish"
-    ],
+    "rules": ["ignite", "spread", "detonate", "spill", "soak", "steam", "extinguish"],
     "depth": 6,
     "eventCount": 37,
     "destroyed": [
@@ -198,18 +158,14 @@
       "prop-barrel-1-2:local:blast"
     ],
     "monsterKilled": true,
-    "kills": [
-      "local"
-    ],
+    "kills": ["local"],
     "hash": "89ebdc85",
     "reproducible": true
   },
   "policies": {
     "chainOff": {
       "neighbourBurning": 0,
-      "coilVisited": [
-        "conduct|prop-coil-1-0"
-      ]
+      "coilVisited": ["conduct|prop-coil-1-0"]
     },
     "materialOff": {
       "pausedBurning": 537,
