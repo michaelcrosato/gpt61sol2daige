@@ -260,3 +260,50 @@ Reaction damage and events wait for `Adventure.step`, which applies monster dama
 **Versions.** Physical world **8**: policy samples carry `materialReactions`, `chainReactions`, `environmentalForces` and `fieldStrength`, and older samples are recomputed and proven unchanged. Adventure envelope **6**: `reactions`. Land archives keep a land's reactions with relative fuse and cooldown timers and drop monster statuses. Room protocol **9**. Real M07 checkpoints migrate: yards and wind lanes join the active land once, and an archived pre-M08 land gains them on return.
 
 **Presentation** (`src/render/reactions.ts`): flames, drips, oil sheen, crackle, fuse sparks and char on props and monsters; puddles and slicks under everything; wind streaks, swirls and rings; arcs, blasts, splashes, steam puffs and short labels; six new synthesized voices (ignite, hiss, zap, boom, splash, gust).
+
+## M09 physical rigs and expressive reactions
+
+**Rig recipes** (`src/game/rigs.ts`, engine-safe). Each of the six monster rigs is a tree of parts. A part has:
+- a socket (its pivot on its parent, in sprite units with the origin at the feet), a mass share and hinge limits;
+- a material (vegetation, wood, cloth, metal or glass) and its own pixel art;
+- secondary-motion `follow` and `lag`, and an authored animation channel (leg, arm, tail, antenna, head) with a windup `lift`;
+- optionally `detach`: `hit` armor and bark (brute bark plates, warden metal plates and emblem, totem crown) or a `death` piece (the wraith's glass lantern core).
+
+Collider boxes are measured from each part's own art (`rigGeometry`), so a ragdoll limb is exactly the shape that is drawn. Each blueprint also sets its locomotion (`grounded`, `floating` or `rooted`), death style (`topple`, `flip`, `collapse` or `fell`), lean spring, poise thresholds, knockback multiplier and ragdoll mass. `rigExport()` serves agents and docs.
+
+**Living rigs** stay one Rapier actor each (no per-limb bodies while alive). `Enemy.reaction` is authoritative, saved and replicated in the room header:
+- a screen-space lean spring and a vertical squash spring;
+- poise, `staggerUntil`, a knockdown (`toppleAt`, `toppleUntil`, side);
+- the latest blow (`knockX`, `knockY`) and a `shed` mask.
+
+`stepReaction` advances it every tick. `hitReaction` adds recoil (`recoil × knock × reaction strength`) and poise (`(10 + % of max health) × strength`). Past a rig's thresholds the monster staggers (the windup or charge is interrupted, the motor slows) or is knocked down. A knocked-down monster neither steers nor attacks until it rises. Stagger, knockdown and shedding need effective world reactions. Bosses only stagger, at 2.5× poise, and rooted totems never fall over.
+
+`enemyPose(e, tick)` turns authored channels plus `follow × lean + lag × lean rate` into part angles within limits. A knockdown rotates the figure about its fall pivot: grounded rigs fall over, the crawler flips onto its back, and the wraith scatters. Renderer and physics use the same function.
+
+**Death transfer** (`src/physics/rigs.ts`, `AdventurePhysics.retire`). At the first boundary after a kill, the actor body leaves the solver and, in the same tick, `remainsRecipes` builds the remains from the drawn pose at that tick:
+- one dynamic `remains` prop per part (`prop-remains-<enemy>-<part>`), joined by unbreakable limited hinges into a `remains-<enemy>` assembly whose root is the first part;
+- detachables not already shed as loose material props.
+
+The bodies lie where the art would lie after the fall: rotated through `fallAngle` (away from the killing blow and mostly sideways, π for a crawler, a slump for a wraith) about the rig's fall pivot. A felled totem keeps its roots as a fixed body. Every body carries the actor's velocity plus 0.35 × the killing knock.
+
+The fall itself is presentation over solved bodies: for `fallTicks` the renderer rotates the assembled parts back about the pivot by the part of the fall still to come, as a rigid rotation. The figure never separates, and it lands on the bodies' actual poses. A `fall:<rig>:<material>` rig event marks the landing. Fire, water, oil and charge on the monster pass to the remains' root.
+
+Remains are `remains` family props with a validated `RemainsTag` (rig, part, theme, variant, scale, mirror, enemy, birth tick, fall angle and pivot). Agents, fields, Whorl, grabs, fire and impact damage treat them as props. Joints cannot be cut, the family cannot be damaged, and burnt remains char rather than turn to ash.
+
+**Collision.** Remains use their own interaction bit. They meet terrain, props and travelers but never each other, and sit in dominance group −1, so everything pushes them and they block nobody. Frozen remains meet only terrain.
+
+**Controls.**
+- `ragdolls` freezes jointed remains in place; loose pieces follow `dynamicProps`.
+- Where ragdolls are off at death, no bodies are made: the enemy record shows the authored death pose (the same fall, faded out with the 40-tick record).
+- Remains are cosmetic transients: they leave whole (`PhysicsWorld.removeAssembly`) 2,700 ticks (45 s) after death, and never enter land archives.
+
+**Wayfarer and townsfolk.**
+- `Hero.recoil` holds a lean and a lantern pendulum stepped from the traveler's acceleration and blows. It is presentation-only in effect: input and movement are untouched.
+- In town, each townsperson is a physical actor (`npc-<id>`, mass 0.8). Travelers always touch them, whatever the town's crowd contacts. A motor walks them back along their authored stroll, and a traveler's shove emits `npc:bump:<id>`.
+- Services are offered where the townsperson stands now.
+
+**Foliage** (`RigPhysics`). Trees and brush carry a saved bend spring, excited by wind and pressure fields (scaled by field strength where environmental forces are on), bodies brushing past and blows. Where `foliage` is off, nothing excites it and it relaxes to rest.
+
+**Versions.** Physical world **9**: every collision filter changed, so older raw bytes rebuild semantically, and policy samples gain `ragdolls`, `foliage` and `reactionStrength`. Adventure envelope **7**: `rigs` (remains records, foliage bend, pending rig events). Room protocol **10**: the header carries enemy reactions, hero recoil and `rig` events.
+
+**Presentation** (`src/render/rigs.ts`). Part images are rasterized once per rig, theme, variant and part, and drawn with per-part transforms. Living figures get a ground shadow that stretches when knocked down and shrinks under a hover, emissive light from glowing parts, and a hurt flash. Remains are drawn as one y-sorted group at their lowest point, with soft per-part shadows, a fade before expiry and a still marker where frozen. Two new voices: thud and flutter. Camera shake strength and hit/blast flashes are local `Settings` preferences, never simulation state.

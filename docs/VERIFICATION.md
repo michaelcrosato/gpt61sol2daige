@@ -227,3 +227,31 @@ In the browser, real V/WASD/mouse input carries an oil jar onto the brazier unti
 Feedback-volume note: with a reaction yard beside every clearing, a long fight produces more events. Two M05 browser and headless checks now read the full event ring (or collect events as they happen) instead of the latest 12 or 96 entries; their assertions are unchanged.
 
 Rendering and simulation cost (informational, D53): with no other load, reactions add about 8% to a headless combat tick (median 15.7 ms against 14.5 ms with all three switches off, 2,400 creatures). In the browser, 47 burning bodies add about 7 ms per frame (36 ms against 29). Two pre-existing per-tick and per-frame pose clones were removed: terrain synchronization and the renderer now read positions directly. The full-population browser clear (64.9 s against 64.1 s on `main` in the same container) was given more wall-clock time.
+
+## M09 physical rigs evidence
+
+On 2026-10-05:
+- `npm run check` passed **134 headless tests** and `npm run build` produced the bundle.
+- `npm run test:e2e` passed **E2E_COUNT browser scenarios**, including three new M09 scenarios and the preserved WebRTC smoke checks ([D53](physics/DECISIONS.md)).
+- `npm run verify:run` cleared all nine areas (level 18, 2,659 gold; [route](evidence/physics-m09-route.jsonl)). Staggers and knockdowns now interrupt monster attacks.
+
+The numbers below come from the [receipt](evidence/physics-m09.json) (`node tools/physics-rigs.ts`; seed 142, area 1, other monsters removed).
+
+| M09 acceptance | Evidence |
+| --- | --- |
+| Six rigs, each with an inspected moving capture of a distinct hit and death response | The [frame-by-frame sheet](evidence/physics-m09-steps.png) (idle, hit, recoil, knockdown, recovered, death, falling, landed, rest; one row per rig) and a [real-input video](evidence/physics-m09-rigs.webm) of held-mouse slashes felling each rig. Peak lean from one 20-damage blow: <ul><li>wraith 0.75 rad (floating sway);</li><li>stalker 0.56;</li><li>crawler 0.32;</li><li>totem 0.29, displaced only 2.4 units against the stalker's 9.8 (rooted);</li><li>brute and warden 0.21.</li></ul> Under sustained 70-damage blows: <ul><li>a wraith goes down after 7, a stalker and a crawler after 8, a brute after 14 and a warden after 23;</li><li>a totem only staggers (30 blows, five staggers) and sheds its crown;</li><li>bosses only stagger.</li></ul> Deaths: <ul><li>stalker, brute and warden topple sideways (fall 1.69 rad);</li><li>the crawler flips onto its back (2.98 rad);</li><li>the wraith's shroud slumps (0.77 rad) and spreads while its glass core rolls loose;</li><li>the totem's trunk is felled while its roots stay a fixed body.</li></ul> Ragdolls have 4–10 jointed bodies, the brute and warden lose 3–4 armor or bark props, and each lands once, 14–30 ticks after death, with `fall:<rig>:<material>`. |
+| A dead body reacts to Whorl or a field, then freezes or settles when ragdolls are disabled; saves cannot revive it or repeat its reward | A settled stalker ragdoll is thrown 90.1 units by Whorl and carried 103.7 by a wind lane. With ragdolls off (an area override, or the Agent lab panel in the browser) every jointed body freezes and another Whorl moves it 0. Re-enabling wakes it in place with zero motion, and it reacts again. Raw saves continue with an identical state hash. After restore, 0 monsters are alive, kills stay 1 → 1 and no new drop exists. A page save/restore in the browser keeps kills single. Where ragdolls are already off at death, no bodies are made and the authored fall plays and fades. |
+| Limbs stay with their art; interpolation, joint limits and ground contact stay legible | Every part's collider equals its art bounds (all rigs, all four variants, tested). At spawn, each hinge's two anchors coincide, and the root sits where the drawn root was, turned through the fall. After 200 ticks and a Whorl every hinge's gap is 0.000 and its relative angle is within limits (±0.08). The fall is drawn as a rigid rotation that lands on the solved poses. Remains have ground shadows per part, sort as one body at their lowest point and fade before their 45 s expiry. |
+| The player responds immediately; NPC services stay usable; desktop and mobile agree; guests receive the same poses and results | With and without a large injected recoil (lean 0.25, lantern 0.9), the wayfarer's trajectory is identical and a reversal is followed at once. In town the traveler shoves Rowan 29.7 units (`npc:bump:rowan`, a startled mark), the shop opens where Rowan stands, and Rowan walks back to within 2.1 units in 4 s. A touch Slash fells a stalker the same way a mouse does. A guest's portable scene holds identical remains bodies and rig state, and `enemyPose` on a decoded header equals the host's. Local camera shake and flashes set to 0 report 0 in `observe().render.feedback`. |
+
+Also covered:
+- **Shedding:** brute bark is wood, warden plates are metal and totem crowns are wood, never duplicated at death.
+- **Status transfer:** a burning monster's remains keep burning.
+- **Expiry:** 2,700 ticks remove the whole assembly, its joints and its record.
+- **Foliage:** a wind lane bends a tree canopy, walking through brush bends it, and foliage off returns both to rest and ignores blows.
+- **Reaction strength 0:** no recoil or stagger.
+- **Master off:** recoil shows, but no stagger, knockdown or shedding.
+- **Determinism:** two runs of the same six-rig fight hash equal.
+- **M08 migration:** a real M08 checkpoint (envelope 6 / world 8, from `main` `a53af8d`) restores to envelope 7 / world 9 with rigs at rest, and its earlier death makes no remains.
+
+Captures: [Whorl](evidence/physics-m09-whorl.png), [settled with ragdolls off](evidence/physics-m09-settled.png), [town shove](evidence/physics-m09-town-shove.png), [touch stalker](evidence/physics-m09-touch-stalker.png).

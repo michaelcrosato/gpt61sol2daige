@@ -72,6 +72,25 @@ Both switches are gated by world reactions; master-off is absolute. A connected 
 
 All four are gated by world reactions; master-off is absolute. A reaction is checked at its source (propagation) and accepted at its target (material reactions): fire spreading along a fuse stops at a protected segment and never reaches the keg beyond it. Statuses and surfaces carry their chain's owner; reaction damage credits that owner like an M06 impact. Presets: Quiet turns all three switches off; Sanctuary turns material and chain reactions off and sets field strength 0.35 (a gentle breeze); Wild doubles field strength. Turning a feature back on resumes from the paused counters: no accumulated burst (measured 0 extra events).
 
+## M09 delivered controls
+
+| Value | Meaning | Off / zero |
+| --- | --- | --- |
+| `ragdolls` (boolean, default on) | A monster that dies here becomes a jointed ragdoll of its parts. The ragdoll carries the body's momentum and the killing blow. Whorl, fields, blasts, grabs and passing bodies move it, and it lands with a material thud. | No bodies are made at death: the authored death pose plays (the same fall) and fades with the enemy record. Existing ragdolls freeze where they lie, as non-reactive corpses, and meet only terrain. Loose armor and bark follow `dynamicProps`. Re-enabling wakes them in place with zero motion. Nothing is revived and no reward is repeated. |
+| `foliage` (boolean, default on) | Trees and brush bend to wind and pressure fields (scaled by field strength where environmental forces are on), to bodies brushing past and to blows. The bend is saved and replicated. | Nothing new bends them; they return to rest and show no idle sway. Colliders follow each plant's role, as before. |
+| `reactionStrength` (0–10, default 1) | Multiplies rig recoil (lean), poise build-up toward stagger and knockdown, and the hero's recoil. | 0: rigs only flash when hit; there is no recoil, stagger, knockdown or shedding. Base damage and knockback are unchanged. |
+
+All three are gated by world reactions, and master-off is absolute for `ragdolls`, `foliage`, stagger, knockdown and shedding. A blow's recoil still shows under master-off, unless reaction strength is 0.
+
+A ragdoll resolves its policy at its root part, like any assembly (M07), so a corpse lying across a region boundary freezes or wakes whole.
+
+Presets:
+- Quiet turns ragdolls and foliage off.
+- Sanctuary keeps them on, with reaction strength 0.35.
+- Wild doubles reaction strength.
+
+Camera shake and hit/blast flashes are local device preferences (Settings), never policies: they change nothing in the world, saves or replays.
+
 ## Scope and precedence
 
 Resolve values in this order: engine defaults, land profile, area profile, containing named region, then applicable live debug overrides. A more specific live override wins over a broader live override; the session-wide master `worldReactions = false` is an absolute off switch. Within one specificity, use declared priority and stable region ID to break ties. Show the effective value and the source that supplied it.

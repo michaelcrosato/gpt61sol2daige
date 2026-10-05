@@ -378,3 +378,38 @@ Yard ids per area N: `prop-brazier-N-0`, `prop-jar-N-0..1` (oil), `prop-brush-N-
 ```
 
 That reproduces the fuse chain: the brush burns segment by segment, lights the keg's fuse, and the explosion breaks the water casks, which spill and steam the debris. Reaction changes appear as `reaction` events with the chain owner. New policy values: `materialReactions`, `chainReactions`, `environmentalForces` (booleans) and `fieldStrength` (0–10). Saves write adventure envelope 6 / world 8; rooms use protocol 9. See [the M08 contract](ARCHITECTURE.md#m08-material-reactions-and-environmental-fields).
+
+## M09 physical rigs and reactions
+
+| Command | Fields and behavior |
+| --- | --- |
+| `{"op":"actors","action":"rigs"}` | Returns, read-only and on guests too: <ul><li>the rig registry: each rig's parts with sockets, mass shares, limits, materials, follow/lag, channels, detachables and art-measured geometry, plus the reaction and death rules;</li><li>every monster's `reaction` (lean, poise, stagger, knockdown, last blow, shed mask) and its drawn part pose;</li><li>remains records (enemy, rig, birth and landing ticks, fall angle) with each body's pose, motion, `frozen`, material, part and `loose`;</li><li>loose pieces, foliage bend and townsfolk positions and shove.</li></ul> |
+| `{"op":"actors","action":"monster","rig":"brute","x":600,"y":0,"hp":400,"passive":true,"clear":true}` | QA. Places a monster with the chosen rig in the current area, uncounted for the area goal. Options: <ul><li>`passive`: planted and never attacking;</li><li>`boss`;</li><li>`clear`: other live monsters leave without reward, and the area spawns no further waves or boss (it cannot be cleared afterwards).</li></ul> Returns `{id, body, rig, hp}`. Host only. |
+| `{"op":"actors","action":"hit","id":"enemy-12","damage":40,"angle":0}` | One blow through the ordinary hit path, credited to the caller, from the direction `angle` (the blow travels along it). Recoil, poise, stagger, knockdown, shed armor, the kill, its rewards and the remains follow exactly as in play. Host only. |
+
+Remains ids:
+- `prop-remains-<enemy>-<part>` for each part, in assembly `remains-<enemy>`;
+- `prop-remains-<enemy>-<piece>` for loose armor, bark and lantern cores.
+
+Their `blueprint.rig` tag names the rig, part, theme, variant, scale, mirroring, birth tick, fall angle and fall pivot. Townsfolk bodies are `npc-rowan`, `npc-iona` and `npc-orin`, present in town only.
+
+Rig events (`rig` combat events):
+- `stagger:<rig>` and `topple:<rig>`;
+- `shed:<rig>:<material>`;
+- `fall:<rig>:<material>` when remains reach the ground;
+- `npc:bump:<id>`.
+
+```json
+{"op":"encounter","index":1}
+{"op":"actors","action":"monster","rig":"stalker","x":520,"y":-24,"hp":120,"passive":true,"clear":true}
+{"op":"actors","action":"hit","id":"enemy-12","damage":5000,"angle":0}
+{"op":"step","ticks":30}
+{"op":"actors","action":"rigs"}
+```
+
+That kills the stalker and leaves a six-body ragdoll lying to the east. Use the monster's actual id from `monster`'s result.
+- New policy values: `ragdolls` and `foliage` (booleans) and `reactionStrength` (0–10).
+- Saves write adventure envelope 7 / world 9; rooms use protocol 10.
+- Local `Settings` gain `cameraShake` (0–1) and `hitFlash` (boolean), and `observe().render.feedback` reports the last frame's shake and flash.
+
+See [the M09 contract](ARCHITECTURE.md#m09-physical-rigs-and-expressive-reactions).

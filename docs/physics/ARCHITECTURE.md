@@ -59,6 +59,14 @@ Base combat damage, skill unlocks and the original mechanic benefits remain game
 
 M08 delivers this as `ReactionPhysics`: a rule registry, statuses, surfaces, fields and causal chains (D54–D60). See the [M08 contract](../ARCHITECTURE.md#m08-material-reactions-and-environmental-fields) and [handoff](handoffs/M08.md).
 
+M09 adds physical rigs (D61–D68):
+- Rig recipes are part trees whose colliders are measured from their art.
+- Living monsters stay one actor each, with an authoritative lean and poise state.
+- At death the drawn pose and momentum become a jointed ragdoll; armor and bark come loose as material props.
+- The wayfarer gets controlled recoil, townsfolk are shoved and recover, and foliage bend is saved state.
+
+See the [M09 contract](../ARCHITECTURE.md#m09-physical-rigs-and-expressive-reactions) and [handoff](handoffs/M09.md).
+
 ## Terrain and persistence
 
 Build physical obstacles from terrain/decoration recipes near occupied or explicitly loaded regions, independently of camera visibility. A collider's stable key includes land identity and tile/object identity. Region unloading removes runtime handles but retains meaningful mutations: broken tree, moved reward container, destroyed wall or claimed loot. Cosmetic transients may have an authored lifetime; expiry must be declared rather than silently tied to performance.
