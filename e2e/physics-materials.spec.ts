@@ -52,7 +52,16 @@ test("real attacks break material scenery in the renderer, with feedback, reward
   const shards = broken.props.filter((p) => p.blueprint?.parent === "prop-pylon-1-0");
   expect(shards.length).toBe(5);
   expect(shards.every((p) => p.material === "glass")).toBe(true);
-  const events = (await page.evaluate(() => window.fern.game.observe())).events;
+  // The full 96-event ring: a Stormglass pylon now also releases its charge (M08), whose arcs
+  // follow the break inside the 12-event observation window.
+  const events = await page.evaluate(
+    () =>
+      (
+        window.fern.command({ op: "save" }) as {
+          adventure: { events: { type: string; text: string }[] };
+        }
+      ).adventure.events,
+  );
   expect(events.some((e) => e.type === "break" && e.text === "pylon:glass")).toBe(true);
   // The agent damage path breaks a tree (140 toughness: four 40-point hits) into a fixed stump
   // and pushable log, and a wagon (120 toughness: two 60-point hits) into planks and wheels.

@@ -243,6 +243,12 @@ test("continuous contact and repeated hits never destroy or reward an object twi
   try {
     const physical = sim.physical!;
     let barrel = physical.world.pose("prop-barrel-1-0");
+    // Break events are collected as they happen: M08 reactions (the volatile barrel next door,
+    // the reaction yard the barrel is knocked into) add enough feedback to cycle the 96-event ring.
+    const breaks = new Map<number, string>();
+    const collect = () => {
+      for (const e of sim.adventure.state.events) if (e.type === "break") breaks.set(e.id, e.text);
+    };
     // Real slashes through player input: the same path a person uses. Hits knock the barrel
     // back, so each swing follows it (and keeps striking where it broke afterwards).
     const swing = () => {
@@ -250,8 +256,12 @@ test("continuous contact and repeated hits never destroy or reward an object twi
       sim.teleport("local", barrel.x - 24, barrel.y);
       sim.setInput("local", { attack: true, aimX: 1, aimY: 0 });
       sim.step();
+      collect();
       sim.setInput("local", {});
-      sim.step(24);
+      for (let k = 0; k < 24; k++) {
+        sim.step();
+        collect();
+      }
     };
     const destroyed = () => physical.destroyedRecords().some((r) => r.id === "prop-barrel-1-0");
     for (let n = 0; n < 40 && !destroyed(); n++) swing();
@@ -265,9 +275,10 @@ test("continuous contact and repeated hits never destroy or reward an object twi
     const pieceIds = after.flatMap((r) => r.pieces);
     assert.equal(new Set(pieceIds).size, pieceIds.length);
     assert.equal(
-      breakEvents(sim).filter((text) => text.startsWith("barrel:")).length,
+      [...breaks.values()].filter((text) => text.startsWith("barrel:")).length,
       after.filter((r) => r.family === "barrel").length,
     );
+    assert.equal(breaks.size, after.length, "one break event per destroyed parent");
     const hero = sim.adventure.hero("local");
     assert.equal(
       hero.gold + goldDrops(sim) - 80,
@@ -334,7 +345,7 @@ test("save/load, replay, recall and late-join replicas preserve the same destruc
     } finally {
       guest.dispose();
     }
-    assert.equal(PROTOCOL_VERSION, 8);
+    assert.equal(PROTOCOL_VERSION, 9);
     assert.ok(encodeSnapshot(sim, "local").byteLength > 0);
     assert.throws(
       () =>
@@ -407,8 +418,8 @@ test("real M04 checkpoints migrate: exact legacy bodies, M05 content added once,
       assert.equal(physical.destroyedRecords().length, 0);
       assert.ok(physical.world.has("prop-tree-5-0"), "M05 scenery joins the active land");
       const saved = sim.save();
-      assert.equal(saved.actorPhysics!.version, 5);
-      assert.equal(saved.actorPhysics!.world.version, 7);
+      assert.equal(saved.actorPhysics!.version, 6);
+      assert.equal(saved.actorPhysics!.world.version, 8);
       const archive = saved.actorPhysics!.archives.find((a) => a.id === "land-1-0")!;
       assert.ok(archive.props.some((p) => p.id === "prop-wagon-1-0"));
       assert.ok(archive.props.filter((p) => p.id.startsWith("crate-")).every((p) => p.material));
