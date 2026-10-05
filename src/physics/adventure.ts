@@ -109,13 +109,32 @@ function freshPolicies(sim: Simulation, previous?: PolicyCheckpoint): PolicyChec
     pending: [],
   };
 }
+type AreaCircle = { index: number; x: number; y: number; radius: number };
+const landCircles = new Map<string, AreaCircle[]>();
+/** A land's four area footprints are pure functions of seed and land; building their full
+ * recipes for every creature on every tick dominated high-population ticks. */
+let lastCircles: { seed: number; townLand: number; circles: AreaCircle[] } | undefined;
+function areaCircles(seed: number, townLand: number): AreaCircle[] {
+  if (lastCircles?.seed === seed && lastCircles.townLand === townLand) return lastCircles.circles;
+  const key = `${seed}:${townLand}`;
+  let circles = landCircles.get(key);
+  if (!circles) {
+    if (landCircles.size >= 16) landCircles.clear();
+    circles = Array.from({ length: 4 }, (_, i) => {
+      const r = areaRecipe(seed, townLand * 4 + i + 1);
+      return { index: r.index, x: r.x, y: r.y, radius: r.radius };
+    });
+    landCircles.set(key, circles);
+  }
+  lastCircles = { seed, townLand, circles };
+  return circles;
+}
 export function adventureAreaAt(s: AdventureState, x: number, y: number): string {
   if (Math.hypot(x, y) < 265) return "town";
+  const circles = areaCircles(s.seed, s.townLand);
   for (let i = 0; i < 4; i++) {
-    const r =
-      s.mode === "area" && s.recipe.index === s.townLand * 4 + i + 1
-        ? s.recipe
-        : areaRecipe(s.seed, s.townLand * 4 + i + 1);
+    const r: AreaCircle =
+      s.mode === "area" && s.recipe.index === s.townLand * 4 + i + 1 ? s.recipe : circles[i];
     if (Math.hypot(x - r.x, y - r.y) < r.radius + 35) return `area-${r.index}`;
   }
   return "wilderness";
@@ -158,6 +177,9 @@ export class AdventurePhysics {
   private seed: number;
   private terrain = new TerrainRegistry();
   private ambient = new Map<number, AmbientSample>();
+  /** `ambientBodyId` per slot, rebuilt only when that slot's generation changes. */
+  private readonly ambientIds: string[] = [];
+  private readonly ambientIdGenerations: number[] = [];
   private archives = new Map<string, LandArchive>();
   private actors = new Set<string>();
   private navigation = new Map<number, NavigationState>();
@@ -277,6 +299,13 @@ export class AdventurePhysics {
     }
     this.world.bindArea(id, areaId);
   }
+  private ambientId(slot: number, generation: number): string {
+    if (this.ambientIdGenerations[slot] !== generation || this.ambientIds[slot] === undefined) {
+      this.ambientIds[slot] = ambientBodyId(slot, generation);
+      this.ambientIdGenerations[slot] = generation;
+    }
+    return this.ambientIds[slot];
+  }
   begin(sim: Simulation): void {
     this.synchronizeLand(sim);
     this.world.boundary();
@@ -320,7 +349,7 @@ export class AdventurePhysics {
         previous?.areaId === areaId ? previous.regions : [],
       );
       const owner = policy.effective.ambientPhysics ? "rapier" : "ambient",
-        id = ambientBodyId(i, sim.generation[i]);
+        id = this.ambientId(i, sim.generation[i]);
       if (owner === "rapier") {
         this.actor(id, "ambient", sim.x[i], sim.y[i], sim.kind[i] === 1 ? 4 : 2.5, 0.3, areaId);
         if (previous?.owner !== "rapier") {
@@ -335,15 +364,24 @@ export class AdventurePhysics {
         sim.vy[i] = pose.vy;
         this.world.remove(id);
       }
-      this.ambient.set(i, {
-        slot: i,
-        generation: sim.generation[i],
-        x: sim.x[i],
-        y: sim.y[i],
-        areaId,
-        regions: policy.regions,
-        owner,
-      });
+      // Reuse the slot's sample: a fresh object per creature per tick dominated GC at high
+      // populations. `recycleAmbient` still replaces a recycled slot's sample.
+      if (previous) {
+        previous.x = sim.x[i];
+        previous.y = sim.y[i];
+        previous.areaId = areaId;
+        previous.regions = policy.regions;
+        previous.owner = owner;
+      } else
+        this.ambient.set(i, {
+          slot: i,
+          generation: sim.generation[i],
+          x: sim.x[i],
+          y: sim.y[i],
+          areaId,
+          regions: policy.regions,
+          owner,
+        });
     }
     // Newly bound actors must resolve their actual area's policy before this tick's motor.
     this.world.boundary();

@@ -1,0 +1,20 @@
+{
+  "method": "Headless Node 24.21.0, 4 vCPU container; seed 142, default start, 8 travelers; median of 60 ticks after 5 warmup ticks. Run-to-run noise is about +/-20%.",
+  "medianTickMs": {
+    "before": { "6000": 38.4, "32768": 183.8, "65536": 436 },
+    "after": { "6000": 18, "32768": 77.8, "65536": 177.1 }
+  },
+  "profileBefore32768": {
+    "beginShare": 0.7,
+    "areaRecipeRebuildShare": 0.23,
+    "policyResolutionShare": 0.21,
+    "garbageCollectionShare": 0.09
+  },
+  "equivalence": {
+    "scenario": "area 1, 8 travelers walking through clearings with attacks and dashes for 150 ticks; then area and quiet-region ambient overrides for 120 ticks; then area worldReactions off for 120 ticks",
+    "2048": ["c45e2be2", "20fd55eb", "f31da4ad"],
+    "32768": ["0e0cc077", "54db7603", "e57c6dc2"],
+    "result": "state hashes and full portable save digests identical to main at every phase"
+  },
+  "remaining": "begin() is about 37% of the optimized tick; the pre-existing legacy ambient terrain movement (moveBody/resolveWorld) is about 19%. Skipping unchanged creatures entirely would be an algorithmic change, not taken here."
+}

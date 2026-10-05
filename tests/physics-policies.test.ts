@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { AgentRuntime, type Replay, replay } from "../src/engine/agent.ts";
 import { Simulation } from "../src/engine/simulation.ts";
+import { areaRecipe } from "../src/game/content.ts";
+import { adventureAreaAt } from "../src/physics/adventure.ts";
 import { initializePhysics } from "../src/physics/bootstrap.ts";
 import {
   containsRegion,
@@ -615,4 +617,89 @@ test("applied/off and queued policies survive JSON save, replay, continuation; c
     played?.dispose();
   }
   assert.deepEqual(physicsResources(), baseline);
+});
+test("memoized policy resolution equals uncached resolution, is frozen and follows applied edits", () => {
+  const sim = new Simulation(142, 0);
+  try {
+    sim.addPlayer("local");
+    sim.adventure.startArea(sim, 1);
+    sim.step();
+    const controller = new PolicyController(sim.physical!.world.save().policies);
+    const state = controller.save().state;
+    const areas = state.profiles.areas.map((a) => a.id);
+    // Sweep every area across region interiors, edges and outside points, with both
+    // hysteresis inputs, so shared results must match the uncached resolver exactly.
+    for (const region of state.profiles.regions) {
+      const shape = region.shape;
+      const [cx, cy, reach] =
+        shape.kind === "circle"
+          ? [shape.x, shape.y, shape.radius + 4]
+          : shape.kind === "rectangle"
+            ? [shape.x + shape.width / 2, shape.y + shape.height / 2, shape.width / 2 + 4]
+            : [0, 0, 4];
+      for (let step = -12; step <= 12; step++)
+        for (const areaId of [region.areaId, ...areas.slice(0, 2)])
+          for (const previous of [[], [region.id]]) {
+            const x = cx + (reach * step) / 10,
+              y = cy - (reach * step) / 17;
+            const cached = controller.resolve(areaId, x, y, previous);
+            assert.deepEqual(cached, resolvePolicy(state, areaId, x, y, previous));
+            assert.ok(Object.isFrozen(cached) && Object.isFrozen(cached.effective));
+            assert.equal(controller.resolve(areaId, x, y, previous), cached);
+          }
+    }
+    const before = controller.resolve("area-1", 0, 0);
+    assert.throws(() => controller.resolve("missing-area", 0, 0), /Unknown body area/);
+    controller.configure({
+      expectedRevision: state.revision,
+      edits: [{ type: "override", scope: "area", id: "area-1", values: { ambientPhysics: true } }],
+    });
+    // Queued edits do not leak into resolution until applied.
+    assert.equal(controller.resolve("area-1", 0, 0), before);
+    controller.apply();
+    const after = controller.resolve("area-1", 0, 0);
+    assert.notEqual(after, before);
+    assert.equal(after.values.ambientPhysics, true);
+    assert.deepEqual(after, resolvePolicy(controller.save().state, "area-1", 0, 0));
+  } finally {
+    sim.dispose();
+  }
+});
+test("cached area footprints classify exactly like rebuilt area recipes across lands and seeds", () => {
+  const reference = (s: Simulation["adventure"]["state"], x: number, y: number) => {
+    if (Math.hypot(x, y) < 265) return "town";
+    for (let i = 0; i < 4; i++) {
+      const r =
+        s.mode === "area" && s.recipe.index === s.townLand * 4 + i + 1
+          ? s.recipe
+          : areaRecipe(s.seed, s.townLand * 4 + i + 1);
+      if (Math.hypot(x - r.x, y - r.y) < r.radius + 35) return `area-${r.index}`;
+    }
+    return "wilderness";
+  };
+  for (const seed of [142, 7, 3298013210]) {
+    const sim = new Simulation(seed, 0);
+    try {
+      sim.addPlayer("local");
+      for (const [land, area] of [
+        [0, 0],
+        [0, 3],
+        [2, 0],
+        [2, 10],
+      ]) {
+        const state = sim.adventure.state;
+        state.townLand = land;
+        if (area) sim.adventure.startArea(sim, area);
+        let checked = 0;
+        for (let x = -1400; x <= 1400; x += 37)
+          for (let y = -1400; y <= 1400; y += 41) {
+            assert.equal(adventureAreaAt(state, x, y), reference(state, x, y));
+            checked++;
+          }
+        assert.ok(checked > 5000);
+      }
+    } finally {
+      sim.dispose();
+    }
+  }
 });

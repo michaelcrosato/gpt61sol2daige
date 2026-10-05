@@ -529,6 +529,14 @@ and returns its solved pose/velocity to ambient steering; on creates
 exactly one body at that pose. Ordinary population recycling retains its
 explicit generation change. Physical participants render in normal
 encounters rather than being hidden with decorative wildlife.</p>
+<p>Ownership is re-evaluated for every selected creature on every tick.
+<code>PolicyController.resolve</code> memoizes per immutable policy
+state: only region containment, with its hysteresis margin, is evaluated
+per position, and every creature in the same area and ordered region set
+shares one frozen result. <code>adventureAreaAt</code> caches each
+land’s four area footprints, and samples are updated in place. These
+caches hold derived values only; they are not saved or replicated, and a
+state-hash comparison against the uncached path is identical.</p>
 <p>Four crates and a wheel per clearing are real optional props visible
 in ordinary play. Same-land recall/travel retains them. Outward travel
 archives old-land prop poses/motion, consequences, policies and tile
