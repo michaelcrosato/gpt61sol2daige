@@ -158,12 +158,12 @@ test("normal encounter renders solved prop pushes, held attacks and dash; patche
   );
   expect(player.angle).toBe(0);
   expect(player.angularVelocity).toBe(0);
-  expect(
-    (await page.evaluate(() => window.fern.game.observe())).events.some((e) => e.type === "slash"),
-  ).toBe(true);
-  expect(
-    (await page.evaluate(() => window.fern.game.observe())).events.some((e) => e.type === "whorl"),
-  ).toBe(true);
+  // observe() shows the latest 12 events; the scenery breaks above follow the attacks, so read
+  // the checkpoint's full bounded history.
+  const history = (await page.evaluate(() => window.fern.command({ op: "save" }) as SaveState))
+    .adventure!.events;
+  expect(history.some((e) => e.type === "slash")).toBe(true);
+  expect(history.some((e) => e.type === "whorl")).toBe(true);
   await page.evaluate(() => {
     const p = window.fern.observe().players[0];
     window.fern.command({

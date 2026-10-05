@@ -151,7 +151,7 @@ The former `fps > 20` browser assertion is removed. Entity coverage, visible dra
 
 ## M05 materials and destruction evidence
 
-On 2026-10-05, `npm run check` passed **86 headless tests**, `npm run build` produced the bundle and `npm run test:e2e` passed **E2E_COUNT browser scenarios**, including the preserved eight-client WebRTC stories. `npm run verify:run` cleared all nine areas.
+On 2026-10-05, `npm run check` passed **86 headless tests**, `npm run build` produced the bundle and `npm run test:e2e` passed **26 browser scenarios**, including the preserved eight-client WebRTC stories. `npm run verify:run` cleared all nine areas.
 
 | M05 acceptance | Evidence |
 | --- | --- |
@@ -164,4 +164,4 @@ On 2026-10-05, `npm run check` passed **86 headless tests**, `npm run build` pro
 
 The first full browser runs exposed a regression: with 2,400 creatures the adventure loop ran at 5–10 FPS and its area could not clear in time. A pre-existing per-tick pose validation deep-cloned every body, and the test controller's `observe()` hashed a full save with its byte array serialized as JSON; M05 multiplied the bodies behind both. After the fix, the Node combat tick median is 16.6 ms against main's 19.5 ms and the pre-fix 32.8 ms, and an idle tick takes 2.1 ms against 3.3 and 12.9 ms. Browser `observe()` takes 28 ms against main's 46 ms, and the adventure controller runs at 12.7–14.3 FPS against main's 10.8–12.8 ([tick evidence](evidence/physics-m05-tick.json)).
 
-Scenery rewards raise route gold (area 9: 3,047 against M04's recorded 2,424; level 19 against 18); combat tuning is unchanged. These are mechanics observations, not performance claims.
+Scenery rewards raise route gold (area 9: 3,043 against M04's recorded 2,424; level 19 against 18); combat tuning is unchanged. These are mechanics observations, not performance claims.

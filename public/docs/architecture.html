@@ -766,6 +766,14 @@ wood blueprints with pose key order preserved, and absent clearing props
 are added once as fresh content to the active and archived lands.
 Validation requires world 5 for envelope 3. Real M04 checkpoints from
 <code>main</code> are test fixtures.</p>
+<p>Per-tick reads stay cheap with the larger scene. The post-step finite
+check reads Rapier values directly. Poses and saves copy recipes,
+policies, body entries and ambient samples structurally, with the same
+JSON as before. <code>stateHash</code> covers raw Rapier bytes through
+the snapshot’s checksum instead of serializing the byte array. Only
+movable props occupy terrain chunks. The M05 combat tick matches main’s
+with 2.5× the bodies, and <code>observe()</code> is cheaper than main’s
+(<a href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/evidence/physics-m05-tick.json">tick evidence</a>).</p>
 <p><code>src/render/props.ts</code> draws each family in its body frame
 (trees, pylons and lanterns upright), with land-palette construction,
 crack stages, frozen outlines, debris fade before expiry, a canopy/cloth

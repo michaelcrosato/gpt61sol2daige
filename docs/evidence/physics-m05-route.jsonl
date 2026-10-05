@@ -1,9 +1,9 @@
 {"area":1,"name":"Brambleburst","land":0,"cleared":true,"ticks":571,"dead":false,"level":5,"gold":287,"items":7,"mechanicUses":4}
-{"area":2,"name":"Slipstream","land":0,"cleared":true,"ticks":433,"dead":false,"level":6,"gold":442,"items":13,"mechanicUses":10}
-{"area":3,"name":"Stormglass","land":0,"cleared":true,"ticks":314,"dead":false,"level":8,"gold":585,"items":16,"mechanicUses":16}
-{"area":4,"name":"Echo Wells","land":0,"cleared":true,"ticks":495,"dead":false,"level":10,"gold":838,"items":21,"mechanicUses":23}
-{"area":5,"name":"Cinderwake","land":1,"cleared":true,"ticks":550,"dead":false,"level":11,"gold":1153,"items":25,"mechanicUses":27}
-{"area":6,"name":"Bloodbloom","land":1,"cleared":true,"ticks":588,"dead":false,"level":13,"gold":1524,"items":32,"mechanicUses":28}
-{"area":7,"name":"Gravity Knots","land":1,"cleared":true,"ticks":713,"dead":false,"level":15,"gold":1986,"items":40,"mechanicUses":36}
-{"area":8,"name":"Riftstep","land":1,"cleared":true,"ticks":730,"dead":false,"level":17,"gold":2474,"items":40,"mechanicUses":43}
-{"area":9,"name":"Ravenous Echo Wells","land":2,"cleared":true,"ticks":778,"dead":false,"level":19,"gold":3047,"items":40,"mechanicUses":55}
+{"area":2,"name":"Slipstream","land":0,"cleared":true,"ticks":472,"dead":false,"level":6,"gold":442,"items":13,"mechanicUses":10}
+{"area":3,"name":"Stormglass","land":0,"cleared":true,"ticks":344,"dead":false,"level":8,"gold":632,"items":16,"mechanicUses":15}
+{"area":4,"name":"Echo Wells","land":0,"cleared":true,"ticks":476,"dead":false,"level":9,"gold":819,"items":22,"mechanicUses":22}
+{"area":5,"name":"Cinderwake","land":1,"cleared":true,"ticks":513,"dead":false,"level":11,"gold":1128,"items":26,"mechanicUses":26}
+{"area":6,"name":"Bloodbloom","land":1,"cleared":true,"ticks":619,"dead":false,"level":13,"gold":1475,"items":34,"mechanicUses":28}
+{"area":7,"name":"Gravity Knots","land":1,"cleared":true,"ticks":731,"dead":false,"level":15,"gold":1926,"items":40,"mechanicUses":38}
+{"area":8,"name":"Riftstep","land":1,"cleared":true,"ticks":770,"dead":false,"level":17,"gold":2394,"items":40,"mechanicUses":47}
+{"area":9,"name":"Ravenous Echo Wells","land":2,"cleared":true,"ticks":847,"dead":false,"level":19,"gold":3043,"items":40,"mechanicUses":64}

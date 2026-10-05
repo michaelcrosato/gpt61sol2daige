@@ -628,7 +628,7 @@ final receipt, not inferred from these local results.</p>
 destruction evidence</h2>
 <p>On 2026-10-05, <code>npm run check</code> passed <strong>86 headless
 tests</strong>, <code>npm run build</code> produced the bundle and
-<code>npm run test:e2e</code> passed <strong>E2E_COUNT browser
+<code>npm run test:e2e</code> passed <strong>26 browser
 scenarios</strong>, including the preserved eight-client WebRTC stories.
 <code>npm run verify:run</code> cleared all nine areas.</p>
 <table>
@@ -693,7 +693,18 @@ bodies and gain M05 scenery once (20 → 84 props per land)</td>
 </tr>
 </tbody>
 </table>
-<p>Scenery rewards raise route gold (area 9: 3,047 against M04’s
+<p>The first full browser runs exposed a regression: with 2,400
+creatures the adventure loop ran at 5–10 FPS and its area could not
+clear in time. A pre-existing per-tick pose validation deep-cloned every
+body, and the test controller’s <code>observe()</code> hashed a full
+save with its byte array serialized as JSON; M05 multiplied the bodies
+behind both. After the fix, the Node combat tick median is 16.6 ms
+against main’s 19.5 ms and the pre-fix 32.8 ms, and an idle tick takes
+2.1 ms against 3.3 and 12.9 ms. Browser <code>observe()</code> takes 28
+ms against main’s 46 ms, and the adventure controller runs at 12.7–14.3
+FPS against main’s 10.8–12.8 (<a
+href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/evidence/physics-m05-tick.json">tick evidence</a>).</p>
+<p>Scenery rewards raise route gold (area 9: 3,043 against M04’s
 recorded 2,424; level 19 against 18); combat tuning is unchanged. These
 are mechanics observations, not performance claims.</p></main>
 <footer>Fern · A world engine built for agents · <a href="https://github.com/michaelcrosato/gpt61sol2daige">Source on GitHub</a></footer>
