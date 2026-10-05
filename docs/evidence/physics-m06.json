@@ -1,0 +1,325 @@
+{
+  "milestone": "M06",
+  "date": "2026-10-05",
+  "base": "main 26a9d48de2343ec5205eb2f298b9d92546a6411e",
+  "method": "Headless Node scenarios mirroring tests/physics-combat.test.ts (seed 142, area 1, one stationary monster, mechanics cleared); values rounded to 0.01.",
+  "gates": {
+    "check": "98 headless tests passed",
+    "testE2e": "29 browser scenarios passed",
+    "verifyRun": "nine areas cleared (level 18, 2,717 gold)"
+  },
+  "registry": {
+    "exportSha256": "660eb8bfe568aa3e29eba724331f8d8177ec7ab31b68841332b1f1698c61cfd4",
+    "attacks": {
+      "slash0": {
+        "team": "party",
+        "impulse": 150,
+        "torque": 2,
+        "material": 1,
+        "scenery": "phase",
+        "pierce": 0,
+        "ricochet": 0
+      },
+      "slash1": {
+        "team": "party",
+        "impulse": 175,
+        "torque": 3,
+        "material": 1,
+        "scenery": "phase",
+        "pierce": 0,
+        "ricochet": 0
+      },
+      "slash2": {
+        "team": "party",
+        "impulse": 270,
+        "torque": 6,
+        "material": 1.25,
+        "scenery": "phase",
+        "pierce": 0,
+        "ricochet": 0
+      },
+      "whorl": {
+        "team": "party",
+        "impulse": 360,
+        "torque": 4,
+        "material": 1,
+        "scenery": "phase",
+        "pierce": 0,
+        "ricochet": 0
+      },
+      "nova": {
+        "team": "party",
+        "impulse": 430,
+        "torque": 6,
+        "material": 1.2,
+        "scenery": "phase",
+        "pierce": 0,
+        "ricochet": 0
+      },
+      "lance": {
+        "team": "party",
+        "impulse": 220,
+        "torque": 3,
+        "material": 1,
+        "scenery": "pierce",
+        "pierce": 5,
+        "ricochet": 0
+      },
+      "dash": {
+        "team": "party",
+        "impulse": 190,
+        "torque": 2,
+        "material": 0,
+        "scenery": "phase",
+        "pierce": 0,
+        "ricochet": 0
+      },
+      "bloom": {
+        "team": "party",
+        "impulse": 240,
+        "torque": 3,
+        "material": 1,
+        "scenery": "phase",
+        "pierce": 0,
+        "ricochet": 0
+      },
+      "mechanic": {
+        "team": "party",
+        "impulse": 220,
+        "torque": 3,
+        "material": 1,
+        "scenery": "phase",
+        "pierce": 0,
+        "ricochet": 0
+      },
+      "charge": {
+        "team": "enemy",
+        "impulse": 260,
+        "torque": 3,
+        "material": 0.6,
+        "scenery": "phase",
+        "pierce": 0,
+        "ricochet": 0
+      },
+      "shot": {
+        "team": "enemy",
+        "impulse": 60,
+        "torque": 1,
+        "material": 0.5,
+        "scenery": "cover",
+        "pierce": 0,
+        "ricochet": 0
+      },
+      "impact": {
+        "team": "world",
+        "impulse": 0,
+        "torque": 0,
+        "material": 1,
+        "scenery": "phase",
+        "pierce": 0,
+        "ricochet": 0
+      }
+    }
+  },
+  "abilities": {
+    "slash": {
+      "peakSpeed": 145.16,
+      "moved": 38.57,
+      "broken": false,
+      "owner": "local"
+    },
+    "whorl": {
+      "peakSpeed": 348.39,
+      "moved": 92.57,
+      "broken": false,
+      "owner": "local"
+    },
+    "lance": {
+      "peakSpeed": 461.97,
+      "moved": null,
+      "broken": {
+        "pieces": 4,
+        "cause": "lance"
+      },
+      "owner": "local"
+    },
+    "nova": {
+      "peakSpeed": 448.81,
+      "moved": null,
+      "broken": {
+        "pieces": 4,
+        "cause": "nova"
+      },
+      "owner": "local"
+    },
+    "dash": {
+      "peakSpeed": 323.79,
+      "moved": 92.1,
+      "broken": false,
+      "owner": "local"
+    }
+  },
+  "thrown": {
+    "monsterHp": 0,
+    "impacts": [
+      {
+        "owner": "local",
+        "amount": 17.41
+      }
+    ],
+    "heroKills": [0, 1, 1],
+    "xpDropsAdded": 1,
+    "dropsAdded": 2,
+    "extraAfter120Ticks": 0
+  },
+  "whorlLaunched": {
+    "impacts": [
+      {
+        "owner": "local",
+        "amount": 8.29
+      }
+    ],
+    "monsterHurt": true
+  },
+  "unowned": {
+    "monsterHp": 0,
+    "heroKills": 0,
+    "dropsAdded": 0,
+    "killOwner": "",
+    "killText": "environment"
+  },
+  "impactPolicy": {
+    "default": {
+      "hurt": 18.24,
+      "moved": 96.05
+    },
+    "strength2": {
+      "hurt": 36.48,
+      "moved": 96.05
+    },
+    "off": {
+      "hurt": 0,
+      "moved": 91.34
+    }
+  },
+  "thornlance": {
+    "pot": {
+      "target": "prop-pot-1-0",
+      "broken": true,
+      "flying": true,
+      "pierceLeft": 5,
+      "ricochetLeft": 0,
+      "vx": 470,
+      "events": []
+    },
+    "crate": {
+      "target": "crate-1-3",
+      "broken": true,
+      "flying": true,
+      "pierceLeft": 4,
+      "ricochetLeft": 0,
+      "vx": 470,
+      "events": []
+    },
+    "stone": {
+      "target": "prop-stone-1-0",
+      "broken": false,
+      "flying": false,
+      "pierceLeft": 5,
+      "ricochetLeft": 0,
+      "vx": 470,
+      "events": ["stone:cover"]
+    },
+    "stoneRicochet": {
+      "target": "prop-stone-1-0",
+      "broken": false,
+      "flying": true,
+      "pierceLeft": 5,
+      "ricochetLeft": 0,
+      "vx": -470,
+      "events": ["stone:deflect"]
+    }
+  },
+  "enemyShots": {
+    "projectileWorldOn": {
+      "heroHpLost": 0,
+      "cover": true
+    },
+    "projectileWorldOff": {
+      "heroHpLost": 7.89,
+      "cover": false
+    }
+  },
+  "grab": {
+    "far": "Move within 72 units to grab it",
+    "fixed": "That prop is fixed in place here",
+    "taken": "Another traveler is holding that",
+    "holderWalked": 70.39,
+    "carriedAhead": 24.24,
+    "restoredHold": "crate-1-3",
+    "holdAfterFreeze": null
+  },
+  "loot": {
+    "drops": 2,
+    "bodiesOnDrop": 2,
+    "settleMoved": [44.18, 45.83],
+    "restoreSameBodies": true,
+    "goldDropped": 5,
+    "goldCollected": 5,
+    "physicsOff": {
+      "bodies": 0,
+      "collected": 7
+    },
+    "deepWaterRecovery": {
+      "from": [1016, 8],
+      "to": [968, -40],
+      "terrain": 1,
+      "deepWater": 4
+    }
+  },
+  "modifiers": {
+    "nodes": [
+      ["blade-6", "Edgecraft", "shatter"],
+      ["root-7", "Ironwood", "force"],
+      ["gale-4", "Static Charge", "ricochet"]
+    ],
+    "treeSize": 48,
+    "level20Rolls": {
+      "sampled": 400,
+      "withPhysicalAffix": 88,
+      "ricochetOnWeaponsOnly": true
+    },
+    "whorlCrateVx": {
+      "ironwood0": 337.15,
+      "ironwood1": 404.58,
+      "ironwood3": 539.44
+    }
+  },
+  "persistence": {
+    "pendingImpactSaved": [
+      {
+        "prop": "crate-1-3",
+        "target": "enemy-4",
+        "owner": "local",
+        "damage": 17.41,
+        "closing": 271.2
+      }
+    ],
+    "landedAfterRestore": 17,
+    "replayHash": "7ae03931",
+    "hostHash": "7ae03931",
+    "lateJoinCombatEqual": true,
+    "versions": {
+      "adventureEnvelope": 4,
+      "world": 6
+    }
+  },
+  "migration": {
+    "fixture": "m05-raw.json.gz",
+    "source": "main 26a9d48",
+    "envelope": [3, 4],
+    "world": [5, 6],
+    "destroyedKept": true,
+    "destroyed": 1
+  }
+}

@@ -64,20 +64,19 @@ test("desktop: V grabs, the mouse throws with ownership, held attacks stay immed
     .toBe("local");
   const thrown = await body(page, held);
   expect(Math.hypot(thrown.vx, thrown.vy) > 60 || thrown.x > view.x + 40).toBe(true);
-  // Held mouse attacks still respond at once: slash events within a few frames.
-  const before = await page.evaluate(() => window.fern.command({ op: "save" }) as SaveState);
-  const slashes = before.adventure!.events.filter((e) => e.type === "slash").length;
+  // Held mouse and keyboard attacks still respond at once: slash events within a few frames.
+  const slashCount = async () =>
+    (
+      await page.evaluate(() => window.fern.command({ op: "save" }) as SaveState)
+    ).adventure!.events.filter((e) => e.type === "slash").length;
+  let slashes = await slashCount();
   await page.mouse.down();
-  await expect
-    .poll(
-      async () =>
-        (
-          await page.evaluate(() => window.fern.command({ op: "save" }) as SaveState)
-        ).adventure!.events.filter((e) => e.type === "slash").length,
-      { timeout: 2000 },
-    )
-    .toBeGreaterThan(slashes);
+  await expect.poll(slashCount, { timeout: 2000 }).toBeGreaterThan(slashes);
   await page.mouse.up();
+  slashes = await slashCount();
+  await page.keyboard.down("j");
+  await expect.poll(slashCount, { timeout: 2000 }).toBeGreaterThan(slashes);
+  await page.keyboard.up("j");
   // Physical loot: a kill launches drops as loot bodies; they settle and survive save/restore.
   const loot = await page.evaluate(() => {
     window.fern.pause(true);

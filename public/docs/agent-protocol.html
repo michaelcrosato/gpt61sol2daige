@@ -843,7 +843,67 @@ Saves write adventure envelope 3 / world 5; rooms use protocol 6. Real
 M04 checkpoints migrate with exact legacy bodies. Guests read
 <code>props</code>/<code>recipes</code> but cannot <code>damage</code>.
 See <a href="ARCHITECTURE.md#m05-materials-and-destructible-scenery">the
-M05 contract</a>.</p></main>
+M05 contract</a>.</p>
+<h2 id="m06-combat-forces-grabthrow-and-physical-loot">M06 combat
+forces, grab/throw and physical loot</h2>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr>
+<th>Command</th>
+<th>Fields and behavior</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>{"op":"actors","action":"attacks"}</code></td>
+<td>The shared attack spec: impulse, torque, material multiplier and
+cover/pierce/ricochet rules per ability, plus impact formula, ownership
+window and team rules. Works on guests.</td>
+</tr>
+<tr>
+<td><code>{"op":"adventure","action":{"type":"grab","id":"crate-1-3"}}</code></td>
+<td>Host-validated: a loose, unfrozen prop within 72 units and mass ≤ 8
+that nobody else holds. The prop follows the traveler’s aim
+(<code>aimX/aimY</code>, else facing).</td>
+</tr>
+<tr>
+<td><code>{"op":"adventure","action":{"type":"release","throw":true}}</code></td>
+<td>Throw along the aim (speed 430 × force × impulse strength, slower
+for heavy props) and own it for 2.5 s; <code>throw:false</code> sets it
+down.</td>
+</tr>
+<tr>
+<td><code>actors</code> <code>inspect</code> → <code>combat</code></td>
+<td><code>{instigators, impacts, suppressed, holds, settled}</code>;
+guests’ replica inspection includes the same record.</td>
+</tr>
+</tbody>
+</table>
+<pre class="json"><code>{&quot;op&quot;:&quot;encounter&quot;,&quot;index&quot;:1}
+{&quot;op&quot;:&quot;adventure&quot;,&quot;action&quot;:{&quot;type&quot;:&quot;grab&quot;,&quot;id&quot;:&quot;crate-1-3&quot;}}
+{&quot;op&quot;:&quot;input&quot;,&quot;aimX&quot;:1,&quot;aimY&quot;:0}
+{&quot;op&quot;:&quot;step&quot;,&quot;ticks&quot;:10}
+{&quot;op&quot;:&quot;adventure&quot;,&quot;action&quot;:{&quot;type&quot;:&quot;release&quot;,&quot;throw&quot;:true}}
+{&quot;op&quot;:&quot;step&quot;,&quot;ticks&quot;:30}
+{&quot;op&quot;:&quot;actors&quot;,&quot;action&quot;:&quot;inspect&quot;}</code></pre>
+<p>Combat events add <code>impact</code> texts <code>impact:hit</code>
+(a launched prop struck a monster), <code>&lt;material&gt;:cover</code>
+and <code>&lt;material&gt;:deflect</code>, and <code>grab</code> events
+(<code>&lt;id&gt;</code>, <code>throw:&lt;id&gt;</code>,
+<code>drop:&lt;id&gt;</code>). An environmental kill emits
+<code>kill</code> with owner <code>""</code> and text
+<code>environment</code>. New policy values: <code>impactDamage</code>,
+<code>projectileWorld</code>, <code>physicalLoot</code> (booleans) and
+<code>impactStrength</code> (0–10). Item affixes and
+<code>HeroStats</code> add <code>force</code>, <code>shatter</code> and
+<code>ricochet</code>. Saves write adventure envelope 4 / world 6; rooms
+use protocol 7. See <a
+href="ARCHITECTURE.md#m06-combat-forces-projectiles-and-physical-loot">the
+M06 contract</a>.</p></main>
 <footer>Fern · A world engine built for agents · <a href="https://github.com/michaelcrosato/gpt61sol2daige">Source on GitHub</a></footer>
 </body>
 </html>
