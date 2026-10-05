@@ -425,7 +425,7 @@ function execute(command: Command): unknown {
     !["observe", "describe", "inspect", "save", "catalog"].includes(command.op) &&
     !(
       command.op === "actors" &&
-      ["inspect", "body", "policy", "props", "recipes", "attacks"].includes(
+      ["inspect", "body", "policy", "props", "recipes", "attacks", "mechanisms"].includes(
         String(command.action ?? "inspect"),
       )
     ) &&
