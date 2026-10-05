@@ -1160,7 +1160,12 @@ export class PhysicsWorld {
     }
     const body = this.body(id);
     const entry = this.registry.get(id)!;
-    if (bodyRole(entry.recipe) === "prop" && !entry.policy!.effective.dynamicProps) return; // No stored motion or impulse backlog in a quiet region.
+    // No stored motion or impulse backlog in a quiet region or on a frozen mechanism part.
+    if (
+      bodyRole(entry.recipe) === "prop" &&
+      (!entry.policy!.effective.dynamicProps || entry.frozen)
+    )
+      return;
     if (!body.isDynamic()) throw new Error("Fixed bodies cannot receive impulses");
     const strength =
       bodyRole(entry.recipe) === "prop" ? entry.policy!.effective.impulseStrength : 1;

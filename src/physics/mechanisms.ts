@@ -37,7 +37,7 @@ export const MECHANISMS: Record<MechanismKind, MechanismInfo> = {
     summary:
       "A leaf on a sprung hinge closes a reward pen. Pushed past 83° it latches open (authored event); pushed back it swings shut.",
     event: "latch",
-    joints: "hinge ±1.9 rad with a return spring (6/s², 4/s); breaks at 1000 load or 45 cut damage",
+    joints: "hinge ±1.9 rad with a return spring (6/s², 4/s); breaks at 1400 load or 45 cut damage",
   },
   chain: {
     name: "Chained ball",
@@ -176,7 +176,8 @@ export function areaMechanisms(
           anchorB: { x: -19.5, y: 0 },
           limits: [-1.9, 1.9],
           motor: { mode: "position", target: 0, ...GATE_MOTOR },
-          breakLoad: 1000,
+          // A traveler walking off with the leaf loads it to about 1060: only blows rip it.
+          breakLoad: 1400,
           toughness: 45,
         },
       ],
