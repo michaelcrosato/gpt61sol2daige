@@ -121,6 +121,7 @@ The final 300-frame browser measurement includes both Canvas rendering and live 
 - Version 1.1's far-view renderer originally made one Canvas call per creature. A reusable RGBA buffer reduced rendering cost substantially at 32k and 65k populations. Nearby sprites retain their existing detail.
 - Large checkpoint storage now uses IndexedDB. The test covers a 65,536-creature world at distant coordinates with the full 2,048-tile patch layer, as well as existing localStorage saves.
 - High-population region rebalancing now clears derived proximity flags when a slot respawns; the checkpoint test checks exact future state while travelers separate.
+- M04's eight-client test lost six guests at 32,768 creatures on main CI and on both commits of its first repair. Local reproduction showed a loaded host processing guest acknowledgements 3–10 s late, so stop-and-wait guests heard nothing for 10 s; per-hello population-sized rebinding and per-guest frame builds amplified the load. A 1 Hz host heartbeat now carries liveness, builds are shared and cost-spaced, and staged receipts stop resends to guests that are still decoding. [Release evidence](evidence/physics-m04-release.json).
 
 ## Scope limits
 

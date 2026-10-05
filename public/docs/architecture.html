@@ -336,7 +336,7 @@ recent effects. Relative float encoding retains subpixel detail far from
 the origin. Total packet size, counts, values and enum ranges are
 validated before state mutation. Both ArrayBuffer and reassembled
 Uint8Array delivery are supported and regression-tested.</p>
-<p>Wire protocol <strong>4</strong> uses a separate version-1 physical
+<p>Wire protocol <strong>5</strong> uses a separate version-2 physical
 channel described below. The bounded observational packet helper remains
 available for tools/tests: up to 65,536 compact ambient records plus
 512,000 metadata bytes (1,560,584 bytes total). It is not a complete
@@ -383,15 +383,17 @@ preserve all players; browser loads choose one local traveler and resume
 solo. The browser lab is a QA console, not an editor that future agents
 must operate.</p>
 <h3 id="join-lifecycle">Join lifecycle</h3>
-<p>A guest requests a welcome until the first valid world snapshot is
-received. The host admits an already-open native channel idempotently
-and rate-limits repeated welcome responses. A transient failure during
-admission recreates the connection, with handshake timeouts of 6, 10 and
-22 seconds across at most three attempts. Explicit full-room/version
-rejection and invalid snapshots are not retried. Generation and request
-identifiers prevent callbacks from canceled attempts from mutating a new
-session. The native connection still carries every byte; no test
-substitutes a fake transport.</p>
+<p>A guest repeats its hello until the host’s welcome arrives. The host
+admits an already-open native channel idempotently, binds the traveler’s
+physical body once at admission and answers repeated hellos with a
+rate-limited welcome only; a population-sized rebind per hello
+previously starved every channel during a late join. A transient failure
+during admission recreates the connection, with handshake timeouts of 6,
+10 and 22 seconds across at most three attempts. Explicit
+full-room/version rejection and invalid snapshots are not retried.
+Generation and request identifiers prevent callbacks from canceled
+attempts from mutating a new session. The native connection still
+carries every byte; no test substitutes a fake transport.</p>
 <h2 id="m01-physics-foundation">M01 physics foundation</h2>
 <p>Await <code>initializePhysics()</code> from
 <code>src/physics/bootstrap.ts</code> before constructing, restoring or
@@ -582,8 +584,10 @@ solver contact caches are re-created, so subsequent physical
 trajectories use outcome tolerances. Gameplay facts remain exact.
 Corrupt compatible bytes are rejected, not silently replaced with fresh
 content. Original M01 v1 and M02 v2 lab bytes, M03 adventure v1/world
-v3, and pre-physics version-1 games import explicitly; only content
-absent from an old save receives defaults.</p>
+v3, and pre-physics version-1 games import explicitly; old version-1
+co-op legacy/replica flags migrate into fresh authoritative physics with
+unchanged builds/terrain; only content absent from an old save receives
+defaults.</p>
 <p><code>validateSave</code>, <code>validatePhysicsSnapshot</code> and
 semantic terrain validation reject invalid identities, motor/policy
 facts, pose mappings, seed/land bindings and recipes before allocating a
@@ -593,29 +597,48 @@ correspondence. <code>Adventure.configureTerrain</code> shares seeded
 region configuration with validation. Pending terrain saves keep the
 previous collider boundary until the next tick, as in M03.</p>
 <p><code>src/net/physical.ts</code> owns physical wire
-<strong>1</strong>, separate from the observational JSON header. A
+<strong>2</strong>, separate from the observational JSON header. A
 <code>physical-start</code> manifest names sequence, scene revision,
-total UTF-8 length, chunk count and checksum.
+compressed and expanded UTF-8 lengths, chunk count and checksum.
 <code>physical-chunk</code> payloads are at most <strong>48,000
-bytes</strong>; total transfer is explicitly bounded at
-<strong>256,000,000 bytes</strong>. The payload includes a complete
-portable save and reliable scene/spawn/remove/policy lifecycle events.
-Every selected ambient creature and physical body is carried. A scene
-exceeding that bound reports an export/checkpoint-loading error; no body
-is clipped. Complete frames are shared among recipients at the same
-tick; sending waits for acknowledgement/backpressure without altering
-host simulation or physical eligibility. Large scenes may transmit at
-less than the nominal 10 Hz cadence.</p>
+bytes</strong>; compressed and expanded transfer lengths are explicitly
+bounded at <strong>256,000,000 bytes</strong> each. Native gzip streams
+preserve every semantic fact; bounded inflation rejects over-expansion
+before scene allocation. The payload includes a complete portable save
+and reliable scene/spawn/remove/policy lifecycle events. Every selected
+ambient creature and physical body is carried. A scene exceeding that
+bound reports an export/checkpoint-loading error; no body is clipped.
+One complete frame build serves every recipient. At most one build runs
+at a time, builds are spaced by twice their measured cost (at least 100
+ms, the nominal 10 Hz cadence), and each guest receives the newest frame
+above its acknowledgement floor. A traveler’s floor starts at admission,
+so it never receives a frame built before its body existed; an accepted
+action forces a frame built after it. Sending waits for
+acknowledgement/backpressure without altering host simulation or
+physical eligibility. Large scenes may transmit at less than the nominal
+10 Hz cadence.</p>
 <p>One receiver stages chunks, accepting equal duplicates and any chunk
 order after its manifest. Missing chunks leave the previous complete
 scene intact. Conflicting duplicates, invalid counts/lengths,
 checksum/schema corruption and old sequences cannot publish a partial
-world. A new transfer supersedes unfinished staging; unacknowledged
-transfers retry after five seconds. The manifest precedes chunks on the
-reliable channel. Both PeerJS ArrayBuffer and Uint8Array chunk forms are
-supported. First baseline publication/acknowledgement precedes guest
-interactions. A pending join retains its old local scene until a
-complete host baseline replaces it.</p>
+world. A new transfer supersedes unfinished staging; a guest reports
+<code>physical-staged</code> once every chunk is held, before its
+decode. The host never resends a staged transfer and resends an unstaged
+one, with the same immutable sequence/payload, only after 10 seconds
+without sending. Chunks refill to 1 MiB of native buffered data whenever
+the channel drains below 256 KiB or the host updates, and respect PeerJS
+buffering. Already committed duplicates receive acknowledgement. Valid
+transfer traffic, and after the welcome an in-order host heartbeat,
+refreshes join progress, so loading a large baseline does not spuriously
+close a working channel. Connected guests also receive the 1 Hz host
+heartbeat: a loaded host can process acknowledgements seconds late, so
+liveness does not depend on them. A guest continues solo only after 10
+seconds without any host frame, chunk or heartbeat. The manifest
+precedes chunks on the reliable channel. Both PeerJS ArrayBuffer and
+Uint8Array chunk forms are supported. First baseline
+publication/acknowledgement precedes guest interactions. A pending join
+retains its old local scene until a complete host baseline replaces
+it.</p>
 <p><code>Simulation.applyReplica</code> validates then reuses game
 arrays/world state, retains the complete semantic scene and interpolates
 prop position and shortest-path angle. Guests never step authoritative
@@ -643,7 +666,14 @@ and frees replaced worlds/queues. Received ambient arrays preserve the
 actual selected population, even when a guest’s draw budget is small.
 The CLI’s <code>restore-file</code> parses expanded checkpoint files
 outside the unchanged 8 MB JSONL command limit; browser IndexedDB and
-JSON export retain complete saves.</p></main>
+JSON export retain complete saves.</p>
+<p>M04 release repair also keeps paused browser input stable until
+explicit input or resume. A distant teleport publishes Rapier’s solved
+Float32 pose to game state immediately, so legitimate paused saves do
+not contain contradictory coordinates. Version-1 co-op solver flags
+migrate to fresh physics initialized in the saved land after restoring
+game/terrain, avoiding unused initial worlds and phantom land
+archives.</p></main>
 <footer>Fern · A world engine built for agents · <a href="https://github.com/michaelcrosato/gpt61sol2daige">Source on GitHub</a></footer>
 </body>
 </html>

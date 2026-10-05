@@ -1,0 +1,11 @@
+{
+  "roomProtocol": 5,
+  "physicalWire": 2,
+  "population": 32768,
+  "bodyCount": 134,
+  "expandedBytes": 6386621,
+  "compressedBytes": 1624713,
+  "chunks": 34,
+  "chunkBound": 48000,
+  "allSelectedSlots": true
+}

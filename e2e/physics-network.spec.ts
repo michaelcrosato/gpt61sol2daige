@@ -128,7 +128,7 @@ test("eight real WebRTC travelers share props/policies, late join atomically and
           if (typeof data === "string") {
             const message = JSON.parse(data);
             if (message.type === "OFFER" && message.payload?.metadata) {
-              message.payload.metadata.version = 3;
+              message.payload.metadata.version = 4;
               data = JSON.stringify(message);
             }
           }
@@ -177,6 +177,7 @@ test("eight real WebRTC travelers share props/policies, late join atomically and
         ],
       }),
     );
+    await expect.poll(async () => (await body(host)).frozen).toBe(false);
     await expect.poll(async () => (await body(late)).frozen).toBe(false);
     await late.evaluate(() => window.fern.network.interact({ id: "prop-shared", x: -40, y: 10 }));
     await expect.poll(async () => (await body(guest)).vx).toBeLessThan(0);
@@ -237,6 +238,23 @@ test("eight real WebRTC travelers share props/policies, late join atomically and
       );
     }
     expect(errors).toEqual([]);
+  } catch (error) {
+    const diagnostics = await Promise.all(
+      travelers.map(async ({ page }) =>
+        page
+          .evaluate(() => ({
+            tick: window.fern.observe().tick,
+            paused: window.fern.observe().paused,
+            network: window.fern.network.status(),
+            prop: window.fern.command({ op: "actors", action: "body", id: "prop-shared" }),
+            policy: window.fern.command({ op: "actors", action: "inspect" }),
+          }))
+          .catch(() => null),
+      ),
+    );
+    await mkdir("artifacts", { recursive: true });
+    await writeFile("artifacts/m04-network-failure.json", JSON.stringify(diagnostics, null, 2));
+    throw error;
   } finally {
     await Promise.all(travelers.map((t) => t.context.close()));
   }
@@ -282,6 +300,62 @@ test("physical portal replication snaps travelers and props to the new land", as
       (await guest.evaluate(() => window.fern.command({ op: "save" }) as SaveState)).actorPhysics!
         .landId,
     ).toBe("land-1-1");
+  } finally {
+    await Promise.all(contexts.map((context) => context.close()));
+  }
+});
+
+test("a progressing native baseline can outlast the initial join timer without exposing a partial scene", async ({
+  browser,
+  baseURL,
+}) => {
+  const contexts = await Promise.all([browser.newContext(), browser.newContext()]);
+  try {
+    const [host, guest] = await Promise.all(contexts.map((context) => context.newPage()));
+    await host.addInitScript(() => {
+      const send = RTCDataChannel.prototype.send;
+      let firstLargeAt = 0;
+      RTCDataChannel.prototype.send = function (data) {
+        const size =
+          typeof data === "string"
+            ? data.length
+            : data instanceof Blob
+              ? data.size
+              : data.byteLength;
+        if (size > 512) {
+          firstLargeAt ||= performance.now();
+          const wait = 8000 - (performance.now() - firstLargeAt);
+          if (wait > 0) {
+            setTimeout(() => {
+              if (this.readyState === "open") send.call(this, data as ArrayBufferView<ArrayBuffer>);
+            }, wait);
+            return;
+          }
+        }
+        send.call(this, data as ArrayBufferView<ArrayBuffer>);
+      };
+    });
+    await instrumentRtc(guest);
+    for (const page of [host, guest]) {
+      await page.goto(baseURL!);
+      await page.waitForFunction(() => !!window.fern);
+      await page.evaluate(() => {
+        window.fern.command({ op: "population", count: 64 });
+        window.fern.view("lab");
+      });
+    }
+    const room = await host.evaluate(() => window.fern.network.host());
+    const joined = guest.evaluate((code) => window.fern.network.join(code), room);
+    await guest.waitForTimeout(6500);
+    expect(await guest.evaluate(() => window.fern.network.status().baselineReady)).toBe(false);
+    const partial = await guest.evaluate(() => window.fern.command({ op: "save" }) as SaveState);
+    expect(partial.players).toHaveLength(1);
+    expect(partial.players[0].id).toBe("local");
+    await joined;
+    expect(await guest.evaluate(() => window.fern.network.status().baselineReady)).toBe(true);
+    const diagnostics = (await rtcDiagnostics(guest)) as { rtc: { states: string[] }[] };
+    expect(diagnostics.rtc.filter((connection) => connection.states.length > 0)).toHaveLength(1);
+    expect(await guest.evaluate(() => window.fern.observe().players.length)).toBe(2);
   } finally {
     await Promise.all(contexts.map((context) => context.close()));
   }

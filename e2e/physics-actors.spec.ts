@@ -85,6 +85,10 @@ test("playable adventure physics controls match agent edits, retain policies and
     await page.waitForFunction(() => !!window.fern);
     await page.evaluate(() => window.fern.pause(true));
     await page.getByRole("button", { name: "Continue your saved trail" }).click();
+    await page.mouse.move(640, 450);
+    await page.evaluate(async () => {
+      for (let i = 0; i < 3; i++) await new Promise(requestAnimationFrame);
+    });
     expect(await page.evaluate(() => window.fern.observe().hash)).toBe(saved);
     await page.evaluate(() => window.fern.view("lab"));
     await page.getByLabel("Physics scene", { exact: true }).selectOption("adventure");

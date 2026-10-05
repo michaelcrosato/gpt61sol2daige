@@ -508,6 +508,14 @@ patch layer, as well as existing localStorage saves.</li>
 <li>High-population region rebalancing now clears derived proximity
 flags when a slot respawns; the checkpoint test checks exact future
 state while travelers separate.</li>
+<li>M04’s eight-client test lost six guests at 32,768 creatures on main
+CI and on both commits of its first repair. Local reproduction showed a
+loaded host processing guest acknowledgements 3–10 s late, so
+stop-and-wait guests heard nothing for 10 s; per-hello population-sized
+rebinding and per-guest frame builds amplified the load. A 1 Hz host
+heartbeat now carries liveness, builds are shared and cost-spaced, and
+staged receipts stop resends to guests that are still decoding. <a
+href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/evidence/physics-m04-release.json">Release evidence</a>.</li>
 </ul>
 <h2 id="scope-limits">Scope limits</h2>
 <p>The physics tests cover circles, static terrain and the reference

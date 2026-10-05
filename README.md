@@ -6,7 +6,7 @@ Keep your familiar wayfarer, carve through monster packs, shape a build across f
 
 [Play Fern](https://gpt61sol2daige.vercel.app) · [Design report](docs/REPORT.md) · [Architecture](docs/ARCHITECTURE.md) · [Agent protocol](docs/AGENT-PROTOCOL.md)
 
-The [reactive physics implementation plan](docs/physics/README.md) covers twelve milestones. M01–M02 supply a solo Rapier2D playground in **Agent lab**: push/spin real props, launch a swept body, configure land/area/region policies, freeze and re-enable the same bodies, and test prop blocking with a lab contact traveler. Inspect effective values and their sources, queue edits or apply them while paused, and save/replay the scene. Adventure actor migration, physical co-op, materials and mechanisms follow in M03–M12. See [status and handoffs](docs/physics/STATUS.md) for verified progress.
+The [reactive physics implementation plan](docs/physics/README.md) covers twelve milestones. M01–M02 supply a solo Rapier2D playground in **Agent lab**: push/spin real props, launch a swept body, configure land/area/region policies, freeze and re-enable the same bodies, and test prop blocking with a lab contact traveler. Inspect effective values and their sources, queue edits or apply them while paused, and save/replay the scene. M03 moves travelers, monsters, terrain and encounter props into Rapier with regional ambient ownership; M04 carries that physical scene through versioned saves and host-authoritative eight-player co-op. Materials, destruction and mechanisms follow in M05–M12. See [status and handoffs](docs/physics/STATUS.md) for verified progress.
 
 ![The familiar wayfarer fighting Brambleheart in the Verdant March](docs/evidence/adventure-boss.png)
 
@@ -34,7 +34,7 @@ npm run bench:quality  # 6k / 16k / 32k / 65,536 creatures in game mode
 npm run bench:combat   # 300 close-up combat frames in a generated encounter
 ```
 
-E2E starts its own app on **5187** and local signaling server on **9018**. Those ports must be free. It uses `/usr/bin/google-chrome`; set `CHROME_PATH` for another installed Chrome. With `BASE_URL=https://…`, the same suite targets a deployment and its configured signaling service. Screenshots and traces go to `artifacts/`, `test-results/`, and `playwright-report/`.
+E2E starts its own app on **5187** and local signaling server on **9018**. Those ports must be free. It uses `/usr/bin/google-chrome`; set `CHROME_PATH` for another installed Chrome. In IPv4-only containers, set `SIGNAL_HOST=0.0.0.0` so the local signaling server does not bind IPv6. With `BASE_URL=https://…`, the same suite targets a deployment and its configured signaling service. Screenshots and traces go to `artifacts/`, `test-results/`, and `playwright-report/`.
 
 ## Play
 

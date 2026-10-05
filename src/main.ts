@@ -1081,7 +1081,7 @@ function loop(now: number): void {
   const input = getInput(now),
     encoded = JSON.stringify(input);
   if (net.status.role !== "guest") {
-    if (encoded !== lastInput) {
+    if (!paused && encoded !== lastInput) {
       runtime.sim.setInput(net.localId, input);
       if (net.status.role === "solo")
         runtime.log.push({ op: "input", player: net.localId, ...input });
