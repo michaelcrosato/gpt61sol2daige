@@ -314,3 +314,75 @@ Remains are `remains` family props with a validated `RemainsTag` (rig, part, the
 **Presentation** (`src/render/rigs.ts`). Part images are rasterized once per rig, theme, variant and part, and drawn with per-part transforms. Living figures get a ground shadow that stretches when knocked down and shrinks under a hover, emissive light from glowing parts, and a hurt flash. Remains are drawn as one y-sorted group at their lowest point, with soft per-part shadows, a fade before expiry and a still marker where frozen. Two new voices: thud and flutter. Camera shake strength and hit/blast flashes are local `Settings` preferences, never simulation state.
 
 **Key taps** (`src/main.ts`). Browser input is sampled once per animation frame. A key pressed and released between two frames (a quick tap on a slow device) is latched until a simulation tick has consumed it, or until a guest has sent it to the host, so it still acts once. A tap that cannot apply (paused, a dialog open) is dropped rather than replayed later.
+
+## M10 reactive towns and authored areas
+
+**Town Sanctuary** (`townScene` in `src/physics/showcase.ts`). Each town's policy is the Sanctuary preset's values (`TOWN_VALUES`): things shove and swing but never break, and material reactions are off. A `market` region (x −230, y −178, 210 × 103) keeps prop blocking, so goods there stand in the way while the rest of the town stays soft. Town content:
+
+- three `stall` assemblies (a counter and an awning on a position-motor hinge, limits ±0.9);
+- four `lamp` assemblies (a post and a lamp on a 10-unit bracket arm);
+- one `bunting` line (ten pennants on ropes between two posts), kept moving by a `breeze-town` wind strip;
+- baskets in front of each stall, plus crates, a barrel and pots as loose goods.
+
+Services are protected by permanent `sanctuary-<service>` repel fields (`TOWN_SERVICES`: the hearth, the gate and each townsperson's home), not by freezing the town. Services still follow their townsperson (M09).
+
+**Area showcases** (`areaShowcase`, registry `SHOWCASE`, keyed by mechanic). Every area mechanic has three instances on rings (`mechanicLayout` in `src/game/content.ts`, shared with `startArea`). For every mechanic an area lists, each instance gets that mechanic's set piece:
+
+- bramble: a thorn-hedge arc and a pot cache;
+- wind: a permanent tailwind lane with a barrel, a wheel and a driven vane;
+- glass: a permanent pool, two conductor rods and a pylon;
+- echo: resonance pots and stones;
+- cinder: a dry-brush fuse into a weakened four-board stockade around a cache;
+- blood: the bloom (vines anchor there);
+- gravity: stones, a log and a barrel;
+- rift: freight on the first arch's pad.
+
+Placement (`placeFrame`):
+- Each frame turns around the full circle and pushes outward until it clears terrain, earlier reaction sources (30-unit berth) and the keep-clear spots (entry, portals, a 22-unit warden spot).
+- Loose pieces relocate individually; a piece that still clashes is skipped.
+- Tailwind lanes route around ignition hazards ([D79](physics/DECISIONS.md)).
+
+Later areas combine mechanics automatically: area 9 gets three kinds of set piece.
+
+**Regions inside an area.** Instance n=1 of the signature mechanic sits in `wild-<area>` (Wild values), n=2 in `calm-<area>` (`CALM_VALUES`: Quiet with world reactions left on). Both are circles (radius 64, priority 20), drawn as dashed rings marked CALM and WILD.
+
+**Mechanic hooks** (`Adventure.activate` and friends):
+- Bramble pods call `thornburst`: a 5-tick pressure field that spares the party, eight owned `prop-thorn-<seq>-<k>` splinters, and hedges breaking.
+- Wind mechanics add a `gust:<id>` lane field owned by the crosser.
+- Glass: hero strikes on wet monsters stimulate shock (`stormglass:arc`).
+- Echo repeats carry cause `echo:<ability>`.
+- Cinder vents ignite their own fuse.
+- Blood blooms call `snare`.
+- Gravity knots add an attract field with `spare: "party"` and a `drift` along the blow.
+- Rift arches carry `freight` and spare it from the arrival strike.
+
+**Fields and surfaces** gain `spare`, `drift` and permanent `ticks: -1` surfaces (`addSurface`). **Restraints** (`ShowcasePhysics`) are Fern elastic tethers applied as velocity changes before each solve; they are saved, released with their actor and pruned on save ([D74](physics/DECISIONS.md)).
+
+**Wardens** (`src/game/wardens.ts`). `Enemy.warden` (`WardenState`: move, locked target, echo time, exposure) is saved and replicated. Each boss's signature move replaces the slam: windup `WARDEN_WINDUP` = 64 ticks with the target locked at its start, then `signature()` resolves it:
+
+| Warden | Move | Telegraph | Exposed by |
+| --- | --- | --- | --- |
+| Brambleheart | thornburst | ring | a pod bursting beside it |
+| The Gale Stag | gale charge | lane | crashing into a solid prop, fence or tree |
+| Vyr, Glasskeeper | discharge | ring | shock while wet |
+| The Echo Matron | echo slam | ring | an Echo Well's repeat |
+| Cinderjaw | breath | line | being doused |
+| The Bloom Tyrant | lash | line | a dash out of the lash |
+| The Hollow Atlas | collapse | ring (closing) | a hero-launched prop |
+| The Riftbound King | blink | marker | a traveler's rift arrival beside it |
+
+Exposure (`EXPOSED`): 180 ticks of 1.5× damage, a 40-tick stagger and a broken telegraph, then a 300-tick cooldown. Only the area's own weakness counts.
+
+**Physics runtime.**
+- `PhysicsWorld.settle()` canonicalizes a freshly built land ([D76](physics/DECISIONS.md)).
+- `reauthor` (with `PolicyController.reauthor`) migrates an older layout ([D80](physics/DECISIONS.md)).
+- `driveJoints` reads a hinged part's turn from its angular momentum about the pin ([D77](physics/DECISIONS.md)).
+- New assembly kinds: `stall`, `lamp` and `bunting`.
+- New families: `stall`, `awning`, `lamp`, `pennant`, `basket`, `hedge` (vegetation, thorn pieces) and `barricade` (wood, plank pieces).
+
+**Versions.** Adventure envelope **8**: `showcase` (restraints, sequence, events; land archives keep it). Room protocol **11**. The physical world stays **9**. M09 checkpoints and archives are re-authored once ([D80](physics/DECISIONS.md)).
+
+**Presentation and tools.**
+- `src/render/showcase.ts` draws vines, region rings, warden telegraphs, the pending echo and exposure. `combat.ts` marks the market and annotates the atlas. The HUD shows EXPOSED or the signature with its dodge hint. The mechanic guide explains each physical extension, warden and calm/wild ring.
+- `actors` actions: `showcase`, `mechanic` (id) and `warden` (`enemy-<id>`).
+- The QA bot steers around solid scenery. `node tools/adventure.ts playthrough 9 --reactions off` runs the route with the session master switch off. `node tools/physics-world.ts` writes the receipt.

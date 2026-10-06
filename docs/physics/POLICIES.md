@@ -91,6 +91,25 @@ Presets:
 
 Camera shake and hit/blast flashes are local device preferences (Settings), never policies: they change nothing in the world, saves or replays.
 
+## M10 delivered controls
+
+M10 adds no new policy values. Its towns and authored areas use the existing switches per area and per region, with these off semantics ([registry](../../src/physics/showcase.ts) `SHOWCASE.off`):
+
+| Feature | Controls | Off |
+| --- | --- | --- |
+| Town (Sanctuary values, `market` region) | Sanctuary: `destruction`, `impactDamage`, `jointBreakage`, `crowdContacts` and material/chain reactions off; impulse, field and reaction strength 0.35. The `market` region turns `propBlocking` on | A Reactive town still never blocks a service: permanent repel fields clear the hearth, gate and homes. |
+| Brambleburst thornburst | `environmentalForces`, `dynamicProps`, `destruction` | No shove, no splinters, hedges stand. The pod still roots and hurts. |
+| Slipstream lanes and gusts | `environmentalForces` | Lanes and gusts stop; haste and spirit remain. |
+| Stormglass pools and arcs | `materialReactions` | No soaking, conduction or arcs; a pylon's direct lightning still hits. |
+| Echo Wells force repeat | `worldReactions` | The echo repeats damage only. |
+| Cinderwake vents | `materialReactions` | No eruption or burning; the burning-strike buff remains. |
+| Bloodbloom vines, Bloom Tyrant lash | `mechanisms`, `jointBreakage`, `jointStrength` | No vines grow (held vines go slack); with breakage off they never snap. The life trade and its bonus remain. |
+| Gravity Knots drifting cluster | `environmentalForces` | No pull or drift; the knot's root and impulse remain. |
+| Riftstep freight | `dynamicProps`, `environmentalForces` | Freight stays behind; no arrival push. |
+| Warden signatures | the same switches at the warden | A signature still telegraphs and strikes. Its physical part follows the switch, and the weakness needs the area's rule to be on. |
+
+Every area has a `wild-<area>` region (Wild values) around the signature mechanic's second instance and a `calm-<area>` region (Quiet values, world reactions on) around its third, so the same mechanic plays three ways in one area. With the session master switch off, every area clears by kills alone (route evidence in [VERIFICATION.md](../VERIFICATION.md#m10-reactive-towns-and-authored-areas-evidence)).
+
 ## Scope and precedence
 
 Resolve values in this order: engine defaults, land profile, area profile, containing named region, then applicable live debug overrides. A more specific live override wins over a broader live override; the session-wide master `worldReactions = false` is an absolute off switch. Within one specificity, use declared priority and stable region ID to break ties. Show the effective value and the source that supplied it.

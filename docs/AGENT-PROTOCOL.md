@@ -416,3 +416,44 @@ That kills the stalker and leaves a six-body ragdoll lying to the east. Use the 
 - Local `Settings` gain `cameraShake` (0–1) and `hitFlash` (boolean), and `observe().render.feedback` reports the last frame's shake and flash.
 
 See [the M09 contract](ARCHITECTURE.md#m09-physical-rigs-and-expressive-reactions).
+
+## M10 reactive towns and authored areas
+
+| Command | Fields and behavior |
+| --- | --- |
+| `{"op":"actors","action":"showcase"}` | Returns, read-only and on guests too: <ul><li>the showcase registry (each mechanic's extension, set piece and off semantics) and the warden registry (move, telegraph, weakness, windup and exposure);</li><li>live restraints (`snare-<n>`: kind `bloom` or `lash`, body, anchor or point, rest length, owner, `until`, load);</li><li>recent showcase events;</li><li>every living warden's `warden` state (move, locked target `tx`/`ty`, `echoAt`, `exposedUntil`, `exposedBy`, `lastExposed`);</li><li>`setPieces`: the M10 body ids per area.</li></ul> |
+| `{"op":"actors","action":"mechanic","id":4}` | QA. Uses area mechanic `id` now, as the caller, through the ordinary activation (costs and physical extension included); a mechanic that is not ready is refused. Returns the mechanic and the showcase state. Host only. |
+| `{"op":"actors","action":"warden","id":"enemy-12"}` | QA. Makes that living boss's next attack, due now, its signature move: at its next attack it winds up for 64 ticks toward its target, which is locked when the telegraph starts. Returns `{id, name, warden}`. Host only. |
+
+Set-piece ids follow `prop-<family>-<area>-<mechanic>-<instance>-<piece>`, for example:
+- `prop-hedge-1-bramble-0-1` and `prop-barricade-5-cinder-0-front`;
+- `prop-crate-8-rift-0-0` (rift freight);
+- `vane-<area>-wind-<n>` (a vane assembly).
+
+Town fixtures are `prop-<family>-town-…` in the assemblies `stall-town-<n>`, `lamp-town-<n>` and `bunting-town`. Other ids:
+- thorn splinters: `prop-thorn-<seq>-<k>`;
+- fields: `tailwind-<area>-<n>`, `gust:<mechanic>`, `mechanic:<id>` (a drifting knot), `thornburst-<seq>`, `breeze-town` and `sanctuary-<service>`;
+- permanent pools: `pool-<area>-<n>`;
+- regions: `market`, `wild-<area>` and `calm-<area>`.
+
+Events:
+- `assembly` events: `snare:grown`, `snare:snapped`, `snare:withered`, `lash:caught`, `lash:snapped`, `lash:withered` and `freight:carried` (amount = pieces).
+- `mechanic` events: `warden:<move>` at the start of a telegraph (amount = windup ticks).
+- `rig` events: `warden:exposed:<cause>` and `warden:crash`.
+- Stormglass arcs are `reaction` events starting `conduct`. Echo repeats instigate with cause `echo:<ability>`.
+
+```json
+{"op":"encounter","index":6}
+{"op":"actors","action":"monster","rig":"crawler","x":2600,"y":0,"hp":100000,"boss":true,"clear":true}
+{"op":"actors","action":"warden","id":"enemy-1031"}
+{"op":"step","ticks":70}
+{"op":"actors","action":"showcase"}
+```
+
+That starts the Bloom Tyrant's lash at the traveler; after the telegraph a `lash` restraint holds them until a dash tears it (`warden:exposed:lash`). Use the boss's actual id and the area's position from `observe`.
+
+- No new policy values. Saves write adventure envelope 8 / world 9; rooms use protocol 11.
+- `node tools/adventure.ts playthrough 9 --reactions off` runs the route with the session master switch off and writes `playthrough-reactions-off.json`.
+- `node tools/physics-world.ts` prints the M10 receipt.
+
+See [the M10 contract](ARCHITECTURE.md#m10-reactive-towns-and-authored-areas).
