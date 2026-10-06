@@ -720,10 +720,12 @@ export class Coop {
       conn.send({ type, seq, ...payload });
     });
   }
-  update(dt: number, input: Input, view: SnapshotView): void {
+  /** Returns true when a guest sent this input to the host. */
+  update(dt: number, input: Input, view: SnapshotView): boolean {
     const now = performance.now();
     if (this.status.role === "guest" && this.status.state === "connected") {
       const conn = this.connections.values().next().value;
+      let sent = false;
       if (conn?.open && now - this.lastSent > 30) {
         conn.send({
           type: "input",
@@ -735,15 +737,16 @@ export class Coop {
           ...input,
         });
         this.lastSent = now;
+        sent = true;
       }
       if (now - Math.max(this.lastSnapshot, this.lastReceive, this.heartbeatAt) > HOST_SILENCE_MS) {
         this.disconnect();
         this.status.message = "Host stopped responding. Continuing solo.";
         this.changed();
       }
-      return;
+      return sent;
     }
-    if (this.status.role !== "host") return;
+    if (this.status.role !== "host") return false;
     for (const [id, time] of this.lastInput)
       if (now - time > 300) this.getSim().setInput(id, idleInput());
     for (const conn of this.connections.values()) this.pumpTransfer(conn);
@@ -752,7 +755,7 @@ export class Coop {
       for (const conn of this.connections.values()) if (conn.open) conn.send({ type: "alive" });
     }
     this.elapsed += dt;
-    if (this.elapsed < 0.1) return;
+    if (this.elapsed < 0.1) return false;
     this.elapsed = 0;
     for (const conn of this.connections.values())
       if (
@@ -761,6 +764,7 @@ export class Coop {
         (!("bufferSize" in conn) || Number(conn.bufferSize) < 8)
       )
         void this.sendPhysical(conn);
+    return false;
   }
 
   disconnect(cancelJoin = true, recover = true): void {

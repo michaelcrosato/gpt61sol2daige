@@ -231,8 +231,9 @@ Rendering and simulation cost (informational, D53): with no other load, reaction
 ## M09 physical rigs evidence
 
 On 2026-10-05:
+
 - `npm run check` passed **134 headless tests** and `npm run build` produced the bundle.
-- `npm run test:e2e` passed **37 browser scenarios**, including three new M09 scenarios and the preserved WebRTC smoke checks ([D53](physics/DECISIONS.md)).
+- `npm run test:e2e` passed **38 browser scenarios**, including four new M09 scenarios and the preserved WebRTC smoke checks ([D53](physics/DECISIONS.md)). The fourth new scenario checks that a key tap shorter than one frame still casts once. CI exposed that race: on its slower frames, an existing Whorl press was lost, and taps are now latched until a tick consumes them. `FERN_VIDEO=1` records the real-input video; recording needs Playwright's ffmpeg, so the default suite runs unrecorded against any Chrome.
 - `npm run verify:run` cleared all nine areas (level 18, 2,659 gold; [route](evidence/physics-m09-route.jsonl)). Staggers and knockdowns now interrupt monster attacks.
 
 The numbers below come from the [receipt](evidence/physics-m09.json) (`node tools/physics-rigs.ts`; seed 142, area 1, other monsters removed).
@@ -245,6 +246,7 @@ The numbers below come from the [receipt](evidence/physics-m09.json) (`node tool
 | The player responds immediately; NPC services stay usable; desktop and mobile agree; guests receive the same poses and results | With and without a large injected recoil (lean 0.25, lantern 0.9), the wayfarer's trajectory is identical and a reversal is followed at once. In town the traveler shoves Rowan 29.7 units (`npc:bump:rowan`, a startled mark), the shop opens where Rowan stands, and Rowan walks back to within 2.1 units in 4 s. A touch Slash fells a stalker the same way a mouse does. A guest's portable scene holds identical remains bodies and rig state, and `enemyPose` on a decoded header equals the host's. Local camera shake and flashes set to 0 report 0 in `observe().render.feedback`. |
 
 Also covered:
+
 - **Shedding:** brute bark is wood, warden plates are metal and totem crowns are wood, never duplicated at death.
 - **Status transfer:** a burning monster's remains keep burning.
 - **Expiry:** 2,700 ticks remove the whole assembly, its joints and its record.

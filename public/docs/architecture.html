@@ -1024,15 +1024,19 @@ synthesized voices (ignite, hiss, zap, boom, splash, gust).</p>
 and expressive reactions</h2>
 <p><strong>Rig recipes</strong> (<code>src/game/rigs.ts</code>,
 engine-safe). Each of the six monster rigs is a tree of parts. A part
-has: - a socket (its pivot on its parent, in sprite units with the
-origin at the feet), a mass share and hinge limits; - a material
-(vegetation, wood, cloth, metal or glass) and its own pixel art; -
-secondary-motion <code>follow</code> and <code>lag</code>, and an
+has:</p>
+<ul>
+<li>a socket (its pivot on its parent, in sprite units with the origin
+at the feet), a mass share and hinge limits;</li>
+<li>a material (vegetation, wood, cloth, metal or glass) and its own
+pixel art;</li>
+<li>secondary-motion <code>follow</code> and <code>lag</code>, and an
 authored animation channel (leg, arm, tail, antenna, head) with a windup
-<code>lift</code>; - optionally <code>detach</code>: <code>hit</code>
-armor and bark (brute bark plates, warden metal plates and emblem, totem
-crown) or a <code>death</code> piece (the wraith’s glass lantern
-core).</p>
+<code>lift</code>;</li>
+<li>optionally <code>detach</code>: <code>hit</code> armor and bark
+(brute bark plates, warden metal plates and emblem, totem crown) or a
+<code>death</code> piece (the wraith’s glass lantern core).</li>
+</ul>
 <p>Collider boxes are measured from each part’s own art
 (<code>rigGeometry</code>), so a ragdoll limb is exactly the shape that
 is drawn. Each blueprint also sets its locomotion
@@ -1043,11 +1047,14 @@ thresholds, knockback multiplier and ragdoll mass.
 <code>rigExport()</code> serves agents and docs.</p>
 <p><strong>Living rigs</strong> stay one Rapier actor each (no per-limb
 bodies while alive). <code>Enemy.reaction</code> is authoritative, saved
-and replicated in the room header: - a screen-space lean spring and a
-vertical squash spring; - poise, <code>staggerUntil</code>, a knockdown
-(<code>toppleAt</code>, <code>toppleUntil</code>, side); - the latest
-blow (<code>knockX</code>, <code>knockY</code>) and a <code>shed</code>
-mask.</p>
+and replicated in the room header:</p>
+<ul>
+<li>a screen-space lean spring and a vertical squash spring;</li>
+<li>poise, <code>staggerUntil</code>, a knockdown
+(<code>toppleAt</code>, <code>toppleUntil</code>, side);</li>
+<li>the latest blow (<code>knockX</code>, <code>knockY</code>) and a
+<code>shed</code> mask.</li>
+</ul>
 <p><code>stepReaction</code> advances it every tick.
 <code>hitReaction</code> adds recoil
 (<code>recoil × knock × reaction strength</code>) and poise
@@ -1066,11 +1073,14 @@ scatters. Renderer and physics use the same function.</p>
 <code>AdventurePhysics.retire</code>). At the first boundary after a
 kill, the actor body leaves the solver and, in the same tick,
 <code>remainsRecipes</code> builds the remains from the drawn pose at
-that tick: - one dynamic <code>remains</code> prop per part
+that tick:</p>
+<ul>
+<li>one dynamic <code>remains</code> prop per part
 (<code>prop-remains-&lt;enemy&gt;-&lt;part&gt;</code>), joined by
 unbreakable limited hinges into a <code>remains-&lt;enemy&gt;</code>
-assembly whose root is the first part; - detachables not already shed as
-loose material props.</p>
+assembly whose root is the first part;</li>
+<li>detachables not already shed as loose material props.</li>
+</ul>
 <p>The bodies lie where the art would lie after the fall: rotated
 through <code>fallAngle</code> (away from the killing blow and mostly
 sideways, π for a crawler, a slump for a wraith) about the rig’s fall
@@ -1093,22 +1103,29 @@ ash.</p>
 They meet terrain, props and travelers but never each other, and sit in
 dominance group −1, so everything pushes them and they block nobody.
 Frozen remains meet only terrain.</p>
-<p><strong>Controls.</strong> - <code>ragdolls</code> freezes jointed
-remains in place; loose pieces follow <code>dynamicProps</code>. - Where
-ragdolls are off at death, no bodies are made: the enemy record shows
-the authored death pose (the same fall, faded out with the 40-tick
-record). - Remains are cosmetic transients: they leave whole
+<p><strong>Controls.</strong></p>
+<ul>
+<li><code>ragdolls</code> freezes jointed remains in place; loose pieces
+follow <code>dynamicProps</code>.</li>
+<li>Where ragdolls are off at death, no bodies are made: the enemy
+record shows the authored death pose (the same fall, faded out with the
+40-tick record).</li>
+<li>Remains are cosmetic transients: they leave whole
 (<code>PhysicsWorld.removeAssembly</code>) 2,700 ticks (45 s) after
-death, and never enter land archives.</p>
-<p><strong>Wayfarer and townsfolk.</strong> - <code>Hero.recoil</code>
-holds a lean and a lantern pendulum stepped from the traveler’s
-acceleration and blows. It is presentation-only in effect: input and
-movement are untouched. - In town, each townsperson is a physical actor
+death, and never enter land archives.</li>
+</ul>
+<p><strong>Wayfarer and townsfolk.</strong></p>
+<ul>
+<li><code>Hero.recoil</code> holds a lean and a lantern pendulum stepped
+from the traveler’s acceleration and blows. It is presentation-only in
+effect: input and movement are untouched.</li>
+<li>In town, each townsperson is a physical actor
 (<code>npc-&lt;id&gt;</code>, mass 0.8). Travelers always touch them,
 whatever the town’s crowd contacts. A motor walks them back along their
 authored stroll, and a traveler’s shove emits
-<code>npc:bump:&lt;id&gt;</code>. - Services are offered where the
-townsperson stands now.</p>
+<code>npc:bump:&lt;id&gt;</code>.</li>
+<li>Services are offered where the townsperson stands now.</li>
+</ul>
 <p><strong>Foliage</strong> (<code>RigPhysics</code>). Trees and brush
 carry a saved bend spring, excited by wind and pressure fields (scaled
 by field strength where environmental forces are on), bodies brushing
@@ -1129,7 +1146,13 @@ from glowing parts, and a hurt flash. Remains are drawn as one y-sorted
 group at their lowest point, with soft per-part shadows, a fade before
 expiry and a still marker where frozen. Two new voices: thud and
 flutter. Camera shake strength and hit/blast flashes are local
-<code>Settings</code> preferences, never simulation state.</p></main>
+<code>Settings</code> preferences, never simulation state.</p>
+<p><strong>Key taps</strong> (<code>src/main.ts</code>). Browser input
+is sampled once per animation frame. A key pressed and released between
+two frames (a quick tap on a slow device) is latched until a simulation
+tick has consumed it, or until a guest has sent it to the host, so it
+still acts once. A tap that cannot apply (paused, a dialog open) is
+dropped rather than replayed later.</p></main>
 <footer>Fern · A world engine built for agents · <a href="https://github.com/michaelcrosato/gpt61sol2daige">Source on GitHub</a></footer>
 </body>
 </html>

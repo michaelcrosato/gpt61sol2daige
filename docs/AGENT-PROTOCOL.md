@@ -388,12 +388,14 @@ That reproduces the fuse chain: the brush burns segment by segment, lights the k
 | `{"op":"actors","action":"hit","id":"enemy-12","damage":40,"angle":0}` | One blow through the ordinary hit path, credited to the caller, from the direction `angle` (the blow travels along it). Recoil, poise, stagger, knockdown, shed armor, the kill, its rewards and the remains follow exactly as in play. Host only. |
 
 Remains ids:
+
 - `prop-remains-<enemy>-<part>` for each part, in assembly `remains-<enemy>`;
 - `prop-remains-<enemy>-<piece>` for loose armor, bark and lantern cores.
 
 Their `blueprint.rig` tag names the rig, part, theme, variant, scale, mirroring, birth tick, fall angle and fall pivot. Townsfolk bodies are `npc-rowan`, `npc-iona` and `npc-orin`, present in town only.
 
 Rig events (`rig` combat events):
+
 - `stagger:<rig>` and `topple:<rig>`;
 - `shed:<rig>:<material>`;
 - `fall:<rig>:<material>` when remains reach the ground;
@@ -408,6 +410,7 @@ Rig events (`rig` combat events):
 ```
 
 That kills the stalker and leaves a six-body ragdoll lying to the east. Use the monster's actual id from `monster`'s result.
+
 - New policy values: `ragdolls` and `foliage` (booleans) and `reactionStrength` (0–10).
 - Saves write adventure envelope 7 / world 9; rooms use protocol 10.
 - Local `Settings` gain `cameraShake` (0–1) and `hitFlash` (boolean), and `observe().render.feedback` reports the last frame's shake and flash.

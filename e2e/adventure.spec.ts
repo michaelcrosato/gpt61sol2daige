@@ -32,6 +32,32 @@ test("solo menus and atlas pause time while preserving an explicit lab pause", a
     .toBeGreaterThan(manualTick);
 });
 
+test("a key tap shorter than one frame still casts once", async ({ page }) => {
+  await page.goto("/");
+  await page.waitForFunction(() => !!window.fern);
+  const casts = await page.evaluate(async () => {
+    window.fern.pause(true);
+    window.fern.command({ op: "reset", seed: 142, count: 0 });
+    window.fern.command({ op: "encounter", index: 1 });
+    window.fern.command({ op: "step", ticks: 2 });
+    window.fern.pause(false);
+    const canvas = document.querySelector("#world-canvas") as HTMLElement;
+    canvas.focus();
+    const frame = () => new Promise(requestAnimationFrame);
+    await frame();
+    await frame();
+    // Down and up in one task: no frame samples the held key, so only the tap latch can cast.
+    canvas.dispatchEvent(new KeyboardEvent("keydown", { key: "q", bubbles: true }));
+    canvas.dispatchEvent(new KeyboardEvent("keyup", { key: "q", bubbles: true }));
+    for (let i = 0; i < 20; i++) await frame();
+    const save = window.fern.command({ op: "save" }) as {
+      adventure: { events: { type: string }[] };
+    };
+    return save.adventure.events.filter((e) => e.type === "whorl").length;
+  });
+  expect(casts).toBe(1);
+});
+
 test("the browser completes the build, combat, loot, outward travel and resupply loop", async ({
   page,
 }) => {

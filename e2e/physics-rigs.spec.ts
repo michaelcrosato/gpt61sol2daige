@@ -1,8 +1,10 @@
 import { expect, type Page, test } from "@playwright/test";
 import type { RigKind } from "../src/game/content.ts";
 
-// The desktop scenario is recorded: its video is the moving capture of all six rigs.
-test.use({ video: { mode: "on", size: { width: 960, height: 660 } } });
+// FERN_VIDEO=1 records the desktop scenario: its video is the moving capture of all six rigs
+// (docs/evidence/physics-m09-rigs.webm). Recording needs Playwright's ffmpeg (`npx playwright
+// install ffmpeg`); without the variable the scenarios run unrecorded against any Chrome.
+if (process.env.FERN_VIDEO) test.use({ video: { mode: "on", size: { width: 960, height: 660 } } });
 
 interface Remains {
   enemy: number;

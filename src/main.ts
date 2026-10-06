@@ -82,6 +82,8 @@ let atlasCenter = { x: 0, y: 0 };
 let inputOverride: Input | null = null;
 let previousNetworkRole = "solo";
 const keys = new Set<string>();
+/** Keys pressed since a tick last consumed input: a tap shorter than one frame still acts once. */
+const tapped = new Set<string>();
 let touchInput = { x: 0, y: 0 },
   pulseUntil = 0,
   dashUntil = 0,
@@ -1031,6 +1033,7 @@ document.addEventListener("keydown", (event) => {
     if (!started) begin();
     inputOverride = null;
     keys.add(key);
+    tapped.add(key);
   }
   if (key === "l" && !event.repeat) el("lantern").click();
   if (key === "c") renderer.follow = true;
@@ -1041,6 +1044,7 @@ document.addEventListener("keydown", (event) => {
 document.addEventListener("keyup", (event) => keys.delete(event.key.toLowerCase()));
 window.addEventListener("blur", () => {
   keys.clear();
+  tapped.clear();
   inputOverride = null;
   touchInput = { x: 0, y: 0 };
   attacking = false;
@@ -1048,6 +1052,7 @@ window.addEventListener("blur", () => {
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) {
     keys.clear();
+    tapped.clear();
     touchInput = { x: 0, y: 0 };
   }
   accumulator = 0;
@@ -1055,32 +1060,36 @@ document.addEventListener("visibilitychange", () => {
 });
 function getInput(now: number): Input {
   if (inputOverride) return inputOverride;
-  if (!started || view !== "world" || document.querySelector("dialog[open]")) return idleInput();
+  if (!started || view !== "world" || document.querySelector("dialog[open]")) {
+    tapped.clear();
+    return idleInput();
+  }
+  const down = (key: string) => keys.has(key) || tapped.has(key);
   const player = runtime.sim.players.get(net.localId);
   pointerWorld = renderer.screenToWorld(pointerScreen.x, pointerScreen.y);
   const aimDistance = player ? Math.hypot(pointerWorld.x - player.x, pointerWorld.y - player.y) : 1;
   return {
     x: clamp(
-      (keys.has("d") || keys.has("arrowright") ? 1 : 0) -
-        (keys.has("a") || keys.has("arrowleft") ? 1 : 0) +
+      (down("d") || down("arrowright") ? 1 : 0) -
+        (down("a") || down("arrowleft") ? 1 : 0) +
         touchInput.x,
       -1,
       1,
     ),
     y: clamp(
-      (keys.has("s") || keys.has("arrowdown") ? 1 : 0) -
-        (keys.has("w") || keys.has("arrowup") ? 1 : 0) +
+      (down("s") || down("arrowdown") ? 1 : 0) -
+        (down("w") || down("arrowup") ? 1 : 0) +
         touchInput.y,
       -1,
       1,
     ),
-    dash: keys.has("shift") || keys.has(" ") || now < dashUntil,
-    pulse: keys.has("q") || keys.has("2") || now < pulseUntil,
-    interact: keys.has("e") || now < interactUntil,
-    attack: !heldProp() && (attacking || keys.has("j") || now < attackUntil),
-    lance: keys.has("r") || keys.has("3") || now < lanceUntil,
-    nova: keys.has("f") || keys.has("4") || now < novaUntil,
-    potion: keys.has("1") || now < potionUntil,
+    dash: down("shift") || down(" ") || now < dashUntil,
+    pulse: down("q") || down("2") || now < pulseUntil,
+    interact: down("e") || now < interactUntil,
+    attack: !heldProp() && (attacking || down("j") || now < attackUntil),
+    lance: down("r") || down("3") || now < lanceUntil,
+    nova: down("f") || down("4") || now < novaUntil,
+    potion: down("1") || now < potionUntil,
     aimX: pointerAim && player ? (pointerWorld.x - player.x) / Math.max(1, aimDistance) : 0,
     aimY: pointerAim && player ? (pointerWorld.y - player.y) / Math.max(1, aimDistance) : 0,
   };
@@ -1242,6 +1251,7 @@ function loop(now: number): void {
   fps = 1000 / Math.max(frameMs, 1);
   const input = getInput(now),
     encoded = JSON.stringify(input);
+  let consumed = paused;
   if (net.status.role !== "guest") {
     if (!paused && encoded !== lastInput) {
       runtime.sim.setInput(net.localId, input);
@@ -1255,6 +1265,7 @@ function loop(now: number): void {
       const tickBudget = Math.max(1, Math.min(5, Math.floor(12 / Math.max(stepMs, 0.1))));
       const ticks = Math.min(Math.floor(accumulator / STEP), tickBudget);
       if (ticks > 0) {
+        consumed = true;
         runtime.sim.step(ticks);
         accumulator = Math.max(0, accumulator - ticks * STEP);
         stepMs = stepMs * 0.9 + runtime.sim.metrics.stepMs * 0.1;
@@ -1267,7 +1278,7 @@ function loop(now: number): void {
       }
     }
   }
-  net.update(delta, input, {
+  const sent = net.update(delta, input, {
     x: renderer.x,
     y: renderer.y,
     radius: Math.min(
@@ -1276,6 +1287,9 @@ function loop(now: number): void {
     ),
     entityLimit: renderer.entityLimit,
   });
+  // A tap is held until a tick has consumed it or, for a guest, until it was sent to the host.
+  if (consumed || sent || (net.status.role === "guest" && net.status.state !== "connected"))
+    tapped.clear();
   const alpha =
     net.status.role === "guest"
       ? clamp((now - net.lastSnapshot) / 100, 0, 1)
