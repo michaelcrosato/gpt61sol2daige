@@ -1643,6 +1643,31 @@ protected fetch returns 403). The release is verified as the READY
 production deployment for the merge commit. The live browser scenarios
 (<code>BASE_URL=… npm run test:e2e</code>) were not run against
 production.</li>
+</ul>
+<h2 id="final-verification-of-the-reactive-physics-plan">Final
+verification of the reactive physics plan</h2>
+<p>On 2026-10-06, after M12 merged (PR #25 at <code>804d788</code>):</p>
+<ul>
+<li><strong>Main CI:</strong> run 37543845815 passed check, build and
+all 48 browser scenarios on <code>804d788</code>.</li>
+<li><strong>Production:</strong> Vercel’s GitHub deployment record
+6897247581 reports its production deployment complete.</li>
+<li><strong>Merged main rechecked in the implementing container</strong>
+(working tree equal to <code>origin/main</code>):
+<ul>
+<li><code>npm run check</code>: 190 of 190 headless tests;</li>
+<li><code>npm run showcase</code>: all six beats;</li>
+<li>both 12-area routes: byte-identical to the committed route
+evidence.</li>
+</ul></li>
+<li><strong><a href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/evidence/physics-release-ledger.json">Release
+ledger</a>:</strong> all 25 PRs from the Fern 2.0 baseline to M12
+merged. Each milestone’s chain ends on a green main CI run, and every
+red run was fixed by the next PR in its chain.</li>
+<li><strong>Not run:</strong> the live production page and its browser
+scenarios. The container’s network policy denies
+<code>*.vercel.app</code>, and the Vercel connector refuses deployment
+reads.</li>
 </ul></main>
 <footer>Fern · A world engine built for agents · <a href="https://github.com/michaelcrosato/gpt61sol2daige">Source on GitHub</a></footer>
 </body>

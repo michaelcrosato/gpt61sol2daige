@@ -378,3 +378,17 @@ Every milestone's experience is reachable in the game or a deliberate tool:
 
 - In normal play the controls stay responsive. The browser showcase with video capture in game mode ran at about 29 FPS on this container, so the recorded run uses the default view at 960×600. Per D53 this is reported as information, not as a release gate.
 - Production cannot be loaded from the implementing container (its network policy denies `*.vercel.app`; the Vercel connector's protected fetch returns 403). The release is verified as the READY production deployment for the merge commit. The live browser scenarios (`BASE_URL=… npm run test:e2e`) were not run against production.
+
+## Final verification of the reactive physics plan
+
+On 2026-10-06, after M12 merged (PR #25 at `804d788`):
+
+- **Main CI:** run 37543845815 passed check, build and all 48 browser scenarios on `804d788`.
+- **Production:** Vercel's GitHub deployment record 6897247581 reports its production deployment complete.
+- **Merged main rechecked in the implementing container** (working tree equal to `origin/main`):
+  - `npm run check`: 190 of 190 headless tests;
+  - `npm run showcase`: all six beats;
+  - both 12-area routes: byte-identical to the committed route evidence.
+- **[Release ledger](evidence/physics-release-ledger.json):** all 25 PRs from the Fern 2.0 baseline to M12 merged. Each milestone's chain ends on a green main CI run, and every red run was fixed by the next PR in its chain.
+- **Not run:** the live production page and its browser scenarios. The container's network policy denies `*.vercel.app`, and the Vercel connector refuses deployment reads.
+

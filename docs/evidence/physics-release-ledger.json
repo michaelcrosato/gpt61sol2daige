@@ -1,0 +1,344 @@
+{
+  "verified": "2026-10-06",
+  "source": "GitHub REST API (pulls, actions/runs?event=push&head_sha) read from the implementing container",
+  "note": "mainCi is the push-triggered CI run on each merge commit; a failure is resolved by the next PR in the same milestone chain. PR #7 merged into PR #8 branch, so it has no main run.",
+  "prs": [
+    {
+      "pr": 1,
+      "milestone": "Baseline (Fern 2.0)",
+      "title": "Build Fern's outward hack-and-slash adventure",
+      "merged": "2026-10-04T10:03:29Z",
+      "mergeCommit": "c47cb119d6f57c70ddf79a4a72db59376d68f1e5",
+      "base": "main",
+      "mainCi": {
+        "run": 37194129782,
+        "conclusion": "success",
+        "attempt": 1
+      }
+    },
+    {
+      "pr": 2,
+      "milestone": "Planning",
+      "title": "Plan Fern's reactive physics milestones and fresh-session handoffs",
+      "merged": "2026-10-04T15:44:33Z",
+      "mergeCommit": "00ab840c1f1757d554610570145820269be6b2e8",
+      "base": "main",
+      "mainCi": {
+        "run": 37214137487,
+        "conclusion": "success",
+        "attempt": 1
+      }
+    },
+    {
+      "pr": 3,
+      "milestone": "M01",
+      "title": "Add Rapier foundation and interactive solo physics playground (M01)",
+      "merged": "2026-10-04T16:26:29Z",
+      "mergeCommit": "59c0c2eab2790769210abc76f5e65cdece094523",
+      "base": "main",
+      "mainCi": {
+        "run": 37216777997,
+        "conclusion": "success",
+        "attempt": 1
+      }
+    },
+    {
+      "pr": 4,
+      "milestone": "M02",
+      "title": "Add regional physics policies and live prop transitions (M02)",
+      "merged": "2026-10-04T19:39:48Z",
+      "mergeCommit": "c2ef7e299575e8716a83f616db613d668f0b74b8",
+      "base": "main",
+      "mainCi": {
+        "run": 37229133467,
+        "conclusion": "success",
+        "attempt": 1
+      }
+    },
+    {
+      "pr": 5,
+      "milestone": "M03",
+      "title": "M03: Physical adventure actors, terrain and regional ambient ownership",
+      "merged": "2026-10-04T22:03:47Z",
+      "mergeCommit": "c3ae7201aafaf5719bcf0a235dcd5fcd1255b75a",
+      "base": "main",
+      "mainCi": {
+        "run": 37238557384,
+        "conclusion": "success",
+        "attempt": 1
+      }
+    },
+    {
+      "pr": 6,
+      "milestone": "M04",
+      "title": "M04: complete physical saves and host-authoritative co-op",
+      "merged": "2026-10-04T23:51:31Z",
+      "mergeCommit": "ef861e9094202f00ff987642cbc1b244b8ac3e5b",
+      "base": "main",
+      "mainCi": {
+        "run": 37245266580,
+        "conclusion": "failure",
+        "attempt": 1
+      }
+    },
+    {
+      "pr": 7,
+      "milestone": "M04",
+      "title": "Complete M04 release: reliable full-scene loading and checkpoint migration",
+      "merged": "2026-10-05T06:24:57Z",
+      "mergeCommit": "c60cd794d07d84203b6aed2146f559a1c9d72610",
+      "base": "main",
+      "mainCi": null
+    },
+    {
+      "pr": 8,
+      "milestone": "M04",
+      "title": "Complete M04 release: keep loaded co-op hosts' guests connected and share frame builds",
+      "merged": "2026-10-05T06:24:56Z",
+      "mergeCommit": "3710313cc7cfe63ec8b800e927fcea8a1c896f01",
+      "base": "main",
+      "mainCi": {
+        "run": 37272297248,
+        "conclusion": "success",
+        "attempt": 1
+      }
+    },
+    {
+      "pr": 9,
+      "milestone": "M04 follow-up",
+      "title": "Cut per-creature ambient ownership cost 2.4x without changing results",
+      "merged": "2026-10-05T08:26:24Z",
+      "mergeCommit": "9bd16f0631e2f4e30f04f67ad0d6f5e10dcf3e34",
+      "base": "main",
+      "mainCi": {
+        "run": 37283639850,
+        "conclusion": "success",
+        "attempt": 1
+      }
+    },
+    {
+      "pr": 10,
+      "milestone": "M05",
+      "title": "M05: materials and destructible scenery",
+      "merged": "2026-10-05T10:23:49Z",
+      "mergeCommit": "26a9d48de2343ec5205eb2f298b9d92546a6411e",
+      "base": "main",
+      "mainCi": {
+        "run": 37296310916,
+        "conclusion": "success",
+        "attempt": 1
+      }
+    },
+    {
+      "pr": 11,
+      "milestone": "M06",
+      "title": "M06: combat forces, projectiles, grab/throw and physical loot",
+      "merged": "2026-10-05T12:08:54Z",
+      "mergeCommit": "dcff3f94e8bbf5dd3cc342bc73892434c232e462",
+      "base": "main",
+      "mainCi": {
+        "run": 37307530480,
+        "conclusion": "success",
+        "attempt": 1
+      }
+    },
+    {
+      "pr": 12,
+      "milestone": "M07",
+      "title": "M07: jointed mechanisms and assemblies",
+      "merged": "2026-10-05T16:40:46Z",
+      "mergeCommit": "275da484c006a20502decc695e40cd6b1ee3fcfe",
+      "base": "main",
+      "mainCi": {
+        "run": 37342707382,
+        "conclusion": "success",
+        "attempt": 1
+      }
+    },
+    {
+      "pr": 13,
+      "milestone": "Direction (D53)",
+      "title": "Feature-first direction: performance never blocks a milestone; co-op follows single player",
+      "merged": "2026-10-05T18:17:28Z",
+      "mergeCommit": "fcba70a98f7a484aab7d18170dc18b2c423b39f7",
+      "base": "main",
+      "mainCi": {
+        "run": 37354838049,
+        "conclusion": "success",
+        "attempt": 1
+      }
+    },
+    {
+      "pr": 14,
+      "milestone": "M08",
+      "title": "M08: material reactions and environmental fields",
+      "merged": "2026-10-05T20:43:15Z",
+      "mergeCommit": "a53af8d5bfff83e9602b6ebee2913603c1dcba42",
+      "base": "main",
+      "mainCi": {
+        "run": 37371489713,
+        "conclusion": "success",
+        "attempt": 2
+      }
+    },
+    {
+      "pr": 15,
+      "milestone": "M09",
+      "title": "M09: physical rigs and expressive reactions",
+      "merged": "2026-10-06T01:20:36Z",
+      "mergeCommit": "d6dc35abcafe2d85a08db3c605983797a3da58a6",
+      "base": "main",
+      "mainCi": {
+        "run": 37398675225,
+        "conclusion": "failure",
+        "attempt": 1
+      }
+    },
+    {
+      "pr": 16,
+      "milestone": "M09",
+      "title": "M09 follow-up: measure the held-attack check in simulation time",
+      "merged": "2026-10-06T02:10:05Z",
+      "mergeCommit": "98114765c13de22df44c32d66add73eb6b9d14fd",
+      "base": "main",
+      "mainCi": {
+        "run": 37402810032,
+        "conclusion": "failure",
+        "attempt": 1
+      }
+    },
+    {
+      "pr": 17,
+      "milestone": "M09",
+      "title": "M09 follow-up: keep presentation-only recoil and foliage out of the state hash",
+      "merged": "2026-10-06T03:29:57Z",
+      "mergeCommit": "cc8a31ee6e18e88c2934d95f0ee7c37cec93e920",
+      "base": "main",
+      "mainCi": {
+        "run": 37409255181,
+        "conclusion": "success",
+        "attempt": 1
+      }
+    },
+    {
+      "pr": 18,
+      "milestone": "M09",
+      "title": "M09: record the release resolution in status and handoff",
+      "merged": "2026-10-06T04:06:28Z",
+      "mergeCommit": "7d1b73c3acb3df576d35d24af3cfc89618bb4f97",
+      "base": "main",
+      "mainCi": {
+        "run": 37412127500,
+        "conclusion": "success",
+        "attempt": 1
+      }
+    },
+    {
+      "pr": 19,
+      "milestone": "M10",
+      "title": "M10: reactive towns and authored areas",
+      "merged": "2026-10-06T07:49:25Z",
+      "mergeCommit": "b96bae6a1395303ffa032cedc477e9238891a12a",
+      "base": "main",
+      "mainCi": {
+        "run": 37432079490,
+        "conclusion": "failure",
+        "attempt": 1
+      }
+    },
+    {
+      "pr": 20,
+      "milestone": "M10",
+      "title": "M10 follow-up: fight the M09 ragdoll scenario on region-free ground",
+      "merged": "2026-10-06T08:55:34Z",
+      "mergeCommit": "03154c8631b4efb5cc652087e9e6d10c7f7705b2",
+      "base": "main",
+      "mainCi": {
+        "run": 37439407985,
+        "conclusion": "success",
+        "attempt": 1
+      }
+    },
+    {
+      "pr": 21,
+      "milestone": "M11",
+      "title": "M11: procedural world physics — encounter grammar, generated areas and modular wardens",
+      "merged": "2026-10-06T14:50:43Z",
+      "mergeCommit": "fa1baacded5140349299c0a4ddd33861ea8413f7",
+      "base": "main",
+      "mainCi": {
+        "run": 37482376357,
+        "conclusion": "failure",
+        "attempt": 1
+      }
+    },
+    {
+      "pr": 22,
+      "milestone": "M11",
+      "title": "M11 follow-up: Burning palisade fuse within a slick's reach; sturdier browser scenario",
+      "merged": "2026-10-06T18:06:15Z",
+      "mergeCommit": "4317547cd2845b3be09d056ed23d6d95d2ae2429",
+      "base": "main",
+      "mainCi": {
+        "run": 37508713002,
+        "conclusion": "failure",
+        "attempt": 1
+      }
+    },
+    {
+      "pr": 23,
+      "milestone": "M11",
+      "title": "M11 follow-up: steady the Sanctuary town browser scenario",
+      "merged": "2026-10-06T19:47:09Z",
+      "mergeCommit": "b0ea666bba06c5d773a1f99f529a83385bb4c001",
+      "base": "main",
+      "mainCi": {
+        "run": 37521522891,
+        "conclusion": "failure",
+        "attempt": 1
+      }
+    },
+    {
+      "pr": 24,
+      "milestone": "M11",
+      "title": "M11 follow-up: clear Brambleburst's waves in the M07 WebRTC vine scenario",
+      "merged": "2026-10-06T20:54:43Z",
+      "mergeCommit": "5a73ad4019cb3e8d4511c0bfade51c476aa565c4",
+      "base": "main",
+      "mainCi": {
+        "run": 37530019535,
+        "conclusion": "success",
+        "attempt": 1
+      }
+    },
+    {
+      "pr": 25,
+      "milestone": "M12",
+      "title": "M12: world physics controls, showcase route, functional matrix and release",
+      "merged": "2026-10-06T22:58:06Z",
+      "mergeCommit": "804d788a8c6d1b190779c6567e5568bafb7bbaa3",
+      "base": "main",
+      "mainCi": {
+        "run": 37543845815,
+        "conclusion": "success",
+        "attempt": 1
+      }
+    }
+  ],
+  "production": {
+    "commit": "804d788a8c6d1b190779c6567e5568bafb7bbaa3",
+    "githubDeployment": 6897247581,
+    "environment": "Production",
+    "state": "success",
+    "description": "Deployment has completed",
+    "at": "2026-10-06T22:58:27Z",
+    "note": "Vercel posts this record to GitHub when a deployment completes. The Vercel connector refused deployment reads (403) after fa1baac; the live page is not reachable from the implementing container (network policy)."
+  },
+  "finalGates": {
+    "tree": "804d788 (main), working tree equal to origin/main",
+    "check": "190/190 headless tests",
+    "showcase": "npm run showcase: all six beats pass",
+    "routes": "npm run verify:run and --reactions off: byte-identical to docs/evidence/physics-m11-route*.jsonl",
+    "mainCiBrowser": "48 passed (15.1m) in run 37543845815"
+  }
+}
