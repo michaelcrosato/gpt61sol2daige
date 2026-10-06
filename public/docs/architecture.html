@@ -1478,6 +1478,81 @@ and how to start it) and the composed warden (moves, weaknesses, armor
 and its counter, arena);</li>
 <li>the boss HUD shows <code>ARMORED ×N</code> while armor holds.</li>
 </ul></li>
+</ul>
+<h2 id="m12-controls-showcase-and-release">M12 controls, showcase and
+release</h2>
+<p>M12 finishes the reactive world as a product: its controls are in the
+game, one route shows every system, and a matrix proves each switch the
+same way (<a href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/physics/DECISIONS.md">D94–D97</a>).</p>
+<ul>
+<li><strong>World physics panel</strong>
+(<code>src/app/world-physics.ts</code>, mounted by
+<code>AdventureUI</code> as the <code>physics</code> panel).
+<ul>
+<li><strong>Opening it:</strong> O (with the mouse over an object, that
+object is inspected), the HUD button beside I/K/P, the game-mode menu,
+or “World physics · O” in the pause menu. Solo menus pause time.</li>
+<li><strong>Where you stand:</strong> every effective value at the
+traveler, with its source; the session master; “Undo every live
+change”.</li>
+<li><strong>Choose where a change applies:</strong> whole land, this
+area, or a region of this area. Regions carry readable names: the
+combination’s name for an M11 cluster, Calm/Wild ring, Market,
+Pass-through patch, Creature circle, Your region.</li>
+<li><strong>Presets and switches:</strong> four preset cards with an
+explanation and their exact differences from Reactive. Each switch has
+an explanation, Default/On/Off buttons and a note of where its value
+comes from. Numeric fields accept a value, or empty for the
+default.</li>
+<li><strong>Region editing:</strong> Center on me, Larger, Smaller,
+Priority ±5, New region around me, Remove (custom regions only), Clear
+live changes here, Reset to authored.</li>
+<li><strong>Inspect an object:</strong> pick on the map (the next click
+or tap chooses it; Esc returns), “Nearest to me”, or a list of objects
+within 240 units. It shows kind and material, motion (free, fixed,
+frozen, reactivation blocked), durability, mechanism, regions, every
+effective value that differs from Reactive with its source, reaction
+status, last reaction and last push.</li>
+<li><strong>Guests:</strong> the same view with every control disabled
+(“The host controls shared physics”).</li>
+<li><strong>Implementation:</strong> every control is an agent command
+(<code>actors policies|policy|body|configure|apply</code>). Paused
+panels apply at once; a running co-op host’s edit commits at the next
+tick.</li>
+</ul></li>
+<li><strong>Highlight</strong> (<code>Renderer.inspection</code>, drawn
+by <code>drawInspection</code> in <code>src/render/showcase.ts</code>):
+the selected region’s true bounds and priority, and a ring on the
+selected body. It is local presentation, outside saves and replays, and
+cleared when the panel closes.</li>
+<li><strong>Profiles.</strong> The adventure’s areas inherit the engine
+defaults, which are the Reactive preset; the town is Sanctuary (D70).
+The M03 <code>quiet-&lt;n&gt;</code> and <code>reactive-&lt;n&gt;</code>
+patches stay as authored comparison regions with honest names.
+<code>ambientPhysics</code> stays off by default: the creature circles
+turn it on. The lab panel is labelled “Physics lab · developer tools”: a
+comparison surface, not a rollout switch.</li>
+<li><strong>Showcase route.</strong>
+<ul>
+<li>The scene recipe is <a
+href="../examples/showcase.json"><code>examples/showcase.json</code></a>,
+in Brambleburst at seed 142. It has six beats, each starting from the
+same clean scene: destructible scenery (the pen fence), a launched prop
+kill (a thrown crate), a physical rig death (the ragdoll, flung by
+Whorl), a jointed mechanism (the sprung launcher), a material chain (an
+oil jar in the brazier) and a regional off/on (the calm ring switched to
+Reactive in the panel, then reset).</li>
+<li><code>tools/lib/showcase.ts</code> plays it headless
+(<code>npm run showcase</code>); <code>e2e/showcase.spec.ts</code> plays
+it with real input. The capture is in
+<code>docs/evidence/physics-m12-showcase.{png,webm}</code>.</li>
+</ul></li>
+<li><strong>Functional matrix</strong>
+(<code>tests/physics-matrix.test.ts</code>): each of the 24 policy
+values gets a cause and a measured effect, checked on, off in a
+priority-900 region, after save/restore, on a late-join replica, and on
+again. A separate test covers the dependency combinations that change
+meaning.</li>
 </ul></main>
 <footer>Fern · A world engine built for agents · <a href="https://github.com/michaelcrosato/gpt61sol2daige">Source on GitHub</a></footer>
 </body>

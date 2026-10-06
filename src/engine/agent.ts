@@ -64,7 +64,7 @@ export const COMMANDS = {
   },
   actors: {
     action:
-      "inspect (default), body, props, recipes, attacks, mechanisms, reactions, rigs, showcase, damage, hit, monster, mechanic, warden, cut, motor, transport, stimulate, field, configure, apply, policy, impulse, place, spawn",
+      "inspect (default), policies, body, props, recipes, attacks, mechanisms, reactions, rigs, showcase, damage, hit, monster, mechanic, warden, cut, motor, transport, stimulate, field, configure, apply, policy, impulse, place, spawn",
     description:
       "Host/solo adventure physical world; guests inspect received bodies, props, destroyed records, assemblies, joints, reactions and policies. Shared tuning, damage, cuts, stimuli and fields are host-only.",
     values:
@@ -91,6 +91,10 @@ export const COMMANDS = {
     motor: "motor: hinge/slider id and motor {mode,target,stiffness,damping} or null",
     transport:
       "transport: id of a member, dx, dy; moves its whole connected part (refused while anchored to a post)",
+    policies:
+      "policies: the policy document alone (applied state, pending queue, nextRevision for configure, projected preview, capability names and presets); guests read the received document. The in-game World physics panel (O) uses it",
+    bodyView:
+      "body: one body's pose, motion, material, policy (effective values, provenance, regions), consequences, reaction status, its last recorded reaction (rule, owner, tick) and its current instigator (who last pushed or threw it)",
     id: "body/impulse/place/damage: player-<player id>, enemy-<id>, ambient-<slot>-<generation>, crate-<area>-<ordinal>, wheel-<area>, prop-<family>-<area>-<n>, <parent id>-<piece>; mechanism parts prop-gate-<area>-leaf, prop-chain-<area>-ball, prop-vine-<area>-pod, prop-launcher-<area>-sled, prop-vane-<area>-rotor, prop-bridge-<area>-plank<k>",
     props:
       "props: every scenery body with material, blueprint {family, palette, piece?, parent?, expiresAt?} and durability %, plus destroyed-parent records",
@@ -416,11 +420,18 @@ export class AgentRuntime {
           if (action === "body") {
             const entry = snapshot.world.bodies.find((b) => b.recipe.id === command.id);
             if (!entry) throw new Error("Unknown physical body");
+            const history = snapshot.reactions?.history ?? [];
+            const instigator = snapshot.combat?.instigators.find(
+              (i) => i.id === command.id && i.until >= this.sim.tick,
+            );
             return {
               ...entry.state,
               reaction: snapshot.reactions?.statuses.find((r) => r.id === command.id) ?? null,
+              lastReaction: history.findLast((e) => e.target === command.id) ?? null,
+              instigator: instigator ?? null,
             };
           }
+          if (action === "policies") return new PolicyController(snapshot.world.policies).inspect();
           if (action === "policy")
             return new PolicyController(snapshot.world.policies).resolve(
               String(
@@ -455,8 +466,14 @@ export class AgentRuntime {
         if (action === "showcase") return this.showcase(physical.showcase.save());
         if (action === "body") {
           if (typeof command.id !== "string") throw new Error("Body id required");
-          return { ...world.pose(command.id), reaction: physical.reactions.status(command.id) };
+          return {
+            ...world.pose(command.id),
+            reaction: physical.reactions.status(command.id),
+            lastReaction: physical.reactions.lastFor(command.id),
+            instigator: physical.combat.instigator(command.id, this.sim.tick),
+          };
         }
+        if (action === "policies") return world.policyState();
         if (action === "policy")
           return world.policyAt(
             typeof command.areaId === "string"

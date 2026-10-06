@@ -683,6 +683,10 @@ export class PolicyController {
   save(): PolicyCheckpoint {
     return { state: structuredClone(this.state), pending: structuredClone(this.pending) };
   }
+  /** Applied and projected revisions, for cheap change detection (menus). */
+  revisions(): string {
+    return `${this.state.revision}:${this.projected.revision}`;
+  }
   /** Applied region profiles, read-only and shared (presentation; never mutate). */
   regions(): readonly RegionProfile[] {
     return this.state.profiles.regions;

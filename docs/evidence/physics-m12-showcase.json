@@ -1,0 +1,174 @@
+{
+  "milestone": "M12",
+  "recipe": "examples/showcase.json",
+  "name": "Fern reactive world showcase",
+  "seed": 142,
+  "area": 1,
+  "ok": true,
+  "ticks": 91,
+  "stateHash": "7b29d340",
+  "beats": [
+    {
+      "id": "scenery",
+      "title": "Destructible scenery",
+      "ok": true,
+      "ticks": 18,
+      "inputs": ["slash prop-fence-1-pen0 (LMB/J)"],
+      "checks": [
+        {
+          "expect": {
+            "destroyed": "prop-fence-1-pen0"
+          },
+          "ok": true,
+          "got": true
+        }
+      ]
+    },
+    {
+      "id": "launched-kill",
+      "title": "Launched prop kill",
+      "ok": true,
+      "ticks": 87,
+      "inputs": [
+        "V: grab crate-1-0",
+        "carry it into $target",
+        "attack while holding: throw at $target"
+      ],
+      "checks": [
+        {
+          "expect": {
+            "dead": "$target"
+          },
+          "ok": true,
+          "got": "dead"
+        },
+        {
+          "expect": {
+            "event": {
+              "type": "impact",
+              "text": "impact:hit",
+              "owner": "local"
+            }
+          },
+          "ok": true,
+          "got": "impact:impact:hit/local"
+        }
+      ]
+    },
+    {
+      "id": "rig-death",
+      "title": "Physical rig death",
+      "ok": true,
+      "ticks": 186,
+      "inputs": [
+        "V: grab crate-1-0",
+        "carry it into $target",
+        "attack while holding: throw at $target",
+        "walk to $target",
+        "Q: Whorl"
+      ],
+      "checks": [
+        {
+          "expect": {
+            "remains": "$target"
+          },
+          "ok": true,
+          "got": 6
+        },
+        {
+          "expect": {
+            "moved": "$target",
+            "min": 12
+          },
+          "ok": true,
+          "got": 105.4
+        }
+      ]
+    },
+    {
+      "id": "mechanism",
+      "title": "Jointed mechanism",
+      "ok": true,
+      "ticks": 60,
+      "inputs": ["V: grab prop-launcher-1-sled", "hold 0,-1 for 30 ticks", "V: set it down"],
+      "checks": [
+        {
+          "expect": {
+            "event": {
+              "type": "assembly",
+              "text": "launcher:fired",
+              "owner": "local"
+            }
+          },
+          "ok": true,
+          "got": "assembly:launcher:fired/local"
+        }
+      ]
+    },
+    {
+      "id": "material-chain",
+      "title": "Material chain",
+      "ok": true,
+      "ticks": 144,
+      "inputs": [
+        "V: grab prop-jar-1-0",
+        "carry it into prop-brazier-1-0",
+        "V: set it down",
+        "walk to 790,70"
+      ],
+      "checks": [
+        {
+          "expect": {
+            "rules": ["spill", "ignite"]
+          },
+          "ok": true,
+          "got": ["coat", "flare", "heat", "ignite", "spill", "spread"]
+        }
+      ]
+    },
+    {
+      "id": "region",
+      "title": "Regional off/on",
+      "ok": true,
+      "ticks": 86,
+      "inputs": [
+        "slash prop-pot-1-bramble-2-cache (LMB/J)",
+        "World physics (O): region calm-1 → Reactive",
+        "slash prop-pot-1-bramble-2-cache (LMB/J)",
+        "World physics (O): region calm-1 → reset to authored"
+      ],
+      "checks": [
+        {
+          "expect": {
+            "intact": "prop-pot-1-bramble-2-cache"
+          },
+          "ok": true,
+          "got": true
+        },
+        {
+          "expect": {
+            "destroyed": "prop-pot-1-bramble-2-cache"
+          },
+          "ok": true,
+          "got": true
+        },
+        {
+          "expect": {
+            "policy": {
+              "at": "calm-1",
+              "values": {
+                "destruction": false,
+                "dynamicProps": false
+              }
+            }
+          },
+          "ok": true,
+          "got": {
+            "destruction": false,
+            "dynamicProps": false
+          }
+        }
+      ]
+    }
+  ]
+}

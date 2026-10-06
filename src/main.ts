@@ -14,6 +14,7 @@ import {
 import { hasCheckpoint, loadCheckpoint, saveCheckpoint } from "./app/save-store.ts";
 import { mountSettingsUI } from "./app/settings-ui.ts";
 import { icon, mountUI } from "./app/ui.ts";
+import { WorldPhysicsPanel } from "./app/world-physics.ts";
 import { AudioEngine } from "./audio/audio.ts";
 import { MATERIAL_SOUNDS, type MaterialSound } from "./audio/synth.ts";
 import { AgentRuntime, type Command } from "./engine/agent.ts";
@@ -95,6 +96,7 @@ let attackUntil = 0,
   attacking = false,
   pointerAim = false;
 let pointerWorld = { x: 0, y: 0 },
+  pointerOnCanvas = false,
   latestCombatEvent = 0;
 let pointerScreen = { x: 0, y: 0 },
   combatSession = "";
@@ -138,7 +140,48 @@ const display = new GameDisplay(
   },
   toast,
 );
+// M12: the World physics panel (pause menu, O, the HUD button). It drives the agent API.
+let picking = false,
+  pickWasPaused = false;
+const physicsPanel = new WorldPhysicsPanel({
+  sim: () => runtime.sim,
+  player: () => net.localId,
+  execute: (command) => execute(command),
+  authority: () => net.status.role !== "guest",
+  paused: () => paused,
+  pick: () => startPick(),
+  highlight: (selection) => {
+    renderer.inspection = selection;
+  },
+});
+/** Close the menu; the next click or tap on the map chooses the object to inspect. */
+function startPick(): void {
+  adventureUI.close();
+  picking = true;
+  pickWasPaused = manuallyPaused;
+  if (net.status.role === "solo") setPaused(true);
+  canvas.classList.add("picking");
+  toast("Click or tap an object to inspect it. Esc returns to the menu.", 6000);
+}
+function finishPick(at: { x: number; y: number } | null): void {
+  picking = false;
+  canvas.classList.remove("picking");
+  if (net.status.role === "solo") setPaused(pickWasPaused);
+  if (at && !physicsPanel.selectNear(at.x, at.y, 18 + 30 / renderer.zoom))
+    toast("Nothing physical there. Pick again from the menu, or use Nearest to me.");
+  adventureUI.open("physics");
+}
+/** O: inspect the object under the mouse (or nearest you) in the World physics panel. */
+function openPhysics(): void {
+  const hero = runtime.sim.players.get(net.localId);
+  const underPointer =
+    pointerOnCanvas &&
+    physicsPanel.selectNear(pointerWorld.x, pointerWorld.y, 18 + 30 / renderer.zoom);
+  if (!underPointer && hero) physicsPanel.selectNear(hero.x, hero.y, 90);
+  adventureUI.open("physics");
+}
 const adventureUI = new AdventureUI({
+  physics: physicsPanel,
   sim: () => runtime.sim,
   player: () => net.localId,
   role: () => net.status.role,
@@ -448,6 +491,7 @@ function execute(command: Command): unknown {
       command.op === "actors" &&
       [
         "inspect",
+        "policies",
         "body",
         "policy",
         "props",
@@ -899,6 +943,11 @@ canvas.addEventListener("pointerdown", (event) => {
   const rect = canvas.getBoundingClientRect();
   pointerScreen = { x: event.clientX - rect.left, y: event.clientY - rect.top };
   pointerWorld = renderer.screenToWorld(event.clientX - rect.left, event.clientY - rect.top);
+  if (picking && event.button === 0) {
+    event.preventDefault();
+    finishPick(pointerWorld);
+    return;
+  }
   if (event.button === 0) {
     if (!started) begin();
     inputOverride = null;
@@ -920,7 +969,11 @@ canvas.addEventListener("pointerdown", (event) => {
     canvas.setPointerCapture(event.pointerId);
   }
 });
+canvas.addEventListener("pointerleave", () => {
+  pointerOnCanvas = false;
+});
 canvas.addEventListener("pointermove", (event) => {
+  pointerOnCanvas = true;
   const rect = canvas.getBoundingClientRect();
   pointerScreen = { x: event.clientX - rect.left, y: event.clientY - rect.top };
   pointerWorld = renderer.screenToWorld(event.clientX - rect.left, event.clientY - rect.top);
@@ -991,8 +1044,14 @@ document.addEventListener("keydown", (event) => {
   )
     return;
   const key = event.key.toLowerCase();
-  if (!event.repeat && ["i", "k", "p", "t"].includes(key)) {
+  if (picking && key === "escape") {
     event.preventDefault();
+    finishPick(null);
+    return;
+  }
+  if (!event.repeat && ["i", "k", "p", "t", "o"].includes(key)) {
+    event.preventDefault();
+    if (key === "o") openPhysics();
     if (key === "i") adventureUI.open("inventory");
     if (key === "k") adventureUI.open("skills");
     if (key === "p") adventureUI.open("pause");

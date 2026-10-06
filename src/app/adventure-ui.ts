@@ -33,6 +33,14 @@ interface Options {
   clearInput: () => void;
   preview: (index: number) => void;
   notify: (text: string) => void;
+  /** M12 World physics panel (pause menu, O). */
+  physics?: {
+    signature(): string;
+    render(): string;
+    click(target: HTMLElement): boolean;
+    change(target: HTMLInputElement): boolean;
+    closed(): void;
+  };
 }
 const esc = (value: unknown) =>
   String(value).replace(
@@ -59,7 +67,15 @@ export class AdventureUI {
   private selectedSkill = SKILLS[0].id;
   private selectedItem = "starter-blade";
   private signature = "";
-  private panel: "inventory" | "skills" | "town" | "pause" | "death" | "mechanics" | null = null;
+  private panel:
+    | "inventory"
+    | "skills"
+    | "town"
+    | "pause"
+    | "death"
+    | "mechanics"
+    | "physics"
+    | null = null;
   private seenDeath = "";
   private readonly dialog: HTMLDialogElement;
   constructor(options: Options) {
@@ -102,18 +118,18 @@ export class AdventureUI {
       `<button class="ability flask-ability" id="potion-button" aria-label="Use healing flask" title="Healing flask (1)"><kbd>1</kbd>${icon("flask", 22)}<span id="flask-count">3 / 3</span></button>`,
     );
     document.querySelector(".input-hints")!.innerHTML =
-      `<span><kbd>W A S D</kbd> move</span><span><kbd>LMB / J</kbd> attack</span><span><kbd>E</kbd> interact</span><span><kbd>V</kbd> grab · throw</span><span><kbd>P</kbd> pause</span>`;
+      `<span><kbd>W A S D</kbd> move</span><span><kbd>LMB / J</kbd> attack</span><span><kbd>E</kbd> interact</span><span><kbd>V</kbd> grab · throw</span><span><kbd>P</kbd> pause</span><span><kbd>O</kbd> physics</span>`;
     el("world-canvas").setAttribute(
       "aria-label",
-      "Fern hack-and-slash. WASD moves, left mouse or J attacks, Q casts Whorl, Shift or Space dashes, E interacts, V grabs a loose prop (attack throws it), 1 heals.",
+      "Fern hack-and-slash. WASD moves, left mouse or J attacks, Q casts Whorl, Shift or Space dashes, E interacts, V grabs a loose prop (attack throws it), 1 heals, O opens world physics (hover an object first to inspect it).",
     );
     el("viewport").insertAdjacentHTML(
       "beforeend",
-      `<div class="adventure-shortcuts"><button id="quick-inventory" title="Equipment (I)" aria-label="Open equipment">${icon("bag", 17)}<kbd>I</kbd></button><button id="quick-skills" title="Skill tree (K)" aria-label="Open skill tree">${icon("tree", 18)}<kbd>K</kbd><i id="skill-alert"></i></button><button id="pause-game" title="Pause & tuning (P)" aria-label="Pause game">${icon("pause", 17)}<kbd>P</kbd></button></div><div class="player-vitals"><span class="level-medallion" id="hud-level">1</span><div class="vital-bars"><div class="health-line"><span>WAYFARER</span><strong id="hud-life">112 / 112</strong></div><div class="health-track"><i id="hud-health-fill"></i></div><div class="xp-track"><i id="hud-xp-fill"></i></div></div><span class="gold-readout">${icon("coin", 14)}<b id="hud-gold">80</b></span></div><div class="boss-hud" id="boss-hud" hidden><span id="boss-name"></span><div><i id="boss-health"></i></div><small id="boss-phase">WARDEN OF THE AREA</small></div><div class="interaction-prompt" id="interaction-prompt" hidden></div><div class="area-toast" id="area-toast" hidden></div>`,
+      `<div class="adventure-shortcuts"><button id="quick-inventory" title="Equipment (I)" aria-label="Open equipment">${icon("bag", 17)}<kbd>I</kbd></button><button id="quick-skills" title="Skill tree (K)" aria-label="Open skill tree">${icon("tree", 18)}<kbd>K</kbd><i id="skill-alert"></i></button><button id="pause-game" title="Pause & tuning (P)" aria-label="Pause game">${icon("pause", 17)}<kbd>P</kbd></button><button id="quick-physics" title="World physics: presets, regions and inspector (O)" aria-label="Open world physics">${icon("target", 17)}<kbd>O</kbd></button></div><div class="player-vitals"><span class="level-medallion" id="hud-level">1</span><div class="vital-bars"><div class="health-line"><span>WAYFARER</span><strong id="hud-life">112 / 112</strong></div><div class="health-track"><i id="hud-health-fill"></i></div><div class="xp-track"><i id="hud-xp-fill"></i></div></div><span class="gold-readout">${icon("coin", 14)}<b id="hud-gold">80</b></span></div><div class="boss-hud" id="boss-hud" hidden><span id="boss-name"></span><div><i id="boss-health"></i></div><small id="boss-phase">WARDEN OF THE AREA</small></div><div class="interaction-prompt" id="interaction-prompt" hidden></div><div class="area-toast" id="area-toast" hidden></div>`,
     );
     el("game-settings").insertAdjacentHTML(
       "beforebegin",
-      `<button class="icon-button" id="game-inventory" aria-label="Game equipment" title="Equipment (I)">${icon("bag", 18)}</button><button class="icon-button" id="game-skills" aria-label="Game skill tree" title="Skills (K)">${icon("tree", 18)}</button><button class="icon-button" id="game-pause" aria-label="Game pause menu" title="Pause (P)">${icon("pause", 18)}</button>`,
+      `<button class="icon-button" id="game-inventory" aria-label="Game equipment" title="Equipment (I)">${icon("bag", 18)}</button><button class="icon-button" id="game-skills" aria-label="Game skill tree" title="Skills (K)">${icon("tree", 18)}</button><button class="icon-button" id="game-pause" aria-label="Game pause menu" title="Pause (P)">${icon("pause", 18)}</button><button class="icon-button" id="game-physics" aria-label="Game world physics" title="World physics (O)">${icon("target", 18)}</button>`,
     );
     el("app").insertAdjacentHTML(
       "beforeend",
@@ -121,9 +137,25 @@ export class AdventureUI {
     );
     this.dialog = el<HTMLDialogElement>("adventure-dialog");
     this.dialog.addEventListener("close", () => {
-      if (!this.dialog.open) this.panel = null;
+      if (!this.dialog.open) {
+        if (this.panel === "physics") this.options.physics?.closed();
+        this.panel = null;
+      }
+    });
+    this.dialog.addEventListener("change", (event) => {
+      const target = event.target as HTMLInputElement;
+      if (target.dataset.wp && this.options.physics?.change(target)) {
+        this.signature = "";
+        this.update();
+      }
     });
     this.dialog.addEventListener("click", (event) => {
+      const physics = (event.target as HTMLElement).closest<HTMLElement>("[data-wp]");
+      if (physics && physics.dataset.wp !== "number" && this.options.physics?.click(physics)) {
+        this.signature = "";
+        this.update();
+        return;
+      }
       const target = (event.target as HTMLElement).closest<HTMLElement>(
         "[data-skill], [data-item], [data-action], [data-buy], [data-preset], [data-panel]",
       );
@@ -230,6 +262,8 @@ export class AdventureUI {
       el(id).addEventListener("click", () => this.open("skills"));
     for (const id of ["pause-game", "game-pause"])
       el(id).addEventListener("click", () => this.open("pause"));
+    for (const id of ["quick-physics", "game-physics"])
+      el(id).addEventListener("click", () => this.open("physics"));
     el("town-open").addEventListener("click", () =>
       this.options.sim().adventure.state.mode === "town"
         ? this.open("town")
@@ -476,6 +510,7 @@ export class AdventureUI {
       s.cleared,
       s.tuning,
       this.options.role(),
+      this.panel === "physics" ? this.options.physics?.signature() : "",
     ]);
     if (signature === this.signature) return;
     this.signature = signature;
@@ -486,6 +521,7 @@ export class AdventureUI {
       pause: "A moment to breathe.",
       death: "The lantern dims.",
       mechanics: "Make the wild work for you.",
+      physics: "Choose how the world answers.",
     }[this.panel];
     el("adventure-eyebrow").textContent = {
       inventory: "EQUIPMENT & SATCHEL",
@@ -497,6 +533,12 @@ export class AdventureUI {
           : "CO-OP CONTINUES WHILE MENUS ARE OPEN",
       death: "YOUR BUILD IS NOT LOST",
       mechanics: `${s.recipe.name.toUpperCase()} · OPTIONAL ADVANTAGES`,
+      physics:
+        this.options.role() === "guest"
+          ? "WORLD PHYSICS · THE HOST'S SETTINGS"
+          : this.options.role() === "solo"
+            ? "WORLD PHYSICS · PAUSED WHILE YOU CHOOSE"
+            : "WORLD PHYSICS · CO-OP CONTINUES",
     }[this.panel];
     if (this.panel === "inventory") {
       const selected = h.inventory.find((item) => item.id === this.selectedItem) ?? h.inventory[0];
@@ -560,6 +602,42 @@ export class AdventureUI {
           .join(
             "",
           )}</div>${recipe.combination ? `<div class="combination-note">NEW COMBINATION: ${mechanicOf(recipe.combination.from).name} also triggers ${mechanicOf(recipe.combination.into).name} after a short delay.</div>` : ""}${wardenNote(recipe)}${encounterNote(recipe)}<p class="mechanic-intro">One ${mechanicOf(recipe.signature).name} spot is calm (its physical effects are off) and one is wild (stronger); the rest follow the area.</p><div class="area-facts"><span>Land ${recipe.land + 1} · ${themeOf(recipe.theme).name}</span><span>${recipe.killGoal} creatures + ${recipe.boss}</span><span>${recipe.procedural ? "PROCEDURALLY COMPOSED" : "AUTHORED INTRODUCTION"}</span></div>`;
+    } else if (this.panel === "physics") {
+      // Keep keyboard focus on the control that was used across the re-render.
+      const focused = document.activeElement as HTMLElement | null;
+      const key =
+        focused && this.dialog.contains(focused) && focused.dataset.wp
+          ? [
+              focused.dataset.wp,
+              focused.dataset.key,
+              focused.dataset.value,
+              focused.dataset.id,
+              focused.dataset.scope,
+              focused.dataset.preset,
+              focused.dataset.to,
+            ]
+              .map((v) => v ?? "")
+              .join("|")
+          : null;
+      el("adventure-panel").innerHTML = this.options.physics?.render() ?? "";
+      if (key)
+        for (const node of el("adventure-panel").querySelectorAll<HTMLElement>("[data-wp]"))
+          if (
+            [
+              node.dataset.wp,
+              node.dataset.key,
+              node.dataset.value,
+              node.dataset.id,
+              node.dataset.scope,
+              node.dataset.preset,
+              node.dataset.to,
+            ]
+              .map((v) => v ?? "")
+              .join("|") === key
+          ) {
+            node.focus({ preventScroll: true });
+            break;
+          }
     } else if (this.panel === "death") {
       el("adventure-panel").innerHTML =
         `<div class="death-summary">${icon("fire", 45)}<p>The wild keeps ${h.goldLost} gold.<br>Your levels, skills and equipment stay with you.</p><div><span>AREA <strong>${s.area}</strong></span><span>LEVEL <strong>${h.level}</strong></span><span>DEFEATED <strong>${h.kills}</strong></span></div><button class="primary-button" data-action="respawn">${sim.players.size > 1 && [...sim.players.keys()].some((other) => other !== id && !sim.adventure.hero(other).dead) ? "Rejoin at the trailhead" : `Return to ${esc(townName(s.townLand))}`} ${icon("arrow", 17)}</button></div>`;
@@ -568,7 +646,7 @@ export class AdventureUI {
       const tune = (key: keyof Tuning, label: string, max: number) =>
         `<label class="tuning-field"><span>${label}<b id="tune-${key}-value">${s.tuning[key].toFixed(2)}×</b></span><input type="range" min="0.1" max="${max}" step="0.05" value="${s.tuning[key]}" data-tune="${key}" aria-label="${label} multiplier" ${host ? "" : "disabled"} /></label>`;
       el("adventure-panel").innerHTML =
-        `<div class="pause-actions"><button class="primary-button" data-action="${h.dead ? "respawn" : "resume"}">${h.dead ? "Rekindle your lantern" : "Return to the wild"} ${icon("play", 16)}</button><button class="secondary-button" data-panel="inventory">Equipment</button><button class="secondary-button" data-panel="skills">Skill tree</button><button class="secondary-button" data-action="settings">Display settings</button><button class="secondary-button" data-action="audio">Toggle sound</button><button class="secondary-button" data-action="journal">Run journal</button></div><div class="difficulty-card"><div><span class="eyebrow">QUICK PLAYTEST TUNING</span><h3>Choose your edge.</h3><p>Changes apply immediately. Adjust the challenge as you explore.</p></div>${tune("difficulty", "Overall difficulty", 3)}<div class="difficulty-presets"><button data-preset="0.6" ${host ? "" : "disabled"}>Story</button><button data-preset="1" ${host ? "" : "disabled"}>Wild</button><button data-preset="1.75" ${host ? "" : "disabled"}>Savage</button></div></div><details class="advanced-tuning" open><summary>Player & enemy multipliers</summary><div class="tuning-columns"><section><h3>Your wayfarer</h3>${tune("playerDamage", "Player damage", 5)}${tune("playerHealth", "Player health", 5)}${tune("playerSpeed", "Player speed", 3)}</section><section><h3>The creatures</h3>${tune("enemyDamage", "Enemy damage", 5)}${tune("enemyHealth", "Enemy health", 5)}${tune("enemySpeed", "Enemy speed", 3)}</section></div></details>${host ? `<details class="advanced-tuning"><summary>Encounter preview & new run</summary><p>Preview any generated area for QA. This changes the active encounter for the party.</p><div class="input-row"><input id="area-preview" type="number" min="1" step="1" value="${Math.max(1, s.area)}" aria-label="Preview area number" /><button class="secondary-button" data-action="preview">Preview area</button></div><button class="text-button" data-action="new-run">Start a new run…</button></details>` : "<p class=co-op-note>The host controls shared difficulty and encounters.</p>"}<button class="text-button" data-action="return" ${s.mode === "town" || !host ? "disabled" : ""}>Channel a return to town · T</button>`;
+        `<div class="pause-actions"><button class="primary-button" data-action="${h.dead ? "respawn" : "resume"}">${h.dead ? "Rekindle your lantern" : "Return to the wild"} ${icon("play", 16)}</button><button class="secondary-button" data-panel="inventory">Equipment</button><button class="secondary-button" data-panel="skills">Skill tree</button><button class="secondary-button" data-panel="physics">World physics · O</button><button class="secondary-button" data-action="settings">Display settings</button><button class="secondary-button" data-action="audio">Toggle sound</button><button class="secondary-button" data-action="journal">Run journal</button></div><div class="difficulty-card"><div><span class="eyebrow">QUICK PLAYTEST TUNING</span><h3>Choose your edge.</h3><p>Changes apply immediately. Adjust the challenge as you explore.</p></div>${tune("difficulty", "Overall difficulty", 3)}<div class="difficulty-presets"><button data-preset="0.6" ${host ? "" : "disabled"}>Story</button><button data-preset="1" ${host ? "" : "disabled"}>Wild</button><button data-preset="1.75" ${host ? "" : "disabled"}>Savage</button></div></div><details class="advanced-tuning" open><summary>Player & enemy multipliers</summary><div class="tuning-columns"><section><h3>Your wayfarer</h3>${tune("playerDamage", "Player damage", 5)}${tune("playerHealth", "Player health", 5)}${tune("playerSpeed", "Player speed", 3)}</section><section><h3>The creatures</h3>${tune("enemyDamage", "Enemy damage", 5)}${tune("enemyHealth", "Enemy health", 5)}${tune("enemySpeed", "Enemy speed", 3)}</section></div></details>${host ? `<details class="advanced-tuning"><summary>Encounter preview & new run</summary><p>Preview any generated area for QA. This changes the active encounter for the party.</p><div class="input-row"><input id="area-preview" type="number" min="1" step="1" value="${Math.max(1, s.area)}" aria-label="Preview area number" /><button class="secondary-button" data-action="preview">Preview area</button></div><button class="text-button" data-action="new-run">Start a new run…</button></details>` : "<p class=co-op-note>The host controls shared difficulty and encounters.</p>"}<button class="text-button" data-action="return" ${s.mode === "town" || !host ? "disabled" : ""}>Channel a return to town · T</button>`;
     }
   }
   private itemDetail(item: Item, sim: Simulation, id: string): string {

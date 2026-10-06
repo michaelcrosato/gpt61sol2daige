@@ -1664,3 +1664,272 @@
 .skill-node.keystone {
   min-height: 92px;
 }
+
+/* M12 World physics panel (pause menu, O). */
+.panel-physics {
+  max-width: 1080px;
+}
+#world-canvas.picking {
+  cursor: crosshair;
+}
+.world-physics {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+  grid-template-areas:
+    "here here"
+    "edit inspect";
+  gap: 16px;
+  font-size: 10px;
+  color: #b9cda2;
+}
+.world-physics section {
+  padding: 16px 18px;
+  border: 1px solid #5974407a;
+  background: #213824;
+  border-radius: 6px;
+  min-width: 0;
+}
+.world-physics h3 {
+  font:
+    19px Georgia,
+    serif;
+  color: #dce5c3;
+  margin: 0 0 9px;
+  font-weight: 400;
+}
+.wp-here {
+  grid-area: here;
+}
+.wp-edit {
+  grid-area: edit;
+}
+.wp-inspect {
+  grid-area: inspect;
+  align-self: start;
+}
+.wp-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 10px 0;
+}
+.wp-chip {
+  padding: 3px 6px;
+  border-radius: 3px;
+  background: #2b4630;
+  color: #a9bf92;
+  font-size: 8px;
+}
+.wp-chip b {
+  color: #dce7b8;
+  font-weight: 400;
+  font-family: monospace;
+}
+.wp-chip.changed {
+  background: #4a4128;
+  color: #e4cf97;
+}
+.wp-chip.off b {
+  color: #f0a78a;
+}
+.wp-buttons,
+.wp-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0;
+}
+.world-physics button {
+  padding: 7px 10px;
+  background: #34492c;
+  border: 1px solid #6c855177;
+  color: #d1dfb1;
+  font-size: 9px;
+  border-radius: 4px;
+  cursor: pointer;
+  min-height: 30px;
+}
+.world-physics button[aria-pressed="true"] {
+  background: #5d6b34;
+  border-color: #c9d68f;
+  color: #f2f5d8;
+}
+.world-physics button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.world-physics button:focus-visible,
+.world-physics input:focus-visible {
+  outline: 2px solid #f4e3a1;
+  outline-offset: 1px;
+}
+.wp-regions,
+.wp-near {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin: 8px 0;
+}
+.wp-regions button,
+.wp-near button {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+}
+.wp-regions small,
+.wp-near small {
+  color: #9db487;
+  font-size: 7px;
+}
+.wp-presets {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+  margin: 10px 0;
+}
+.world-physics .wp-preset {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: left;
+  align-items: flex-start;
+}
+.wp-preset strong {
+  font-size: 11px;
+}
+.wp-preset span {
+  color: #b5c99e;
+  line-height: 1.5;
+}
+.wp-preset small {
+  color: #d9c58e;
+  font-size: 7px;
+  line-height: 1.5;
+}
+.wp-scope-note,
+.wp-region-tools p,
+.wp-hint,
+.wp-guest {
+  line-height: 1.7;
+  color: #a1ba8a;
+}
+.wp-groups {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.wp-group {
+  border: 1px solid #3f5a3477;
+  border-radius: 5px;
+  padding: 8px 10px;
+  margin: 0;
+  min-width: 0;
+}
+.wp-group legend {
+  color: #d6c28a;
+  font-size: 9px;
+  letter-spacing: 0.8px;
+  padding: 0 4px;
+}
+.wp-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 2px 8px;
+  align-items: center;
+  padding: 6px 0;
+  border-bottom: 1px solid #3f5a3444;
+}
+.wp-row:last-child {
+  border-bottom: 0;
+}
+.wp-row strong {
+  display: block;
+  color: #dce5c3;
+  font-weight: 400;
+}
+.wp-row small {
+  display: block;
+  color: #8fa77a;
+  font-size: 8px;
+  line-height: 1.5;
+}
+.wp-row em {
+  grid-column: span 2;
+  font-style: normal;
+  color: #c9b67f;
+  font-size: 8px;
+}
+.wp-toggle {
+  display: inline-flex;
+}
+.world-physics .wp-toggle button {
+  border-radius: 0;
+  padding: 5px 7px;
+  min-height: 26px;
+}
+.world-physics .wp-toggle button:first-child {
+  border-radius: 4px 0 0 4px;
+}
+.world-physics .wp-toggle button:last-child {
+  border-radius: 0 4px 4px 0;
+}
+.wp-row input {
+  width: 74px;
+  padding: 5px 6px;
+  background: #1a3020;
+  border: 1px solid #6c855177;
+  color: #e3ecc6;
+  border-radius: 4px;
+  font: 10px monospace;
+}
+.wp-body {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 5px 10px;
+  margin: 10px 0 0;
+}
+.wp-body dt {
+  color: #8fa77a;
+}
+.wp-body dd {
+  margin: 0;
+  color: #dce5c3;
+  overflow-wrap: anywhere;
+}
+.wp-body small {
+  color: #a7b98e;
+}
+.wp-notice {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 10px 12px;
+  background: #4c3e2777;
+  color: #edc08b;
+  border-radius: 4px;
+}
+@media (max-width: 900px) {
+  .world-physics {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "here"
+      "inspect"
+      "edit";
+  }
+  .wp-presets,
+  .wp-groups {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (pointer: coarse) {
+  .world-physics button {
+    min-height: 40px;
+  }
+  .world-physics .wp-toggle button {
+    min-height: 38px;
+    padding: 6px 11px;
+  }
+}
+.panel-physics .dialog-wallet {
+  display: none;
+}

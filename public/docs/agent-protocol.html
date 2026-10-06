@@ -1289,25 +1289,121 @@ anchor <code>enemy-&lt;id&gt;</code>, rest, load).</p>
 {&quot;op&quot;:&quot;actors&quot;,&quot;action&quot;:&quot;monster&quot;,&quot;rig&quot;:&quot;stalker&quot;,&quot;x&quot;:2500,&quot;y&quot;:200,&quot;hp&quot;:10,&quot;passive&quot;:true,&quot;clear&quot;:true}
 {&quot;op&quot;:&quot;adventure&quot;,&quot;action&quot;:{&quot;type&quot;:&quot;grab&quot;,&quot;id&quot;:&quot;prop-jar-12-c0-0-0&quot;}}</code></pre>
 <p>The preview names the Burning palisade cluster
-(<code>fire-stockade</code>) and its pieces; throwing the camp’s oil jar
-into its brazier (<code>adventure release {throw:true}</code> aimed at
-it) starts the chain: <code>heat</code>, <code>ignite</code>,
-<code>spill</code>, <code>coat</code>, <code>flare</code> and
-<code>spread</code>. The stockade burns through in about 150 ticks
-(<code>encounters export</code> lists the destroyed boards). Use the ids
-your preview returns.</p>
+(<code>fire-stockade</code>) and its pieces. Hold the oil jar and walk
+it into the brazier’s coals (movement input toward it, aim at it) until
+it catches, then set it down
+(<code>adventure release {throw:false}</code>). This starts the chain
+<code>heat</code>, <code>ignite</code>, <code>spill</code>,
+<code>coat</code>, <code>flare</code> and <code>spread</code>. A thrown
+jar breaks without catching. The stockade burns through in about 150
+ticks (<code>encounters export</code> lists the destroyed boards). Use
+the ids your preview returns.</p>
 <ul>
 <li>No new policy values; cluster regions use existing ones. Saves write
 adventure envelope 9 / world 9; rooms use protocol 12.</li>
 <li><code>npm run verify:run</code> now runs 12 areas (areas 9–12 are
-generated); in each generated area the bot first sets off one
-combination with ordinary inputs (<code>leadIn</code>).</li>
+generated). In each generated area holding a combination it can start by
+input, the bot first sets one off with ordinary inputs
+(<code>leadIn</code>).</li>
 <li><code>node tools/physics-encounters.ts</code> prints the M11
 receipt.</li>
 </ul>
 <p>See <a
 href="ARCHITECTURE.md#m11-generated-encounters-and-modular-wardens">the
-M11 contract</a>.</p></main>
+M11 contract</a>.</p>
+<h2 id="m12-world-physics-controls-showcase-and-functional-matrix">M12
+world physics controls, showcase and functional matrix</h2>
+<p>The in-game <strong>World physics</strong> panel (O, the HUD button,
+the game-mode menu or the pause menu) drives the same agent API, so an
+agent can reproduce every click:</p>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr>
+<th>Command</th>
+<th>Fields and behavior</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>{"op":"actors","action":"policies"}</code></td>
+<td>The policy document alone: applied <code>state</code>,
+<code>pending</code> queue, <code>nextRevision</code> (the
+<code>expectedRevision</code> for <code>configure</code>), the projected
+<code>preview</code>, capability names and presets. Guests read the
+received document.</td>
+</tr>
+<tr>
+<td><code>{"op":"actors","action":"policy","x":629,"y":-120}</code></td>
+<td>Effective values, requested values, the source of each value and the
+regions at a point (unchanged; the panel’s “Where you stand”).</td>
+</tr>
+<tr>
+<td><code>{"op":"actors","action":"body","id":"crate-1-0"}</code></td>
+<td>One body’s pose, motion, material, policy (effective, provenance,
+regions), consequences and reaction status, plus
+<code>lastReaction</code> (rule, owner, tick and text of the last
+recorded reaction aimed at it) and <code>instigator</code> (who last
+pushed or threw it, while that credit lasts). Works on guests.</td>
+</tr>
+<tr>
+<td><code>{"op":"actors","action":"configure","expectedRevision":R,"edits":[…]}</code>
+then
+<code>{"op":"actors","action":"apply","expectedRevision":R+1}</code></td>
+<td>What every panel control sends. While paused (solo menus pause time)
+the panel applies at once. A running co-op host’s edit commits at the
+next tick. The browser allows <code>apply</code> only while paused.</td>
+</tr>
+</tbody>
+</table>
+<p>Panel edits, by control: - <strong>Preset at a scope:</strong>
+<code>{type:"preset",scope,id,preset}</code>. - <strong>One switch at a
+scope:</strong>
+<code>{type:"override",scope,id,values:{key:value}}</code>. “Default”
+sends <code>reset … inherited</code> plus the scope’s other live values.
+- <strong>Clear live changes here:</strong>
+<code>reset … inherited</code>. - <strong>Reset to authored:</strong>
+<code>reset … authored</code>. - <strong>Center on me, Larger, Smaller,
+Priority ±5:</strong> a <code>region</code> profile upsert. -
+<strong>New region around me:</strong> a <code>custom-&lt;n&gt;</code>
+circle (radius 80, priority 30). - <strong>Remove region</strong>
+(custom regions only): <code>remove</code>. - <strong>Session
+master:</strong> <code>{type:"master",enabled}</code>. - <strong>Undo
+every live change:</strong> master on, every override reset, custom
+regions removed and edited regions reset to authored, in one
+transaction.</p>
+<p>The showcase route is a scene recipe, <a
+href="../examples/showcase.json"><code>examples/showcase.json</code></a>:
+- <code>setup</code> holds agent commands; <code>as</code> names a
+spawned monster, for example <code>$target</code>. - Each beat has an
+<code>at</code> staging spot, <code>steps</code> (<code>walk</code>,
+<code>slash</code>, <code>grab</code>, <code>drag</code>,
+<code>carry</code>, <code>wait</code>, <code>throw</code>,
+<code>release</code>, <code>whorl</code>, <code>region</code> with
+<code>preset</code> or <code>reset</code>, and inline
+<code>check</code>) and <code>expect</code> (<code>destroyed</code>,
+<code>intact</code>, <code>dead</code>, <code>remains</code>,
+<code>moved</code>, <code>rules</code>, <code>event</code>,
+<code>policy</code>). - Every beat starts from the recipe’s clean scene.
+- <code>npm run showcase [recipe.json]</code> plays it headless and
+prints a receipt; it exits non-zero if a check fails. -
+<code>npx playwright test e2e/showcase.spec.ts</code> plays it in the
+browser with real keys, mouse and panel clicks.
+<code>SHOWCASE_VIDEO=1</code> also records a video.</p>
+<p><code>tests/physics-matrix.test.ts</code> is the functional matrix.
+Every value in <code>POLICY_DEFAULTS</code> gets a cause and a measured
+effect in Brambleburst. Each one is checked on, off inside a scoped
+region, still off after a save and restore, received by a late-join
+replica, and back on. One more test covers the dependency combinations
+POLICIES.md names (master off with features on, joints off with breakage
+on, destruction off with impact damage on, base combat without
+reactions). <code>MATRIX_REPORT=1</code> prints the measured effects (<a
+href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/evidence/physics-m12-matrix.json">evidence</a>).</p>
+<p>See <a href="ARCHITECTURE.md#m12-controls-showcase-and-release">the
+M12 contract</a>.</p></main>
 <footer>Fern · A world engine built for agents · <a href="https://github.com/michaelcrosato/gpt61sol2daige">Source on GitHub</a></footer>
 </body>
 </html>
