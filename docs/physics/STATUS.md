@@ -111,4 +111,6 @@ M12 local gates:
 - Both 12-area routes, rerun on the M12 tree, are byte-identical to M11's.
 - `npm run showcase` passes all six beats.
 
+M12 PR [#25](https://github.com/michaelcrosato/gpt61sol2daige/pull/25): its first CI run ([37533302447](https://github.com/michaelcrosato/gpt61sol2daige/actions/runs/37533302447)) failed the M11 Burning palisade browser scenario, intermittently. The fuse burnt but stopped short of the stockade. Diagnostics found fuse brushes already destroyed by `impact` from the traveler before the jar burst. The scenario steered by holding keys between samples, and a page round trip can take 0.4 s while the page renders, so the traveler overshot at walking speed, circled the coals and swung the held jar through the fuse. The game behaviour is correct. The scenario now steps the jar toward the coals in short key pulses and stands still once it touches them, as a player would. The old loop failed 4 of 26 instrumented local repeats; the new one passes 20 of 20, and 10 of 10 under 3× CPU throttling. PR #25 carries the fix.
+
 [Handoff](handoffs/M12.md) records the controls, showcase, matrix and remaining limitations. This row is written before commit and merge; this session's final verification step reconciles it from Git/GitHub evidence.

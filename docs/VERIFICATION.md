@@ -332,6 +332,7 @@ On 2026-10-06:
   - `node tools/adventure.ts playthrough 12 --reactions off`: level 24, 4,772 gold, 4,850 area ticks.
   - The committed route files are [physics-m11-route.jsonl](evidence/physics-m11-route.jsonl) and [physics-m11-route-reactions-off.jsonl](evidence/physics-m11-route-reactions-off.jsonl).
 - `npm run showcase` passes all six beats ([receipt](evidence/physics-m12-showcase.json)). The browser showcase passed 5 of 5 local runs plus one recorded run.
+- The M12 PR also steadies the M11 Burning palisade scenario. In CI its slow key-holding loop circled the coals and smashed fuse brushes with the carried jar, so the fire stopped short of the stockade. It now steps the jar in short key pulses: 20 of 20 local repeats pass, and 10 of 10 under 3× CPU throttling, against 4 failures in 26 instrumented repeats before.
 
 ### Functional matrix
 

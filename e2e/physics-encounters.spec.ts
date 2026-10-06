@@ -149,65 +149,98 @@ test("desktop: a generated area's Burning palisade by real input — V grabs the
         }
       ).state.history.map((e) => e.text),
     );
-  const holding = () =>
+  // Step the jar toward the coals in short key pulses, then stand still while their heat builds,
+  // as a player would. Holding the keys between samples (a page round trip can take 0.4 s while
+  // the page renders) overshoots at walking speed, circles the coals and swings the held jar
+  // through the fuse, smashing brushes before any fire comes.
+  const box = (await canvas.boundingBox())!;
+  const state = () =>
     page.evaluate(
-      (id) =>
-        (
-          window.fern.command({ op: "actors", action: "inspect" }) as {
-            combat: { holds: { id: string }[] };
-          }
-        ).combat.holds.some((h) => h.id === id),
-      jarId,
+      ([id, bx, by]) => {
+        const f = window.fern,
+          o = f.observe(),
+          p = o.players[0];
+        let at: { x: number; y: number } | null = null;
+        try {
+          at = f.command({ op: "actors", action: "body", id }) as { x: number; y: number };
+        } catch {}
+        return {
+          hero: { x: p.x, y: p.y },
+          jar: at && { x: at.x, y: at.y, touch: Math.hypot(at.x - bx, at.y - by) },
+          view: { cx: o.render.cameraX, cy: o.render.cameraY, zoom: o.render.zoom },
+          holding: (
+            f.command({ op: "actors", action: "inspect" }) as {
+              combat: { holds: { id: string }[] };
+            }
+          ).combat.holds.some((h) => h.id === id),
+          flare: (
+            f.command({ op: "actors", action: "reactions" }) as {
+              state: { history: { text: string }[] };
+            }
+          ).state.history.some((e) => e.text === "flare"),
+        };
+      },
+      [jarId, brazier.x, brazier.y] as const,
     );
   const held = new Set<string>();
+  const press = async (want: Set<string>) => {
+    for (const key of [...held])
+      if (!want.has(key)) {
+        await page.keyboard.up(key);
+        held.delete(key);
+      }
+    for (const key of want)
+      if (!held.has(key)) {
+        await page.keyboard.down(key);
+        held.add(key);
+      }
+  };
   const end = Date.now() + 25_000;
   // When a fixed obstacle stops the traveler, step around it at 45° for a moment.
   let last = { x: 0, y: 0, t: Date.now() },
     side = false;
   try {
-    while (Date.now() < end && !(await reactionTexts()).includes("flare")) {
-      const carried = await page.evaluate((id) => {
-        try {
-          return window.fern.command({ op: "actors", action: "body", id }) as Pose;
-        } catch {
-          return null;
-        }
-      }, jarId);
+    for (let s = await state(); Date.now() < end && !s.flare; s = await state()) {
       // Gone: it burst against the coals and its slick flares there.
-      if (!carried) break;
+      if (!s.jar) break;
       // A bump can knock the jar loose: pick it up again, as a player would.
-      if (!(await holding())) {
-        for (const key of held) await page.keyboard.up(key);
-        held.clear();
-        await walkTo(page, carried.x - 12, carried.y, 10);
+      if (!s.holding) {
+        await press(new Set());
+        await walkTo(page, s.jar.x - 12, s.jar.y, 10);
         await page.keyboard.press("v");
         await page.waitForTimeout(100);
         continue;
       }
-      const aim = await screen(page, brazier.x, brazier.y);
-      await page.mouse.move(aim.x, aim.y);
-      const p = await page.evaluate(() => window.fern.observe().players[0]);
-      if (Math.hypot(p.x - last.x, p.y - last.y) > 3) last = { x: p.x, y: p.y, t: Date.now() };
-      else if (Date.now() - last.t > 700) {
-        side = !side;
-        last = { x: p.x, y: p.y, t: Date.now() };
-      }
-      let dx = brazier.x - p.x,
-        dy = brazier.y - p.y;
-      if (side && Math.hypot(dx, dy) > 40) [dx, dy] = [dx - dy, dy + dx];
+      await page.mouse.move(
+        box.x + box.width / 2 + (brazier.x - s.view.cx) * s.view.zoom,
+        box.y + box.height / 2 + (brazier.y - s.view.cy) * s.view.zoom,
+      );
       const want = new Set<string>();
-      if (dx > 3) want.add("d");
-      if (dx < -3) want.add("a");
-      if (dy > 3) want.add("s");
-      if (dy < -3) want.add("w");
-      for (const key of [...held]) if (!want.has(key)) await page.keyboard.up(key);
-      for (const key of want) if (!held.has(key)) await page.keyboard.down(key);
-      held.clear();
-      for (const key of want) held.add(key);
-      await page.waitForTimeout(100);
+      // Brazier radius 8 + jar radius 6.5 + 4.5: within the coals' heat reach (6) edge to edge.
+      if (s.jar.touch > 19) {
+        const p = s.hero;
+        if (Math.hypot(p.x - last.x, p.y - last.y) > 3) last = { x: p.x, y: p.y, t: Date.now() };
+        else if (Date.now() - last.t > 700) {
+          side = !side;
+          last = { x: p.x, y: p.y, t: Date.now() };
+        }
+        let dx = brazier.x - p.x,
+          dy = brazier.y - p.y;
+        if (side && Math.hypot(dx, dy) > 40) [dx, dy] = [dx - dy, dy + dx];
+        if (dx > 3) want.add("d");
+        if (dx < -3) want.add("a");
+        if (dy > 3) want.add("s");
+        if (dy < -3) want.add("w");
+      }
+      if (want.size) {
+        await press(want);
+        await page.waitForTimeout(90);
+        await press(new Set());
+      }
+      await page.waitForTimeout(60);
     }
   } finally {
-    for (const key of held) await page.keyboard.up(key);
+    await press(new Set());
   }
   if (!(await reactionTexts()).includes("flare")) {
     await page.screenshot({ path: "artifacts/physics-m11-palisade-noflare.png" });

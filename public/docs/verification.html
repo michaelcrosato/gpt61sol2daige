@@ -1456,6 +1456,12 @@ href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/evidence/p
 <li><code>npm run showcase</code> passes all six beats (<a
 href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/evidence/physics-m12-showcase.json">receipt</a>). The browser
 showcase passed 5 of 5 local runs plus one recorded run.</li>
+<li>The M12 PR also steadies the M11 Burning palisade scenario. In CI
+its slow key-holding loop circled the coals and smashed fuse brushes
+with the carried jar, so the fire stopped short of the stockade. It now
+steps the jar in short key pulses: 20 of 20 local repeats pass, and 10
+of 10 under 3× CPU throttling, against 4 failures in 26 instrumented
+repeats before.</li>
 </ul>
 <h3 id="functional-matrix">Functional matrix</h3>
 <table>
