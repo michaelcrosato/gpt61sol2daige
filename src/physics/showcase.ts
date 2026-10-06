@@ -304,13 +304,30 @@ type Circle = { x: number; y: number; r: number; anchor?: string };
 /** Reaction sources earlier milestones placed: set pieces keep a berth so none of their fire,
  * charge or blasts reaches new content by accident. */
 const SOURCES = new Set(["pylon", "lantern", "brazier", "coil", "jar", "cask", "fan"]);
-function occupied(recipe: AreaRecipe, palette: number, blocked: Blocked): Circle[] {
+function occupied(
+  recipe: AreaRecipe,
+  palette: number,
+  blocked: Blocked,
+  base?: readonly BodyRecipe[],
+): Circle[] {
   const out: Circle[] = [];
   const add = (b: BodyRecipe) => {
     const family = b.blueprint?.family ?? "",
       source = SOURCES.has(family) || b.material === "volatile";
     out.push({ x: b.x, y: b.y, r: shapeReach(b.shape) + (source ? 30 : 0) });
   };
+  if (base) {
+    // M11 generated areas: only the base scenery stands before the set pieces.
+    for (const b of base) add(b);
+    for (const [dx, dy, r] of [
+      [-230, 0, 46],
+      [-265, 95, 42],
+      [275, 0, 54],
+      [130, 0, 22],
+    ] as const)
+      out.push({ x: recipe.x + dx, y: recipe.y + dy, r });
+    return out;
+  }
   for (let n = 0; n < 4; n++)
     out.push({ x: recipe.x - 55 + (n % 2) * 25, y: recipe.y + 40 + Math.floor(n / 2) * 25, r: 16 });
   out.push({ x: recipe.x - 85, y: recipe.y + 40, r: 10 });
@@ -507,14 +524,23 @@ export function tailwindLane(
   recipe: Pick<AreaRecipe, "index" | "x" | "y">,
   at: { x: number; y: number },
   palette = 0,
+  base?: readonly BodyRecipe[],
 ): { x: number; y: number; angle: number; length: number } {
-  // The yard's sources and containers, and the clearing's powder barrel and lantern.
-  const hazards = [
-    ...areaReactions(recipe, palette).props.filter((p) => HAZARDS.has(p.blueprint!.family)),
-    ...clearingProps(recipe, palette).filter(
-      (p) => p.material === "volatile" || p.blueprint!.family === "lantern",
-    ),
-  ];
+  // The yard's sources and containers, and the clearing's powder barrel and lantern (M11
+  // generated areas: their base scenery; modules placed later keep out of the lanes).
+  const hazards = base
+    ? base.filter(
+        (p) =>
+          HAZARDS.has(p.blueprint!.family) ||
+          p.material === "volatile" ||
+          p.blueprint!.family === "lantern",
+      )
+    : [
+        ...areaReactions(recipe, palette).props.filter((p) => HAZARDS.has(p.blueprint!.family)),
+        ...clearingProps(recipe, palette).filter(
+          (p) => p.material === "volatile" || p.blueprint!.family === "lantern",
+        ),
+      ];
   const outward = Math.atan2(at.y - recipe.y, at.x - recipe.x);
   let fallback: { x: number; y: number; angle: number; length: number } | null = null;
   for (const length of [TAILWIND.length, 170, 130])
@@ -545,10 +571,11 @@ export function areaShowcase(
   recipe: AreaRecipe,
   palette: number,
   blocked: Blocked = () => false,
+  base?: readonly BodyRecipe[],
 ): ShowcaseContent {
   const i = recipe.index,
     areaId = `area-${i}`,
-    taken = occupied(recipe, palette, blocked);
+    taken = occupied(recipe, palette, blocked, base);
   const bodies: BodyRecipe[] = [],
     mechanisms: MechanismBlueprint[] = [],
     fields: FieldRecipe[] = [],
@@ -561,7 +588,7 @@ export function areaShowcase(
     const outward = Math.atan2(m.y - recipe.y, m.x - recipe.x),
       pieces = piecesFor(m.kind, m.n),
       prefix = `${m.kind}-${m.n}`;
-    const lane = m.kind === "wind" ? tailwindLane(recipe, m, palette) : null;
+    const lane = m.kind === "wind" ? tailwindLane(recipe, m, palette, base) : null;
     if (lane)
       fields.push({
         id: `tailwind-${i}-${m.n}`,
@@ -688,8 +715,9 @@ export function showcaseExport() {
  */
 export interface Restraint {
   id: string;
-  kind: "bloom" | "lash";
-  /** The restrained body: `enemy-<id>` or `player-<id>`. */
+  /** M11 adds "mount": a warden's armor piece (a prop) tethered to the warden. */
+  kind: "bloom" | "lash" | "mount";
+  /** The restrained body: `enemy-<id>` or `player-<id>` (a mount: `prop-armor-<enemy>-<k>`). */
   body: string;
   /** Anchor point; an anchor body (a warden's lash) moves it each tick. */
   x: number;
@@ -847,8 +875,9 @@ export class ShowcasePhysics {
         r.y = round(a.y);
       }
       const m = world.motionOf(r.body);
+      const label = r.kind === "bloom" ? "snare" : r.kind;
       if (tick >= r.until) {
-        this.remove(r.id, `${r.kind === "lash" ? "lash" : "snare"}:withered`, tick, m);
+        this.remove(r.id, `${label}:withered`, tick, m);
         continue;
       }
       const policy = world.policy(r.body);
@@ -866,7 +895,7 @@ export class ShowcasePhysics {
         dv = Math.min(240, (stretch * r.stiffness) / 60 + away * 0.25);
       r.load = round(m.mass * (away + stretch * 4));
       if (policy.jointBreakage && r.load > r.breakLoad * policy.jointStrength) {
-        this.remove(r.id, `${r.kind === "lash" ? "lash" : "snare"}:snapped`, tick, m);
+        this.remove(r.id, `${label}:snapped`, tick, m);
         continue;
       }
       world.pull(r.body, nx * dv, ny * dv);
@@ -916,9 +945,12 @@ export function validateShowcase(state: ShowcaseState, has: (id: string) => bool
       typeof r.id !== "string" ||
       !/^snare-\d+$/.test(r.id) ||
       ids.has(r.id) ||
-      !["bloom", "lash"].includes(r.kind) ||
+      !["bloom", "lash", "mount"].includes(r.kind) ||
       typeof r.body !== "string" ||
-      !/^(enemy|player)-[\w-]{1,80}$/.test(r.body) ||
+      !(r.kind === "mount"
+        ? /^prop-armor-\d+-\d+$/.test(r.body)
+        : /^(enemy|player)-[\w-]{1,80}$/.test(r.body)) ||
+      (r.kind === "mount" && !/^enemy-\d+$/.test(r.anchor)) ||
       typeof r.anchor !== "string" ||
       (r.anchor !== "" && !/^enemy-\d+$/.test(r.anchor)) ||
       ![r.x, r.y].every((v) => finite(v, 1e6)) ||

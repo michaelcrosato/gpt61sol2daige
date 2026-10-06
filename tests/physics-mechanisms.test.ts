@@ -100,6 +100,8 @@ test("every area carries six registered mechanisms with joints, members and auth
       "stall",
       "lamp",
       "bunting",
+      // M11 generated encounters.
+      "cart",
     ]);
     const agent = new AgentRuntime(sim);
     const exported = agent.execute({ op: "actors", action: "mechanisms" }) as {
@@ -661,7 +663,7 @@ test("real M06 checkpoints migrate: mechanisms join once, archived lands gain th
     );
     assert.ok(world.has("prop-gate-5-leaf"));
     const saved = sim.save();
-    assert.equal(saved.actorPhysics!.version, 8);
+    assert.equal(saved.actorPhysics!.version, 9);
     assert.equal(saved.actorPhysics!.world.version, 9);
     const archive = saved.actorPhysics!.archives.find((a) => a.id === "land-1-0")!;
     assert.equal(archive.assemblies, undefined, "an archived pre-M07 land stays as it was saved");

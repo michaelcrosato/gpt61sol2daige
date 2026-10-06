@@ -200,7 +200,9 @@ export class PropRenderer {
   }
   private body(ctx: Ctx, look: Look): void {
     const { family } = look;
-    if (family === "crate") crate(ctx, look);
+    // M11: a warden's censer armor is a lantern on a chain, not on its post.
+    if (family === "lantern" && look.prop.id.startsWith("prop-armor-")) censer(ctx, look);
+    else if (family === "crate") crate(ctx, look);
     else if (family === "barrel") barrel(ctx, look);
     else if (family === "pot") pot(ctx, look);
     else if (family === "log") log(ctx, look);
@@ -233,6 +235,9 @@ export class PropRenderer {
     else if (family === "basket") basket(ctx, look);
     else if (family === "hedge") hedge(ctx, look);
     else if (family === "barricade") barricade(ctx, look);
+    else if (family === "plate") plate(ctx, look);
+    else if (family === "shard") shard(ctx, look);
+    else if (family === "pillar") pillar(ctx, look);
     else debris(ctx, look);
   }
   /**
@@ -1471,4 +1476,130 @@ function barricade(ctx: Ctx, { prop, palette, seed }: Look): void {
   ctx.moveTo(-w / 2, h / 2 - 0.5);
   ctx.lineTo(w / 2, h / 2 - 0.5);
   ctx.stroke();
+}
+
+/** M11 warden armor: a curved slab of bark with growth rings and moss at its rim. */
+function plate(ctx: Ctx, { prop, palette, seed, stage }: Look): void {
+  const { w, h } = size(prop),
+    wood = tone("wood", palette, 0.3);
+  ctx.fillStyle = wood.dark;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, w / 2, h / 2, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = wood.base;
+  ctx.beginPath();
+  ctx.ellipse(0, -0.6, w / 2 - 1.2, h / 2 - 1.4, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = wood.light;
+  ctx.lineWidth = 0.6;
+  for (let k = 0; k < 4; k++) {
+    const x = -w / 2 + 2 + k * ((w - 4) / 3);
+    ctx.beginPath();
+    ctx.moveTo(x, -h / 2 + 1.5);
+    ctx.lineTo(x + ((hash(seed, k) % 3) - 1), h / 2 - 1.5);
+    ctx.stroke();
+  }
+  ctx.fillStyle = ["#6f9a55", "#c46a3c", "#7fb6a8", "#9a7ab6", "#cfe3ee"][palette % 5];
+  ctx.fillRect(-w / 2 + 1, -h / 2, w - 2, 1.4);
+  if (stage > 0) {
+    ctx.strokeStyle = "#1a1410";
+    ctx.lineWidth = 0.8;
+    ctx.beginPath();
+    ctx.moveTo(-2, -h / 2);
+    ctx.lineTo(1, 0);
+    ctx.lineTo(-1, h / 2);
+    ctx.stroke();
+  }
+}
+/** M11 warden armor: a floating glass ward shard that glints. */
+function shard(ctx: Ctx, { prop, palette, time, seed, stage }: Look): void {
+  const { w, h } = size(prop),
+    glass = tone("glass", palette, 0.55),
+    glint = 0.5 + Math.sin(time * 3 + (seed % 40)) * 0.5;
+  ctx.fillStyle = `${glass.base}cc`;
+  ctx.strokeStyle = glass.light;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(0, -h / 2 - 3);
+  ctx.lineTo(w / 2, -1);
+  ctx.lineTo(w / 4, h / 2);
+  ctx.lineTo(-w / 4, h / 2);
+  ctx.lineTo(-w / 2, -1);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = `rgba(255,255,255,${0.25 + glint * 0.45})`;
+  ctx.beginPath();
+  ctx.moveTo(-1, -h / 2);
+  ctx.lineTo(1.5, -1);
+  ctx.lineTo(-0.5, 2);
+  ctx.closePath();
+  ctx.fill();
+  if (stage > 0) {
+    ctx.strokeStyle = "#ffffffaa";
+    ctx.lineWidth = 0.5;
+    ctx.beginPath();
+    ctx.moveTo(-w / 3, -2);
+    ctx.lineTo(w / 4, 3);
+    ctx.stroke();
+  }
+}
+/** M11 arena pillar: a weathered stone column seen from above and the south. */
+function pillar(ctx: Ctx, { prop, material, palette, seed, stage }: Look): void {
+  const r = radius(prop),
+    t = tone(material, palette, 0.3),
+    height = r * 2.6;
+  ctx.fillStyle = t.dark;
+  ctx.fillRect(-r, -height, r * 2, height);
+  ctx.fillStyle = t.base;
+  ctx.fillRect(-r + 1.5, -height, r * 2 - 3, height);
+  ctx.fillStyle = t.light;
+  ctx.beginPath();
+  ctx.ellipse(0, -height, r, r * 0.5, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = t.dark;
+  ctx.lineWidth = 0.8;
+  for (let k = 1; k < 4; k++) {
+    const y = -height + (k * height) / 4 + ((hash(seed, k) % 3) - 1);
+    ctx.beginPath();
+    ctx.moveTo(-r, y);
+    ctx.lineTo(r, y);
+    ctx.stroke();
+  }
+  ctx.fillStyle = t.base;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, r, r * 0.5, 0, 0, Math.PI);
+  ctx.fill();
+  if (stage > 0) {
+    ctx.strokeStyle = "#141210";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(-r * 0.4, -height * 0.85);
+    ctx.lineTo(r * 0.2, -height * 0.5);
+    ctx.lineTo(-r * 0.1, -height * (stage > 1 ? 0.1 : 0.3));
+    ctx.stroke();
+  }
+}
+/** M11 warden armor: an iron censer swinging on its chain, glowing inside. */
+function censer(ctx: Ctx, { prop, palette, time, seed, stage }: Look): void {
+  const r = radius(prop),
+    metal = tone("metal", palette, 0.25),
+    flicker = 0.7 + Math.sin(time * 11 + (seed % 30)) * 0.2;
+  if (stage < 2) {
+    const light = ctx.createRadialGradient(0, -2, 0, 0, -2, 22);
+    light.addColorStop(0, `rgba(255,200,120,${0.35 * flicker})`);
+    light.addColorStop(1, "rgba(255,200,120,0)");
+    ctx.fillStyle = light;
+    ctx.fillRect(-22, -24, 44, 44);
+  }
+  ctx.fillStyle = metal.dark;
+  ctx.beginPath();
+  ctx.arc(0, -2, r + 1, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = metal.base;
+  ctx.beginPath();
+  ctx.arc(0, -2.5, r - 0.4, Math.PI, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = `rgba(255,${170 + Math.round(flicker * 60)},90,${stage < 2 ? 0.95 : 0.3})`;
+  for (let k = 0; k < 3; k++) ctx.fillRect(-3 + k * 2.4, -2, 1.2, 2.2);
 }

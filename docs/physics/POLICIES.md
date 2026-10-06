@@ -110,6 +110,22 @@ M10 adds no new policy values. Its towns and authored areas use the existing swi
 
 Every area has a `wild-<area>` region (Wild values) around the signature mechanic's second instance and a `calm-<area>` region (Quiet values, world reactions on) around its third, so the same mechanic plays three ways in one area. With the session master switch off, every area clears by kills alone (route evidence in [VERIFICATION.md](../VERIFICATION.md#m10-reactive-towns-and-authored-areas-evidence)).
 
+## M11 delivered controls
+
+M11 adds no new policy values. A generated area's clusters use the existing switches where their pieces stand, and each cluster's region (`combo-<area>-<k>`, priority 15, below calm/wild) strengthens the reaction its combination uses: `charged` (reactionStrength 1.6), `tinder` (reactionStrength 1.5, materialDurability 0.8), `gale` (fieldStrength 1.6), `heavy` (impulseStrength 1.4, impactStrength 1.5) and `freight` (impulseStrength 1.2). A region override or the master switch applies to them like any other region.
+
+| Feature | Controls | Off |
+| --- | --- | --- |
+| Fire combinations (palisade, oil flare, powder trail, briar blaze, quench) | `materialReactions`, `chainReactions`, `destruction` | Nothing ignites or spreads; a thrown jar just breaks (its spill is a reaction too). The stockade cache can still be battered open with destruction on. |
+| Conductor combinations (Stormcatch pool, shattered spark, wrecking ball's arc) | `materialReactions`, `chainReactions` | No soaking or conduction; the ball still swings and can break glass with `destruction` on. |
+| Field combinations (rubble maelstrom, powder vortex, debris gale) | `environmentalForces`, `fieldStrength` | The vortex and lane stop moving anything; loose pieces stay where they are. |
+| Launcher combinations (powder battery, battering launcher) | `mechanisms`, `impactDamage` | Mechanisms off freezes the sled; impact damage off lets the stone fly without breaking what it hits. |
+| Rift freight train | `dynamicProps`, `mechanisms` | Freight off stays behind; mechanisms off freezes the tow ropes where they are. |
+| Warden armor | `mechanisms` and `dynamicProps` at the warden's ground; `jointBreakage`/`jointStrength` for mount snapping; `destruction` for pieces breaking | With either of the first two off, the warden spawns unarmored. An armored warden whose ground later turns mechanisms off keeps its pieces but the tethers go slack, so they fall away and stop absorbing blows once they are 64 units away. |
+| Arena kits | the switches of their pieces | As above; every warden still dies to base damage. |
+
+Every generated area clears by kills alone: the reactions-off route clears areas 9–12 ([VERIFICATION](../VERIFICATION.md#m11-generated-encounters-evidence)).
+
 ## Scope and precedence
 
 Resolve values in this order: engine defaults, land profile, area profile, containing named region, then applicable live debug overrides. A more specific live override wins over a broader live override; the session-wide master `worldReactions = false` is an absolute off switch. Within one specificity, use declared priority and stable region ID to break ties. Show the effective value and the source that supplied it.

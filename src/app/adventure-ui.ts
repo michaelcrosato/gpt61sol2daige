@@ -1,6 +1,7 @@
 import type { Simulation } from "../engine/simulation.ts";
 import { xpForLevel } from "../game/adventure.ts";
 import {
+  type AreaRecipe,
   areaRecipe,
   mechanicOf,
   npcPosition,
@@ -8,6 +9,7 @@ import {
   themeOf,
   townName,
 } from "../game/content.ts";
+import { ARENA, ARMOR, COMBINATIONS, encounterPlan } from "../game/encounters.ts";
 import { type Item, RARITY_COLORS, SLOTS, SPECIAL_TEXT } from "../game/loot.ts";
 import { PATHS, PERCENT_STATS, SKILLS, STAT_LABELS, skillReason } from "../game/skills.ts";
 import {
@@ -395,16 +397,24 @@ export class AdventureUI {
     if (boss) {
       el("boss-name").textContent = boss.name;
       el("boss-health").style.width = `${Math.max(0, boss.hp / boss.maxHp) * 100}%`;
+      // M11: a generated warden's identity is the move it is telegraphing (or its first).
       const warden = boss.warden,
-        identity = WARDENS[s.recipe.signature];
+        identity =
+          Object.values(WARDENS).find((w) => w.move === warden?.move) ??
+          WARDENS[s.recipe.signature],
+        armor = [...sim.physicalRestraints()].filter(
+          (r) => r.kind === "mount" && r.anchor === `enemy-${boss.id}`,
+        ).length;
       el("boss-phase").textContent =
         warden && warden.exposedUntil > sim.tick
           ? `EXPOSED · ${identity.exposedBy.toUpperCase()}`
           : warden?.move && boss.phase === "windup"
             ? `${identity.name.toUpperCase()} · DODGE THE ${identity.telegraph === "ring" ? "RING" : identity.telegraph === "marker" ? "MARKED ARCH" : "LINE"}`
-            : boss.hp / boss.maxHp < 0.5
-              ? "ENRAGED · PHASE II"
-              : "WARDEN OF THE AREA";
+            : armor
+              ? `ARMORED ×${armor} · STRIP IT TO HIT HARDER`
+              : boss.hp / boss.maxHp < 0.5
+                ? "ENRAGED · PHASE II"
+                : "WARDEN OF THE AREA";
     }
     const p = sim.players.get(id);
     let hint = "";
@@ -549,7 +559,7 @@ export class AdventureUI {
           })
           .join(
             "",
-          )}</div>${recipe.combination ? `<div class="combination-note">NEW COMBINATION: ${mechanicOf(recipe.combination.from).name} also triggers ${mechanicOf(recipe.combination.into).name} after a short delay.</div>` : ""}<div class="combination-note warden-note">${esc(recipe.boss).toUpperCase()} · ${WARDENS[recipe.signature].name}: ${WARDENS[recipe.signature].summary} Weakness: ${WARDENS[recipe.signature].exposedBy}.</div><p class="mechanic-intro">One ${mechanicOf(recipe.signature).name} spot is calm (its physical effects are off) and one is wild (stronger); the rest follow the area.</p><div class="area-facts"><span>Land ${recipe.land + 1} · ${themeOf(recipe.theme).name}</span><span>${recipe.killGoal} creatures + ${recipe.boss}</span><span>${recipe.procedural ? "PROCEDURALLY COMPOSED" : "AUTHORED INTRODUCTION"}</span></div>`;
+          )}</div>${recipe.combination ? `<div class="combination-note">NEW COMBINATION: ${mechanicOf(recipe.combination.from).name} also triggers ${mechanicOf(recipe.combination.into).name} after a short delay.</div>` : ""}${wardenNote(recipe)}${encounterNote(recipe)}<p class="mechanic-intro">One ${mechanicOf(recipe.signature).name} spot is calm (its physical effects are off) and one is wild (stronger); the rest follow the area.</p><div class="area-facts"><span>Land ${recipe.land + 1} · ${themeOf(recipe.theme).name}</span><span>${recipe.killGoal} creatures + ${recipe.boss}</span><span>${recipe.procedural ? "PROCEDURALLY COMPOSED" : "AUTHORED INTRODUCTION"}</span></div>`;
     } else if (this.panel === "death") {
       el("adventure-panel").innerHTML =
         `<div class="death-summary">${icon("fire", 45)}<p>The wild keeps ${h.goldLost} gold.<br>Your levels, skills and equipment stay with you.</p><div><span>AREA <strong>${s.area}</strong></span><span>LEVEL <strong>${h.level}</strong></span><span>DEFEATED <strong>${h.kills}</strong></span></div><button class="primary-button" data-action="respawn">${sim.players.size > 1 && [...sim.players.keys()].some((other) => other !== id && !sim.adventure.hero(other).dead) ? "Rejoin at the trailhead" : `Return to ${esc(townName(s.townLand))}`} ${icon("arrow", 17)}</button></div>`;
@@ -568,4 +578,25 @@ export class AdventureUI {
     const delta = item.power - (current?.power ?? 0);
     return `<div class="item-detail" style="--rarity:${RARITY_COLORS[item.rarity]}"><div><span class="eyebrow">${item.rarity.toUpperCase()} ${item.slot.toUpperCase()} · LEVEL ${item.level}</span><h3>${esc(item.name)}</h3></div><div class="item-power">${item.power}<span>POWER</span><small class="${delta >= 0 ? "positive" : "negative"}">${equipped ? "EQUIPPED" : `${delta >= 0 ? "+" : ""}${delta} vs equipped`}</small></div><ul>${item.affixes.map((a) => `<li>${affixText(a.stat, a.value)}</li>`).join("")}</ul>${item.special !== "none" ? `<p class="legendary-effect">${SPECIAL_TEXT[item.special]}</p>` : ""}<div class="item-actions"><button class="primary-button small" data-action="equip" ${equipped ? "disabled" : ""}>${equipped ? "Equipped" : "Equip"}</button><button class="secondary-button" data-action="sell" ${equipped || sim.adventure.state.mode !== "town" ? "disabled" : ""}>Sell · ${item.value} gold</button></div></div>`;
   }
+}
+
+/** The warden note of the mechanic guide: one signature (authored) or a composed warden (M11). */
+function wardenNote(recipe: AreaRecipe): string {
+  const plan = encounterPlan(recipe);
+  if (!plan)
+    return `<div class="combination-note warden-note">${esc(recipe.boss).toUpperCase()} · ${WARDENS[recipe.signature].name}: ${WARDENS[recipe.signature].summary} Weakness: ${WARDENS[recipe.signature].exposedBy}.</div>`;
+  const b = plan.boss,
+    moves = b.moves.map((m) => Object.values(WARDENS).find((w) => w.move === m)!);
+  return `<div class="combination-note warden-note">${esc(b.title).toUpperCase()} · ${moves.map((w) => w.name).join(" + ")}. Exposed by ${moves.map((w) => w.exposedBy).join(", or ")}. Armor: ${ARMOR[b.armor].summary} Strip it with ${ARMOR[b.armor].counter}. Arena: ${b.arena.map((a) => ARENA[a].name).join(" and ")}.</div>`;
+}
+/** M11: what the generated area's encounter clusters are and how to set them off. */
+function encounterNote(recipe: AreaRecipe): string {
+  const plan = encounterPlan(recipe);
+  if (!plan) return "";
+  return `<div class="combination-note encounter-note">GENERATED ENCOUNTER · ${plan.clusters
+    .map((c) => {
+      const info = COMBINATIONS[c.combos[0]];
+      return `<b>${esc(info.name)}</b>: ${esc(info.summary)} <i>${esc(info.start)}.</i>`;
+    })
+    .join(" ")}</div>`;
 }

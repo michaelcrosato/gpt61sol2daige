@@ -13,6 +13,12 @@ import type { AdventureAction } from "../game/types.ts";
 import { wardenExport } from "../game/wardens.ts";
 import { adventureAreaAt } from "../physics/adventure.ts";
 import { blueprintExport } from "../physics/blueprints.ts";
+import {
+  type EncounterManifest,
+  encounterCatalog,
+  previewEncounter,
+  validateEncounter,
+} from "../physics/encounter-tools.ts";
 import { interactPhysics } from "../physics/interaction.ts";
 import { linkViews, mechanismExport } from "../physics/mechanisms.ts";
 import type { PolicyEdit } from "../physics/policies.ts";
@@ -107,6 +113,18 @@ export const COMMANDS = {
   encounter: {
     index: "positive area index; agent/debug preview",
     recipe: "optional validated modular AreaRecipe",
+  },
+  encounters: {
+    action:
+      "catalog (default), preview, validate, export: M11 generated encounters (areas 9+); read-only",
+    catalog:
+      "modules (kits of M05–M10 scenery, assemblies, fields, surfaces), compatibility rules (combinations: roles, chain rules, affinity, regional profile), profiles, warden armor and arena kits, slots, routes and placement/fallback rules",
+    preview:
+      "index (9+), optional seed (default: this run's) and plan (an edited EncounterPlan): builds the area without a running game and returns its manifest: plan, realized clusters (links, fallbacks, routes, overlaps), policies, causal rules, module bodies and the reset/encounter commands that reproduce it",
+    validate:
+      "plan (with seed/index) or manifest: {ok, errors, warnings}; unknown references, impossible placements (overlaps, broken chain links, clusters that could not stand) and closed routes are errors; fallbacks are warnings; a manifest must reproduce from its seed",
+    export:
+      "optional index (default: the current area): this land's realized manifest as built, its effective cluster policies and persistent mutations (destroyed module pieces, moved bodies) since the land was built",
   },
   catalog: { description: "Inspect mechanics, themes, archetypes and all 48 skill nodes" },
   observe: { description: "Compact world state, quest, performance, hash and recent events" },
@@ -206,6 +224,83 @@ export class AgentRuntime {
       setPieces,
       town: ids.filter((id) => id.includes("-town")).sort(),
     };
+  }
+  /** M11 generated-encounter tools (read-only). */
+  private encounters(command: Command) {
+    const action = command.action ?? "catalog",
+      s = this.sim.adventure.state;
+    const int = (key: string, fallback?: number) => {
+      const v = command[key] ?? fallback;
+      if (!Number.isSafeInteger(v)) throw new Error(`${key} must be an integer`);
+      return v as number;
+    };
+    if (action === "catalog") return encounterCatalog();
+    if (action === "preview")
+      return previewEncounter(
+        int("seed", s.seed),
+        int("index", s.mode === "area" ? s.area : 9),
+        command.plan as never,
+      );
+    if (action === "validate")
+      return validateEncounter({
+        seed: command.seed === undefined ? s.seed : int("seed"),
+        index: command.index === undefined ? undefined : int("index"),
+        plan: command.plan as never,
+        manifest: command.manifest as EncounterManifest | undefined,
+      });
+    if (action === "export") {
+      const index = int("index", s.area),
+        physical = this.sim.physical,
+        replica = this.sim.replicaPhysics;
+      const state = physical
+        ? { grammar: physical.grammar, areas: physical.encounters }
+        : replica?.encounters;
+      const realized = state?.areas.find((m) => m.index === index);
+      if (!realized)
+        throw new Error(
+          state?.grammar === false
+            ? "This land was saved before generated encounters (M11); it keeps its earlier content"
+            : "No generated encounter for that area in this land",
+        );
+      const fresh = previewEncounter(s.seed, index);
+      const bodies = physical
+        ? physical.world.ids()
+        : (replica?.world.bodies.map((b) => b.recipe.id) ?? []);
+      const present = new Set(bodies);
+      const poses = new Map(
+        (physical
+          ? physical.props()
+          : (replica?.world.bodies.map((b) => b.state!).filter(Boolean) ?? [])
+        ).map((p) => [p.id, p]),
+      );
+      const destroyed = physical ? physical.destroyedRecords() : (replica?.destroyed ?? []);
+      const policies = physical
+        ? physical.world.policyState().state.profiles.regions
+        : (replica?.world.policies?.state.profiles.regions ?? []);
+      return {
+        ...fresh,
+        realized,
+        policies: realized.clusters.map((c) => ({
+          id: c.region,
+          profile: c.profile,
+          values: policies.find((r) => r.id === c.region)?.values ?? null,
+        })),
+        mutations: {
+          destroyed: destroyed
+            .filter((d) => fresh.modules.some((m) => m.id === d.id))
+            .map((d) => ({ id: d.id, cause: d.cause, owner: d.owner, tick: d.tick })),
+          missing: fresh.modules.filter((m) => !present.has(m.id)).map((m) => m.id),
+          moved: fresh.modules
+            .filter((m) => poses.has(m.id))
+            .map((m) => {
+              const p = poses.get(m.id)!;
+              return { id: m.id, distance: Math.round(Math.hypot(p.x - m.x, p.y - m.y) * 10) / 10 };
+            })
+            .filter((m) => m.distance > 1),
+        },
+      };
+    }
+    throw new Error(`Unknown encounters action: ${String(action)}`);
   }
   private rigs() {
     const sim = this.sim,
@@ -612,6 +707,8 @@ export class AgentRuntime {
           command.recipe as AreaRecipe | undefined,
         );
         break;
+      case "encounters":
+        return this.encounters(command);
       case "catalog":
         return {
           mechanics: MECHANICS,

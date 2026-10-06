@@ -1,5 +1,6 @@
 import { clamp, hash, lerp } from "../engine/math.ts";
 import type { Simulation } from "../engine/simulation.ts";
+import { COMBINATIONS } from "../game/encounters.ts";
 import type { Enemy } from "../game/types.ts";
 import { ECHO_DELAY, WARDEN_WINDUP } from "../game/wardens.ts";
 
@@ -11,7 +12,14 @@ import { ECHO_DELAY, WARDEN_WINDUP } from "../game/wardens.ts";
 type Ctx = CanvasRenderingContext2D;
 
 /** Where a restrained body is drawn this frame (interpolated like its actor). */
-function bodyAt(sim: Simulation, id: string, alpha: number): { x: number; y: number } | null {
+function bodyAt(
+  sim: Simulation,
+  id: string,
+  alpha: number,
+  props?: Map<string, { x: number; y: number }>,
+): { x: number; y: number } | null {
+  // M11 armor pieces are props (their solved pose).
+  if (id.startsWith("prop-")) return props?.get(id) ?? null;
   if (id.startsWith("enemy-")) {
     const e = sim.adventure.state.enemies.find((en) => `enemy-${en.id}` === id);
     return e ? { x: lerp(e.px, e.x, alpha), y: lerp(e.py, e.y, alpha) } : null;
@@ -22,10 +30,22 @@ function bodyAt(sim: Simulation, id: string, alpha: number): { x: number; y: num
 
 /** Living vines: a curving, leafy stem from the bloom (or the Bloom Tyrant) to what it holds. */
 export function drawRestraints(ctx: Ctx, sim: Simulation, alpha: number, time: number): void {
+  let props: Map<string, { x: number; y: number }> | undefined;
   for (const r of sim.physicalRestraints()) {
-    const to = bodyAt(sim, r.body, alpha),
+    if (r.kind === "mount" && !props)
+      props = new Map(
+        sim
+          .physicalProps()
+          .filter((p) => p.id.startsWith("prop-armor-"))
+          .map((p) => [p.id, { x: p.x, y: p.y }]),
+      );
+    const to = bodyAt(sim, r.body, alpha, props),
       from = r.anchor ? bodyAt(sim, r.anchor, alpha) : { x: r.x, y: r.y };
     if (!to || !from) continue;
+    if (r.kind === "mount") {
+      drawMount(ctx, from, to, r.rest, r.load / Math.max(1, r.breakLoad));
+      continue;
+    }
     const dx = to.x - from.x,
       dy = to.y - from.y,
       length = Math.hypot(dx, dy) || 1,
@@ -73,15 +93,73 @@ export function drawRestraints(ctx: Ctx, sim: Simulation, alpha: number, time: n
   }
 }
 
+/** M11 armor tether: a short iron chain from the warden to a mounted piece, reddening with strain. */
+function drawMount(
+  ctx: Ctx,
+  from: { x: number; y: number },
+  to: { x: number; y: number },
+  rest: number,
+  strain: number,
+): void {
+  const dx = to.x - from.x,
+    dy = to.y - from.y,
+    length = Math.hypot(dx, dy) || 1,
+    links = Math.max(3, Math.round(length / 5)),
+    sag = Math.max(0, rest - length) * 0.3 + 2;
+  ctx.save();
+  ctx.lineWidth = 1.3;
+  ctx.strokeStyle = `rgb(${90 + clamp(strain, 0, 1) * 150},${86 - clamp(strain, 0, 1) * 40},80)`;
+  for (let k = 0; k < links; k++) {
+    const t = (k + 0.5) / links,
+      x = from.x + dx * t,
+      y = from.y + dy * t - 6 + Math.sin(t * Math.PI) * sag;
+    ctx.beginPath();
+    ctx.ellipse(x, y, 1.8, 1.1, Math.atan2(dy, dx) + (k % 2 ? Math.PI / 2 : 0), 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+/** Region-ring colours of M11 cluster profiles. */
+const PROFILE_RING: Record<string, string> = {
+  charged: "#a7dfe6",
+  tinder: "#f3a85e",
+  gale: "#aae2c9",
+  heavy: "#d6c5a0",
+  freight: "#8fe6c7",
+};
 /** The current area's calm and wild regions: faint rings so local control reads on the ground. */
 export function drawRegionRings(ctx: Ctx, sim: Simulation, time: number, zoom: number): void {
   const s = sim.adventure.state;
   if (s.mode !== "area") return;
   const area = `area-${s.recipe.index}`;
+  const clusters = sim.physicalEncounters().find((m) => m.index === s.recipe.index)?.clusters ?? [];
   for (const region of sim.physicalRegions()) {
     if (region.areaId !== area || region.shape.kind !== "circle") continue;
     const calm = region.id.startsWith("calm-"),
       wild = region.id.startsWith("wild-");
+    // M11: a generated cluster's ring carries its combination's name and profile colour.
+    const cluster = clusters.find((c) => c.region === region.id);
+    if (cluster) {
+      const { x, y, radius } = region.shape,
+        color = PROFILE_RING[cluster.profile] ?? "#d6c5a0";
+      ctx.save();
+      ctx.strokeStyle = `${color}55`;
+      ctx.lineWidth = 1;
+      ctx.setLineDash([2, 5]);
+      ctx.lineDashOffset = -time * 6;
+      ctx.beginPath();
+      ctx.ellipse(x, y, radius, radius * 0.72, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      if (zoom > 0.75) {
+        ctx.font = "7px monospace";
+        ctx.textAlign = "center";
+        ctx.fillStyle = `${color}bb`;
+        ctx.fillText(COMBINATIONS[cluster.combo].name.toUpperCase(), x, y - radius * 0.72 - 4);
+      }
+      ctx.restore();
+      continue;
+    }
     if (!calm && !wild) continue;
     const { x, y, radius } = region.shape;
     ctx.save();

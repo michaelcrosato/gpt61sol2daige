@@ -284,3 +284,35 @@ Also covered:
 - **Hinge motor fix:** a lamp blow now swings it, 22.5 units/s against 3.3 before ([D77](physics/DECISIONS.md)).
 - **Main CI follow-up:** after the merge, the M09 ragdoll scenario sometimes felled its warden inside area 1's new `calm-1` region (2 of 6 local repeats), where calm values freeze ragdolls, so Whorl moved it 0. The scenario now fights west of the trailhead on open ground with no region (6/6 repeats pass). The game behaviour was correct.
 - **Engine-independent trig in per-tick physics** ([D82](physics/DECISIONS.md)): PR CI's lab replay check diverged once the town had motor-driven joints. Locally, the old trig code diverged in 7 of 12 repeats of that scenario; with `dsin`/`dcos`, 12 of 12 lab repeats and 8 of 8 town replay repeats match. The receipt is byte-identical, the reactions-off route is unchanged, and the reactions-on route differs only in area 9's clear time.
+
+## M11 generated encounters evidence
+
+On 2026-10-06:
+
+- `npm run check` passed **160 headless tests**, 11 of them new: 10 in `tests/physics-encounters.test.ts`, and the D91 regression in `tests/physics-world.test.ts`. `npm run build` produced the bundle.
+- `npm run test:e2e` passed **43 browser scenarios**, including the two new M11 scenarios in `e2e/physics-encounters.spec.ts` and the preserved WebRTC smoke checks ([D53](physics/DECISIONS.md)).
+- Both routes cleared all twelve areas, four of them generated, without a death. The bot rested, sold spares and bought an upgrade in all three towns.
+  - **`npm run verify:run`, reactions on:** level 23, 4,743 gold, 5,345 area ticks ([route](evidence/physics-m11-route.jsonl)).
+    - Area 10: walking to the coil and slashing it set off the storm pool: discharge down the rods, then soak, steam and fire chains in the same cluster, with two of its casks broken.
+    - Area 12: grabbing an oil jar with V and walking it into the brazier's coals burnt the stockade through (four barricades, five fuse brushes and the cache).
+    - Areas 9 and 11 hold only fuse and field combinations (vortex powder, powder trail, rubble maelstrom), which need carried fire or run on their own. They were cleared by combat alone.
+  - **`node tools/adventure.ts playthrough 12 --reactions off`**, with the session master switch off: level 24, 4,832 gold, 4,860 area ticks ([route](evidence/physics-m11-route-reactions-off.jsonl)).
+    - The same coil slash only drives the field rule.
+    - The jar grab is refused ("That prop is fixed in place here").
+
+The numbers below come from the [receipt](evidence/physics-m11.json) (`node tools/physics-encounters.ts`) and `tests/physics-encounters.test.ts`.
+
+| M11 acceptance | Evidence |
+| --- | --- |
+| A fixed seed corpus across all five themes and a range of depths (with a large index) shows at least twelve distinct meaningful combinations and several boss assemblies | Seeds 142, 7, 2026 and 31337 × areas 9–25, 33, 101, 4001 and 1,000,001: **84 areas** over glass, dusk, frost, verdant and cinder lands. **All 14 combinations** appear, from 2 (briar blaze) to 28 (rubble maelstrom) times. There are **77 distinct warden assemblies** (rig, armor, composed moves, arena) and all four armor kits. Every area has 0 overlapping bodies, every link within reach and every route open. 99 fallbacks are recorded and none leaves a planned cluster or filler out. Each combination's chain fires in a real simulation: <ul><li>wading crawlers shocked 600 → 577 (coil) and 600 → 569 (pylon);</li><li>a stockade burnt through 155 ticks after a jar met the coals;</li><li>2/2 powder barrels blown by a fuse, together in a vortex and by a launched stone;</li><li>a doused fuse whose last brush stays unburnt;</li><li>4/4 rubble pieces carried by a vortex or a lane;</li><li>a ball shattering glass into a discharge;</li><li>a cargo train through a rift with 3/3 members and both ropes intact.</li></ul> |
+| At least three generated areas beyond area eight are completed through normal inputs; one shows a multi-system interaction, one finishes with reactions disabled | Both routes above clear generated areas 9–12 with ordinary inputs and validated actions only. Multi-system interactions started by input:<ul><li>area 10: a coil slash discharges into the pool, and fire, soak and steam follow in the cluster;</li><li>area 12: a jar carried into the brazier lights a slick and a fuse that burn the stockade open.</li></ul> The reactions-off route clears the same four areas. |
+| Initial recipes reproduce from seed; saved broken and moved state stays authoritative; invalid references and impossible placements fail validation visibly | Two simulations of seed 142 build identical module bodies in area 9, and a fresh build reproduces the manifest. A broken and a moved piece survive raw and portable saves, restore (equal state hash after 20 more ticks) and travel to the next land and back. A real M10 checkpoint of area 9 keeps its earlier content and its broken crate. `encounters validate` reports `unknown module trebuchet` and a tampered manifest ("does not reproduce"). A rift-freight cluster forced into an area without arches fails as an impossible placement. |
+| A generated encounter after save/load and through a late-join replica; no hidden body cap or FPS-driven substitution | The receipt lights a powder trail, saves 30 ticks into the chain and restores: the restored run reaches the same state hash 240 ticks later. A late-join replica receives every generated body, the cluster regions and a warden's armor mounts, and `encounters export` on the guest reads the manifest. Nothing in placement or play depends on frame rate or a body budget. Generated content is a pure function of recipe, palette and terrain. |
+
+Composed wardens (receipt, four armor kits):
+
+- Censer-bearer (2 censers) and Stonehide (2 boulders) take 0.76 of each blow while armored, Glassmantled (3 shards) and Barkbound (3 plates) 0.64.
+- A shock cracks every glass shard in one tick; a blast breaks the boulders and knocks the censers loose; fire burns bark plates one by one.
+- Stripped of armor, the warden takes the full blow.
+- Mount tethers snap under a 900 units/s yank; every mount is released when the warden dies.
+- With mechanisms off at its ground, the warden spawns unarmored.

@@ -387,3 +387,40 @@ Exposure (`EXPOSED`): 180 ticks of 1.5× damage, a 40-tick stagger and a broken 
 - `src/render/showcase.ts` draws vines, region rings, warden telegraphs, the pending echo and exposure. `combat.ts` marks the market and annotates the atlas. The HUD shows EXPOSED or the signature with its dodge hint. The mechanic guide explains each physical extension, warden and calm/wild ring.
 - `actors` actions: `showcase`, `mechanic` (id) and `warden` (`enemy-<id>`).
 - The QA bot steers around solid scenery. `node tools/adventure.ts playthrough 9 --reactions off` runs the route with the session master switch off. `node tools/physics-world.ts` writes the receipt.
+
+## M11 generated encounters and modular wardens
+
+Areas 9+ (`recipe.procedural`) build their physical content from an **encounter grammar** instead of the authored M05 clearing layout, M07 mechanism set and M08 yard ([D83](physics/DECISIONS.md)). Authored areas 1–8 are unchanged.
+
+- **Plan** (`src/game/encounters.ts`, pure function of the recipe; `encounterPlan`):
+  - `MODULES`: 18 kits of M05–M10 vocabulary (storm coil, glass garden, flood basin, brazier camp, oil cellar, brush fuse, timber stockade, thorn hedge, powder store, rubble field, maelstrom, gale lane, fan tower, chain gallows, launcher nest, cargo train, vine tether, gate pen), each with tags (`conductor`, `water`, `ignition`, `fuse`, `timber`, `volatile`, `loose`, `gravity`, `wind`, `cart`, `swing`, `launcher`, `brittle`, `spark`, …) and the switches it follows.
+  - `COMBINATIONS`: 14 compatibility rules. Each orders role modules along a chain and names the M08 rules (or M07/M10 hooks) the chain records, its regional profile and how a traveler starts it. Examples: conductors leading into a pool (`storm-pool`), a fuse from a brazier camp into a weakened stockade (`fire-stockade`), a vortex holding powder barrels (`vortex-powder`), a launcher aimed at powder (`launch-powder`), a chained ball beside glass (`swing-glass`), and a cargo train on a rift arch's pad (`rift-cart`).
+  - Combinations rank by the area's mechanics (affinity ×6) plus a seed term. Areas 9–20 carry two clusters, 21+ three, plus one standalone mechanism module. Each cluster has a ranked list (its intent, then fallbacks), a ring slot (six slots at radius 252–280, none on the arrival–exit line) and a regional profile (`PROFILES`: charged, tinder, gale, heavy, freight).
+  - Combat pockets 85 units inward of each cluster (radius 55): waves gather there (`pocketPoint`).
+  - Routes: the essential arrival → warden → exit line, plus an optional advantage route through each cluster.
+  - `bossPlan`: the M10 rig choice, composed signature moves from the area's mechanics (two; three from area 21), weaknesses = the union of the moves' weaknesses, an armor kit by theme and seed (`ARMOR`: bark, glass, stone, censer) and two arena kits (`ARENA`: one that counters the armor, one that serves a weakness).
+- **Realization** (`src/physics/encounters.ts`, pure function of recipe, palette and terrain; `generatedArea`):
+  - the three trees of the M05 layout, the M10 set pieces around the mechanics (on that base), then each cluster, the filler module and the arena;
+  - a cluster is one frame: its modules laid along the chain with per-combination gaps (`CLUSTERS`), and its links (for example "the last rod stands in the pool", "the fuse's end within spread reach 12 of the front board", "the pylon inside the ball's 67.5-unit sweep") checked with the pieces actually kept;
+  - frames try turns about the clearing centre (±0.3 rad) and radial shifts (±44), then spare slots, then alternate modules, then the next combination; a cluster with no room anywhere leaves its slot open; every fallback is written to the manifest ([D84](physics/DECISIONS.md));
+  - placement hazards, from the soak ([D85](physics/DECISIONS.md)): nothing within 12 units of a lit brazier; modules keep out of lanes and 96 units of run-out; pools never cover a piece a fire chain needs dry; such pieces never stand on water tiles; a maelstrom is a vortex plus a pull;
+  - essential routes: a 12-unit walkability grid treats every placed body as solid (except walk-through and raised parts) and keeps arrival, the warden's ground, the exit, every mechanic and every pocket reachable if they were before the modules ([D86](physics/DECISIONS.md));
+  - the manifest (`RealizedEncounter`): clusters with links, region and profile; the filler; the arena; the boss plan; routes; fallbacks; overlaps (must be empty); body count;
+  - regions `combo-<area>-<k>` (circle radius 85, priority 15) carry each cluster's profile values.
+- **Land ownership.** `AdventurePhysics.grammar` is true for a land built in M11 or later. Generated areas skip the legacy layers and `ensureEncounters` adds content that never existed (destroyed pieces never return; fields and pools are authored once). A land saved before M11 keeps `grammar: false` and its earlier content; nothing is generated over it. Manifests are cached per world, terrain revision and palette, shared by the policy layout and spawning.
+- **Modular wardens** ([D88](physics/DECISIONS.md)):
+  - `Enemy.name` is the composed title, for example "Glasswater Usurper, Censer-bearer".
+  - `WardenState.armor` is the number of pieces still to mount. On the warden's first tick with a body, `AdventurePhysics.armBoss` spawns `prop-armor-<enemy>-<k>` pieces (`plate`, `shard`, `stone` or a dynamic `lantern` censer). Each hangs on a `mount` restraint (`ShowcasePhysics`, anchored to the warden, rest 30–40, break load by piece mass).
+  - Each mounted piece within 64 units removes 12% of damage taken (`ARMOR_RULES`; at most 4 pieces).
+  - Pieces break by their material (bark burns, glass cracks under shock, stone yields to blasts and launched props). A tether snaps under a yank, and every mount is released when the warden dies.
+  - With mechanisms or dynamic props off at its ground, the warden spawns unarmored.
+  - A blink carries its armor along, and the warden's own blows never strike its armor.
+  - `Adventure.nextMove` rotates the composed moves each slam turn (`attacks / 3`). `expose` accepts any of the composed weaknesses, and water exposes whenever it is one of them.
+- **New vocabulary.** Families `plate`, `shard` (armor) and `pillar` (fixed stone, arena), and the assembly kind `cart` (wagon towing a crate and a barrel on ropes, unanchored, so rift freight carries it whole).
+- **Versions** ([D90](physics/DECISIONS.md)): adventure envelope **9** (`encounters`: grammar flag and manifests; land archives keep them), room protocol **12**, physical world still **9**. Wardens validate with seven fields (before M11) or eight. A real M10 checkpoint in a generated land restores unchanged.
+- **Agent:** `encounters` catalog, preview, validate and export ([AGENT-PROTOCOL](AGENT-PROTOCOL.md#m11-generated-encounters)).
+- **Presentation:**
+  - `src/render/showcase.ts` draws mount chains (reddening with strain) and each cluster's ring, labelled with its combination in its profile's colour;
+  - `src/render/props.ts` draws bark plates, ward shards, pillars and censers;
+  - the mechanic guide lists the generated encounter (each combination and how to start it) and the composed warden (moves, weaknesses, armor and its counter, arena);
+  - the boss HUD shows `ARMORED ×N` while armor holds.

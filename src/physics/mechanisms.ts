@@ -94,6 +94,13 @@ export const MECHANISMS: Record<MechanismKind, MechanismInfo> = {
     event: "none",
     joints: "ropes between posts and pennants; 400 load / 10 cut each",
   },
+  cart: {
+    name: "Cargo train",
+    summary:
+      "An unanchored wagon towing a crate and a barrel on ropes: pushed, pulled or carried through a rift, it moves as one assembly. Generated encounters (M11).",
+    event: "none",
+    joints: "ropes (tow lines); 1200 / 1000 load, 30 / 25 cut",
+  },
 };
 /** Reproducible registry export for agents and documentation. */
 export function mechanismExport() {

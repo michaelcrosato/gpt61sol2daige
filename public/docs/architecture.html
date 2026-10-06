@@ -1337,7 +1337,148 @@ extension, warden and calm/wild ring. - <code>actors</code> actions:
 around solid scenery.
 <code>node tools/adventure.ts playthrough 9 --reactions off</code> runs
 the route with the session master switch off.
-<code>node tools/physics-world.ts</code> writes the receipt.</p></main>
+<code>node tools/physics-world.ts</code> writes the receipt.</p>
+<h2 id="m11-generated-encounters-and-modular-wardens">M11 generated
+encounters and modular wardens</h2>
+<p>Areas 9+ (<code>recipe.procedural</code>) build their physical
+content from an <strong>encounter grammar</strong> instead of the
+authored M05 clearing layout, M07 mechanism set and M08 yard (<a
+href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/physics/DECISIONS.md">D83</a>). Authored areas 1–8 are
+unchanged.</p>
+<ul>
+<li><strong>Plan</strong> (<code>src/game/encounters.ts</code>, pure
+function of the recipe; <code>encounterPlan</code>):
+<ul>
+<li><code>MODULES</code>: 18 kits of M05–M10 vocabulary (storm coil,
+glass garden, flood basin, brazier camp, oil cellar, brush fuse, timber
+stockade, thorn hedge, powder store, rubble field, maelstrom, gale lane,
+fan tower, chain gallows, launcher nest, cargo train, vine tether, gate
+pen), each with tags (<code>conductor</code>, <code>water</code>,
+<code>ignition</code>, <code>fuse</code>, <code>timber</code>,
+<code>volatile</code>, <code>loose</code>, <code>gravity</code>,
+<code>wind</code>, <code>cart</code>, <code>swing</code>,
+<code>launcher</code>, <code>brittle</code>, <code>spark</code>, …) and
+the switches it follows.</li>
+<li><code>COMBINATIONS</code>: 14 compatibility rules. Each orders role
+modules along a chain and names the M08 rules (or M07/M10 hooks) the
+chain records, its regional profile and how a traveler starts it.
+Examples: conductors leading into a pool (<code>storm-pool</code>), a
+fuse from a brazier camp into a weakened stockade
+(<code>fire-stockade</code>), a vortex holding powder barrels
+(<code>vortex-powder</code>), a launcher aimed at powder
+(<code>launch-powder</code>), a chained ball beside glass
+(<code>swing-glass</code>), and a cargo train on a rift arch’s pad
+(<code>rift-cart</code>).</li>
+<li>Combinations rank by the area’s mechanics (affinity ×6) plus a seed
+term. Areas 9–20 carry two clusters, 21+ three, plus one standalone
+mechanism module. Each cluster has a ranked list (its intent, then
+fallbacks), a ring slot (six slots at radius 252–280, none on the
+arrival–exit line) and a regional profile (<code>PROFILES</code>:
+charged, tinder, gale, heavy, freight).</li>
+<li>Combat pockets 85 units inward of each cluster (radius 55): waves
+gather there (<code>pocketPoint</code>).</li>
+<li>Routes: the essential arrival → warden → exit line, plus an optional
+advantage route through each cluster.</li>
+<li><code>bossPlan</code>: the M10 rig choice, composed signature moves
+from the area’s mechanics (two; three from area 21), weaknesses = the
+union of the moves’ weaknesses, an armor kit by theme and seed
+(<code>ARMOR</code>: bark, glass, stone, censer) and two arena kits
+(<code>ARENA</code>: one that counters the armor, one that serves a
+weakness).</li>
+</ul></li>
+<li><strong>Realization</strong>
+(<code>src/physics/encounters.ts</code>, pure function of recipe,
+palette and terrain; <code>generatedArea</code>):
+<ul>
+<li>the three trees of the M05 layout, the M10 set pieces around the
+mechanics (on that base), then each cluster, the filler module and the
+arena;</li>
+<li>a cluster is one frame: its modules laid along the chain with
+per-combination gaps (<code>CLUSTERS</code>), and its links (for example
+“the last rod stands in the pool”, “the fuse’s end within spread reach
+12 of the front board”, “the pylon inside the ball’s 67.5-unit sweep”)
+checked with the pieces actually kept;</li>
+<li>frames try turns about the clearing centre (±0.3 rad) and radial
+shifts (±44), then spare slots, then alternate modules, then the next
+combination; a cluster with no room anywhere leaves its slot open; every
+fallback is written to the manifest (<a
+href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/physics/DECISIONS.md">D84</a>);</li>
+<li>placement hazards, from the soak (<a
+href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/physics/DECISIONS.md">D85</a>): nothing within 12 units of a lit
+brazier; modules keep out of lanes and 96 units of run-out; pools never
+cover a piece a fire chain needs dry; such pieces never stand on water
+tiles; a maelstrom is a vortex plus a pull;</li>
+<li>essential routes: a 12-unit walkability grid treats every placed
+body as solid (except walk-through and raised parts) and keeps arrival,
+the warden’s ground, the exit, every mechanic and every pocket reachable
+if they were before the modules (<a
+href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/physics/DECISIONS.md">D86</a>);</li>
+<li>the manifest (<code>RealizedEncounter</code>): clusters with links,
+region and profile; the filler; the arena; the boss plan; routes;
+fallbacks; overlaps (must be empty); body count;</li>
+<li>regions <code>combo-&lt;area&gt;-&lt;k&gt;</code> (circle radius 85,
+priority 15) carry each cluster’s profile values.</li>
+</ul></li>
+<li><strong>Land ownership.</strong>
+<code>AdventurePhysics.grammar</code> is true for a land built in M11 or
+later. Generated areas skip the legacy layers and
+<code>ensureEncounters</code> adds content that never existed (destroyed
+pieces never return; fields and pools are authored once). A land saved
+before M11 keeps <code>grammar: false</code> and its earlier content;
+nothing is generated over it. Manifests are cached per world, terrain
+revision and palette, shared by the policy layout and spawning.</li>
+<li><strong>Modular wardens</strong> (<a
+href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/physics/DECISIONS.md">D88</a>):
+<ul>
+<li><code>Enemy.name</code> is the composed title, for example
+“Glasswater Usurper, Censer-bearer”.</li>
+<li><code>WardenState.armor</code> is the number of pieces still to
+mount. On the warden’s first tick with a body,
+<code>AdventurePhysics.armBoss</code> spawns
+<code>prop-armor-&lt;enemy&gt;-&lt;k&gt;</code> pieces
+(<code>plate</code>, <code>shard</code>, <code>stone</code> or a dynamic
+<code>lantern</code> censer). Each hangs on a <code>mount</code>
+restraint (<code>ShowcasePhysics</code>, anchored to the warden, rest
+30–40, break load by piece mass).</li>
+<li>Each mounted piece within 64 units removes 12% of damage taken
+(<code>ARMOR_RULES</code>; at most 4 pieces).</li>
+<li>Pieces break by their material (bark burns, glass cracks under
+shock, stone yields to blasts and launched props). A tether snaps under
+a yank, and every mount is released when the warden dies.</li>
+<li>With mechanisms or dynamic props off at its ground, the warden
+spawns unarmored.</li>
+<li>A blink carries its armor along, and the warden’s own blows never
+strike its armor.</li>
+<li><code>Adventure.nextMove</code> rotates the composed moves each slam
+turn (<code>attacks / 3</code>). <code>expose</code> accepts any of the
+composed weaknesses, and water exposes whenever it is one of them.</li>
+</ul></li>
+<li><strong>New vocabulary.</strong> Families <code>plate</code>,
+<code>shard</code> (armor) and <code>pillar</code> (fixed stone, arena),
+and the assembly kind <code>cart</code> (wagon towing a crate and a
+barrel on ropes, unanchored, so rift freight carries it whole).</li>
+<li><strong>Versions</strong> (<a href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/physics/DECISIONS.md">D90</a>):
+adventure envelope <strong>9</strong> (<code>encounters</code>: grammar
+flag and manifests; land archives keep them), room protocol
+<strong>12</strong>, physical world still <strong>9</strong>. Wardens
+validate with seven fields (before M11) or eight. A real M10 checkpoint
+in a generated land restores unchanged.</li>
+<li><strong>Agent:</strong> <code>encounters</code> catalog, preview,
+validate and export (<a
+href="AGENT-PROTOCOL.md#m11-generated-encounters">AGENT-PROTOCOL</a>).</li>
+<li><strong>Presentation:</strong>
+<ul>
+<li><code>src/render/showcase.ts</code> draws mount chains (reddening
+with strain) and each cluster’s ring, labelled with its combination in
+its profile’s colour;</li>
+<li><code>src/render/props.ts</code> draws bark plates, ward shards,
+pillars and censers;</li>
+<li>the mechanic guide lists the generated encounter (each combination
+and how to start it) and the composed warden (moves, weaknesses, armor
+and its counter, arena);</li>
+<li>the boss HUD shows <code>ARMORED ×N</code> while armor holds.</li>
+</ul></li>
+</ul></main>
 <footer>Fern · A world engine built for agents · <a href="https://github.com/michaelcrosato/gpt61sol2daige">Source on GitHub</a></footer>
 </body>
 </html>

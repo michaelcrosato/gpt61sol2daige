@@ -14,6 +14,7 @@ import {
   npcPosition,
   TOWN_NPCS,
 } from "../game/content.ts";
+import { ARMOR, ARMOR_RULES, type BossPlan } from "../game/encounters.ts";
 import type { AttackTeam } from "../game/interactions.ts";
 import { enemyPose, rigOf } from "../game/rigs.ts";
 import type { AdventureState, Enemy } from "../game/types.ts";
@@ -36,6 +37,14 @@ import {
   isPropId,
   lootBodyId,
 } from "./combat.ts";
+import {
+  armorPieces,
+  type GeneratedArea,
+  generatedArea,
+  type RealizedEncounter,
+  validateRealized,
+  waterTerrain,
+} from "./encounters.ts";
 import { isMaterial, MATERIALS, type MaterialId, materialDamage } from "./materials.ts";
 import {
   areaMechanisms,
@@ -151,6 +160,18 @@ interface LandArchive {
   reactions?: ReactionArchive;
   /** M10 (envelope 8): showcase state; its presence means the land's M10 scene is authored. */
   showcase?: ShowcaseState;
+  /** M11 (envelope 9): whether the land was built with the encounter grammar, and its manifests. */
+  encounters?: EncounterState;
+}
+/**
+ * M11: a land built with the encounter grammar carries generated modules in its generated
+ * areas (index > 8); a land saved before M11 keeps its earlier content (`grammar` false) and
+ * nothing is ever generated over it.
+ */
+export interface EncounterState {
+  grammar: boolean;
+  /** Realized manifests of the land's generated areas, as built. */
+  areas: RealizedEncounter[];
 }
 /** Persistent destruction fact. The parent body is gone; its pieces are ordinary props. */
 export interface DestroyedRecord {
@@ -220,7 +241,7 @@ interface NavigationState {
   turn: number;
 }
 export interface AdventurePhysicsSnapshot {
-  version: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
+  version: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
   backend: string;
   landId: string;
   run: number;
@@ -244,8 +265,12 @@ export interface AdventurePhysicsSnapshot {
   rigs?: RigState;
   /** Envelope 8 (M10): living-vine restraints, the showcase sequence and pending events. */
   showcase?: ShowcaseState;
+  /** Envelope 9 (M11): the land's encounter grammar flag and realized manifests. */
+  encounters?: EncounterState;
 }
 const round = (value: number) => Math.round(value * 1000) / 1000;
+/** M11 armor mounts never wither while their warden lives (a safe-integer tick). */
+const MOUNT_UNTIL = 2 ** 40;
 /** M10: the authored town is a Sanctuary; before M10 it only dropped actor blocking. */
 export const TOWN_VALUES = presetValues("Sanctuary");
 export const LEGACY_TOWN_VALUES = { crowdContacts: false, propBlocking: false };
@@ -286,10 +311,40 @@ export const MARKET_REGION: RegionProfile = {
   shape: { kind: "rectangle", ...TOWN_MARKET },
   values: { propBlocking: true },
 };
-function layout(sim: Simulation): PolicyLayout {
+/**
+ * M11: the generated areas of the simulation's current land, realized on its terrain (cached
+ * per world, terrain revision and palette: layout and spawning share one realization).
+ */
+const generatedCache = new WeakMap<World, Map<string, GeneratedArea>>();
+export function landGenerated(sim: Simulation): (GeneratedArea | null)[] {
+  const s = sim.adventure.state,
+    palette = s.townLand % PALETTES,
+    world = sim.world;
+  let cache = generatedCache.get(world);
+  if (!cache) {
+    cache = new Map();
+    generatedCache.set(world, cache);
+  }
+  const blocked = solidTerrain(world),
+    water = waterTerrain(world);
+  return Array.from({ length: 4 }, (_, i) => {
+    const r = areaRecipe(s.seed, s.townLand * 4 + i + 1);
+    if (!r.procedural) return null;
+    const key = `${r.seed}:${r.index}:${palette}:${world.seed}:${world.revision}`;
+    let g = cache!.get(key);
+    if (!g) {
+      if (cache!.size > 32) cache!.clear();
+      g = generatedArea(r, palette, blocked, undefined, water);
+      cache!.set(key, g);
+    }
+    return g;
+  });
+}
+function layout(sim: Simulation, grammar: boolean): PolicyLayout {
   const s = sim.adventure.state,
     landId = `land-${s.run}-${s.townLand}`;
   const areas = Array.from({ length: 4 }, (_, i) => areaRecipe(s.seed, s.townLand * 4 + i + 1));
+  const generated = grammar ? landGenerated(sim) : [];
   return {
     lands: [{ id: landId, values: {} }],
     areas: [
@@ -321,12 +376,18 @@ function layout(sim: Simulation): PolicyLayout {
           values: { crowdContacts: true, ambientPhysics: true },
         },
         ...showcaseRegions(r),
+        // M11: each generated cluster's regional profile.
+        ...(generated[r.index - s.townLand * 4 - 1]?.regions.map((g) => structuredClone(g)) ?? []),
       ]),
     ],
   };
 }
-function freshPolicies(sim: Simulation, previous?: PolicyCheckpoint): PolicyCheckpoint {
-  const profiles = layout(sim);
+function freshPolicies(
+  sim: Simulation,
+  grammar: boolean,
+  previous?: PolicyCheckpoint,
+): PolicyCheckpoint {
+  const profiles = layout(sim, grammar);
   return {
     state: {
       version: 1,
@@ -422,8 +483,12 @@ export class AdventurePhysics {
   readonly reactions = new ReactionPhysics();
   /** M09 ragdoll remains, landing events and foliage bend. */
   readonly rigs = new RigPhysics();
-  /** M10 living-vine restraints and showcase events. */
+  /** M10 living-vine restraints and showcase events (M11: warden armor mounts too). */
   readonly showcase = new ShowcasePhysics();
+  /** M11: this land was built with the encounter grammar (false for lands saved before it). */
+  grammar = true;
+  /** M11: realized manifests of this land's generated areas. */
+  encounters: RealizedEncounter[] = [];
   /** Foliage props of this land (trees and brush), rebuilt when scenery changes. */
   private plants: string[] | null = null;
   /** Debris with an explicit lifetime: id -> cleanup tick. Derived from recipes on restore. */
@@ -437,8 +502,15 @@ export class AdventurePhysics {
     this.run = sim.adventure.state.run;
     this.seed = sim.world.seed;
     this.landId = `land-${this.run}-${sim.adventure.state.townLand}`;
-    this.world = new PhysicsWorld(undefined, { scene: "adventure", policies: freshPolicies(sim) });
+    this.world = new PhysicsWorld(undefined, {
+      scene: "adventure",
+      policies: freshPolicies(sim, this.grammar),
+    });
     this.spawnProps(sim);
+  }
+  /** Whether an area of this land is built from the M11 encounter grammar. */
+  private generates(recipe: AreaRecipe): boolean {
+    return this.grammar && recipe.procedural;
   }
   areaAt(sim: Simulation, x: number, y: number): string {
     return adventureAreaAt(sim.adventure.state, x, y);
@@ -464,6 +536,7 @@ export class AdventurePhysics {
       this.ensureMechanisms(sim);
       this.ensureReactions(sim, archive.reactions === undefined);
       this.ensureShowcase(sim, archive.showcase === undefined);
+      this.ensureEncounters(sim, false);
       this.world.settle();
       return;
     }
@@ -471,6 +544,8 @@ export class AdventurePhysics {
       blocked = solidTerrain(sim.world);
     for (let i = 0; i < 4; i++) {
       const r = areaRecipe(sim.adventure.state.seed, sim.adventure.state.townLand * 4 + i + 1);
+      // M11 generated areas build their own content from the encounter grammar.
+      if (this.generates(r)) continue;
       for (let n = 0; n < 4; n++)
         this.world.spawn({
           id: `crate-${r.index}-${n}`,
@@ -505,6 +580,7 @@ export class AdventurePhysics {
     this.ensureMechanisms(sim);
     this.ensureReactions(sim, true);
     this.ensureShowcase(sim, true);
+    this.ensureEncounters(sim, true);
     this.world.settle();
   }
   /**
@@ -517,10 +593,9 @@ export class AdventurePhysics {
       palette = s.townLand % PALETTES,
       present = new Set(this.world.assemblyList().map((a) => a.id));
     for (let i = 0; i < 4; i++) {
-      const { mechanisms, extras } = areaMechanisms(
-        areaRecipe(s.seed, s.townLand * 4 + i + 1),
-        palette,
-      );
+      const recipe = areaRecipe(s.seed, s.townLand * 4 + i + 1);
+      if (this.generates(recipe)) continue;
+      const { mechanisms, extras } = areaMechanisms(recipe, palette);
       for (const m of mechanisms) {
         if (present.has(m.recipe.id)) continue;
         for (const body of m.bodies) this.world.spawn(body);
@@ -542,7 +617,9 @@ export class AdventurePhysics {
       palette = s.townLand % PALETTES,
       blocked = solidTerrain(sim.world);
     for (let i = 0; i < 4; i++) {
-      const yard = areaReactions(areaRecipe(s.seed, s.townLand * 4 + i + 1), palette, blocked);
+      const recipe = areaRecipe(s.seed, s.townLand * 4 + i + 1);
+      if (this.generates(recipe)) continue;
+      const yard = areaReactions(recipe, palette, blocked);
       for (const body of yard.props)
         if (!this.world.has(body.id) && !this.destroyed.has(body.id)) this.world.spawn(body);
       if (fields)
@@ -562,9 +639,10 @@ export class AdventurePhysics {
       present = new Set(this.world.assemblyList().map((a) => a.id)),
       scenes = [
         townScene(palette),
-        ...Array.from({ length: 4 }, (_, i) =>
-          areaShowcase(areaRecipe(s.seed, s.townLand * 4 + i + 1), palette, blocked),
-        ),
+        ...Array.from({ length: 4 }, (_, i) => areaRecipe(s.seed, s.townLand * 4 + i + 1))
+          // Generated areas' set pieces come with their encounter content (M11).
+          .filter((r) => !this.generates(r))
+          .map((r) => areaShowcase(r, palette, blocked)),
       ];
     for (const scene of scenes) {
       for (const m of scene.mechanisms) {
@@ -582,6 +660,34 @@ export class AdventurePhysics {
       for (const surface of scene.surfaces)
         if (!this.reactions.hasSurface(surface.id)) this.reactions.addSurface(surface);
     }
+    this.plants = null;
+  }
+  /**
+   * M11 generated areas: their trees, M10 set pieces, encounter clusters, standalone mechanism
+   * and warden arena. Like the other layers, only content that never existed is added
+   * (destroyed pieces never return); fields and pools are authored once, with the land.
+   */
+  private ensureEncounters(sim: Simulation, authored: boolean): void {
+    if (!this.grammar) return;
+    const present = new Set(this.world.assemblyList().map((a) => a.id)),
+      generated = landGenerated(sim).filter((g): g is GeneratedArea => g !== null);
+    for (const { content } of generated) {
+      for (const m of content.mechanisms) {
+        if (present.has(m.recipe.id)) continue;
+        for (const body of m.bodies) if (!this.world.has(body.id)) this.world.spawn(body);
+        this.world.addAssembly(m.recipe, m.joints);
+        this.mechanisms.track(m.recipe);
+      }
+      for (const body of content.bodies)
+        if (body.assembly === undefined && !this.world.has(body.id) && !this.destroyed.has(body.id))
+          this.world.spawn(body);
+      if (!authored) continue;
+      for (const field of content.fields)
+        if (!this.reactions.hasField(field.id)) this.reactions.addField(field);
+      for (const surface of content.surfaces)
+        if (!this.reactions.hasSurface(surface.id)) this.reactions.addSurface(surface);
+    }
+    if (authored) this.encounters = generated.map((g) => structuredClone(g.manifest));
     this.plants = null;
   }
   /** The hooks reactions use: water terrain, areas and burnt-out ash. */
@@ -658,6 +764,7 @@ export class AdventurePhysics {
         mechanisms: this.mechanisms.save(),
         reactions,
         showcase: this.showcase.archive(),
+        encounters: { grammar: this.grammar, areas: structuredClone(this.encounters) },
       });
     } else this.archives.clear();
     const archive = this.archives.get(id);
@@ -667,12 +774,19 @@ export class AdventurePhysics {
       archive.policies.state.boundaryMargin = previous.state.boundaryMargin;
       // A land archived before M10 gains its Sanctuary town and calm/wild regions.
       if (archive.showcase === undefined)
-        archive.policies.state = reauthorLayout(archive.policies.state, layout(sim), M10_REPLACED);
+        archive.policies.state = reauthorLayout(
+          archive.policies.state,
+          layout(sim, false),
+          M10_REPLACED,
+        );
     }
+    // A fresh land is built with the M11 grammar; an archived one keeps how it was built.
+    this.grammar = archive ? (archive.encounters?.grammar ?? false) : true;
+    this.encounters = structuredClone(archive?.encounters?.areas ?? []);
     this.world.dispose();
     this.world = new PhysicsWorld(undefined, {
       scene: "adventure",
-      policies: archive?.policies ?? freshPolicies(sim, previous),
+      policies: archive?.policies ?? freshPolicies(sim, this.grammar, previous),
     });
     this.landId = id;
     this.run = sim.adventure.state.run;
@@ -1206,7 +1320,8 @@ export class AdventurePhysics {
       has: (id) => this.world.has(id),
       motionOf: (id) => this.world.motionOf(id),
       policy: (id) => this.world.policyOf(id).effective,
-      pull: (id, dvx, dvy) => this.world.velocityChange(id, dvx, dvy),
+      // Actors take it as external motion; M11 armor pieces (props) as a velocity change.
+      pull: (id, dvx, dvy) => void this.world.fieldPush(id, dvx, dvy),
     });
     const contacts = this.world.contacts;
     this.world.step(true);
@@ -1351,6 +1466,12 @@ export class AdventurePhysics {
       if (attack.only !== undefined && id !== attack.only) continue;
       if (attack.except !== undefined && id === attack.except) continue;
       if (attack.spare?.includes(id)) continue;
+      // M11: a warden's own blows never strike the armor it wears.
+      if (
+        attack.owner.startsWith("enemy-") &&
+        id.startsWith(`prop-armor-${attack.owner.slice(6)}-`)
+      )
+        continue;
       const pose = this.world.pose(id);
       if (!pose.blueprint || !pose.material) continue;
       const reach =
@@ -1417,6 +1538,9 @@ export class AdventurePhysics {
         }
       }
       if (family.toughness <= 0) continue; // Pieces and stumps move; they do not break further.
+      // Mechanism members never break, even breakable families such as a cargo train's crate
+      // and barrel (M11): the strike already cut their nearest joint.
+      if (pose.assembly !== undefined) continue;
       if (attack.damage <= 0 || attack.material === 0) continue; // A shove, not a strike.
       const durability = pose.consequences?.durability ?? 100;
       const base: Omit<PropHit, "damage" | "resisted" | "durability" | "stage" | "broken"> = {
@@ -1592,11 +1716,13 @@ export class AdventurePhysics {
         expiresAt: sim.tick + THORNBURST.lifetime,
       };
       this.world.spawn(recipe);
+      // Its lifetime holds even when it lands frozen (in a region with dynamic props off):
+      // restore derives expiry from the recipe, so the live land must track it too (M11 fix).
+      this.track(recipe);
       if (this.world.motionOf(id).frozen) continue;
       const speed = THORNBURST.speed * policy.impulseStrength;
       this.world.motion(id, Math.cos(angle) * speed, Math.sin(angle) * speed, (k % 2 ? 1 : -1) * 9);
       this.combat.instigate(id, burst.owner, burst.team, burst.cause, sim.tick);
-      this.track(recipe);
       ids.push(id);
     }
     return ids;
@@ -1690,6 +1816,91 @@ export class AdventurePhysics {
         amount: out.length,
       });
     return out;
+  }
+  /**
+   * M11 modular warden armor: its pieces (bark plates, glass shards, boulders or censers) spawn
+   * around it on mount tethers. With mechanisms or dynamic props off where it stands, the
+   * warden fights unarmored (nothing is spawned).
+   */
+  armBoss(sim: Simulation, e: Enemy, boss: Pick<BossPlan, "armor" | "pieces">): string[] {
+    const anchor = enemyBodyId(e.id);
+    if (!this.world.has(anchor) || boss.pieces <= 0) return [];
+    const policy = this.policyAt(sim, e.x, e.y).effective;
+    if (!policy.mechanisms || !policy.dynamicProps) return [];
+    const info = ARMOR[boss.armor],
+      palette = sim.adventure.state.townLand % PALETTES,
+      areaId = this.areaAt(sim, e.x, e.y),
+      blocked = solidTerrain(sim.world),
+      out: string[] = [];
+    for (const p of armorPieces(boss.armor, boss.pieces)) {
+      const id = `prop-armor-${e.id}-${p.k}`;
+      if (this.world.has(id)) continue;
+      let angle = p.angle,
+        x = e.x,
+        y = e.y;
+      for (let t = 0; t < 12; t++) {
+        x = round(e.x + Math.cos(angle) * (info.rest - 2));
+        y = round(e.y + Math.sin(angle) * (info.rest - 2));
+        if (!blocked(x, y, 7)) break;
+        angle += Math.PI / 6;
+      }
+      const recipe = propRecipe(id, info.family, palette, x, y, areaId, {
+        angle: round(angle),
+        motion: "dynamic",
+      });
+      this.world.spawn(recipe);
+      this.track(recipe);
+      const r = this.showcase.add({
+        kind: "mount",
+        body: id,
+        x: round(e.x),
+        y: round(e.y),
+        anchor,
+        rest: info.rest,
+        stiffness: info.stiffness,
+        breakLoad: info.breakLoad,
+        until: MOUNT_UNTIL,
+        born: sim.tick,
+        owner: anchor,
+        team: "enemy",
+      });
+      if (r) out.push(id);
+    }
+    if (out.length)
+      this.showcase.emit({
+        tick: sim.tick,
+        text: `mount:armed:${boss.armor}`,
+        owner: anchor,
+        x: round(e.x),
+        y: round(e.y),
+        amount: out.length,
+      });
+    this.plants = null;
+    return out;
+  }
+  /** Mounted armor pieces still within reach of their warden. */
+  armorPieces(e: Enemy): string[] {
+    const anchor = enemyBodyId(e.id),
+      out: string[] = [];
+    for (const r of this.showcase.view()) {
+      if (r.kind !== "mount" || r.anchor !== anchor || !this.world.has(r.body)) continue;
+      const m = this.world.motionOf(r.body);
+      if (Math.hypot(m.x - e.x, m.y - e.y) <= ARMOR_RULES.reach) out.push(r.body);
+    }
+    return out.sort();
+  }
+  /** A blinking warden takes its mounted armor along (the tethers would otherwise tear). */
+  carryArmor(e: Enemy, dx: number, dy: number): void {
+    const anchor = enemyBodyId(e.id);
+    for (const r of this.showcase.list())
+      if (r.kind === "mount" && r.anchor === anchor && this.world.has(r.body)) {
+        const m = this.world.motionOf(r.body);
+        this.world.place(r.body, round(m.x + dx), round(m.y + dy));
+      }
+  }
+  /** Share of damage a warden still takes through its mounted armor (1 when bare). */
+  armorFactor(e: Enemy): number {
+    return 1 - ARMOR_RULES.reduction * Math.min(this.armorPieces(e).length, ARMOR_RULES.maxPieces);
   }
   /** M10 Bloom Tyrant's lash: an elastic vine from the warden to a caught traveler. */
   lash(sim: Simulation, warden: Enemy, player: string): Restraint | null {
@@ -1850,7 +2061,7 @@ export class AdventurePhysics {
   save(portable = false): AdventurePhysicsSnapshot {
     this.showcase.prune((id) => this.world.has(id));
     return {
-      version: 8,
+      version: 9,
       backend: RAPIER_VERSION,
       landId: this.landId,
       run: this.run,
@@ -1871,10 +2082,11 @@ export class AdventurePhysics {
       reactions: this.reactions.save(),
       rigs: this.rigs.save(),
       showcase: this.showcase.save(),
+      encounters: { grammar: this.grammar, areas: structuredClone(this.encounters) },
     };
   }
   static restore(sim: Simulation, snapshot: AdventurePhysicsSnapshot): AdventurePhysics {
-    const migrated = ![3, 4, 5, 6, 7, 8].includes(snapshot?.version);
+    const migrated = ![3, 4, 5, 6, 7, 8, 9].includes(snapshot?.version);
     snapshot = upgradeAdventurePhysics(snapshot, sim);
     validateAdventurePhysics(snapshot, sim);
     const result = new AdventurePhysics(sim);
@@ -1898,6 +2110,9 @@ export class AdventurePhysics {
       result.reactions.restore(snapshot.reactions);
       result.rigs.restore(snapshot.rigs);
       result.showcase.restore(snapshot.showcase);
+      // Lands saved before M11 keep their content: no generated encounter is added to them.
+      result.grammar = snapshot.encounters?.grammar ?? false;
+      result.encounters = structuredClone(snapshot.encounters?.areas ?? []);
       for (const assembly of result.world.assemblyList()) result.mechanisms.track(assembly);
       for (const id of result.world.ids()) {
         const pose = result.world.pose(id);
@@ -1922,7 +2137,7 @@ export class AdventurePhysics {
       if (snapshot.version < 6) result.ensureReactions(sim, true);
       // M10 town scene, set pieces and regions likewise.
       if (snapshot.version < 8) {
-        result.world.reauthor(layout(sim), M10_REPLACED);
+        result.world.reauthor(layout(sim, false), M10_REPLACED);
         result.ensureShowcase(sim, true);
         result.world.settle();
       }
@@ -2060,6 +2275,18 @@ export function upgradeAdventurePhysics(
   }
   return upgraded;
 }
+function validateEncounterState(state: EncounterState | undefined): void {
+  if (
+    !state ||
+    typeof state !== "object" ||
+    Object.keys(state).some((k) => !["grammar", "areas"].includes(k)) ||
+    typeof state.grammar !== "boolean" ||
+    !Array.isArray(state.areas) ||
+    state.areas.length > 4
+  )
+    throw new Error("Invalid encounter state");
+  for (const m of state.areas) validateRealized(m);
+}
 function validateCombat(
   state: CombatPhysicsState | undefined,
   entries: Map<string, { recipe: BodyRecipe; held?: boolean }>,
@@ -2182,7 +2409,7 @@ export function validateAdventurePhysics(
 ): void {
   if (
     !snapshot ||
-    ![1, 2, 3, 4, 5, 6, 7, 8].includes(snapshot.version) ||
+    ![1, 2, 3, 4, 5, 6, 7, 8, 9].includes(snapshot.version) ||
     (snapshot.version === 2 && snapshot.world?.version !== 4) ||
     (snapshot.version === 3 && snapshot.world?.version !== 5) ||
     (snapshot.version === 4 && snapshot.world?.version !== 6) ||
@@ -2190,6 +2417,7 @@ export function validateAdventurePhysics(
     (snapshot.version === 6 && snapshot.world?.version !== 8) ||
     (snapshot.version === 7 && snapshot.world?.version !== 9) ||
     (snapshot.version === 8 && snapshot.world?.version !== 9) ||
+    (snapshot.version === 9 && snapshot.world?.version !== 9) ||
     snapshot.backend !== snapshot.world?.backend ||
     (snapshot.version === 1 && snapshot.backend !== RAPIER_VERSION) ||
     !/^land-\d+-\d+$/.test(snapshot.landId) ||
@@ -2236,6 +2464,11 @@ export function validateAdventurePhysics(
     if (!snapshot.showcase) throw new Error("Missing showcase state");
     validateShowcase(snapshot.showcase, (id) => entries.has(id));
   } else if (snapshot.showcase !== undefined) throw new Error("Showcase state requires envelope 8");
+  if (snapshot.version >= 9) validateEncounterState(snapshot.encounters);
+  else if (snapshot.encounters !== undefined)
+    throw new Error("Encounter state requires envelope 9");
+  for (const archive of snapshot.archives)
+    if (archive?.encounters !== undefined) validateEncounterState(archive.encounters);
   for (const entry of entries.values())
     if (
       entry.recipe.actorKind === "npc" &&

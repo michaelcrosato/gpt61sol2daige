@@ -30,6 +30,7 @@ An accepted call returns `{"ok":true,"result":…}`; failure returns `{"ok":fals
 | `catalog` | none | Mechanics, themes, archetypes, 48 skill nodes and a sample recipe |
 | `adventure` | `player?`, `action?` | Inspect the selected build/run, or execute a validated game action |
 | `encounter` | `index`, `recipe?` | Debug-preview a positive safe-integer area or a validated custom `AreaRecipe`; changes the party encounter |
+| `encounters` | `action?`, `index?`, `seed?`, `plan?`, `manifest?` | M11 generated encounters (read-only): `catalog`, `preview`, `validate`, `export` ([details](#m11-generated-encounters)) |
 | `step` | `ticks`, 0…36,000 | Advances exactly that many fixed ticks; prefer small batches in the browser |
 | `inspect` | `x`, `y`, `radius?` (0…5,000), `limit?` (0…100) | Tile, biome and a bounded set of nearby entities |
 | `population` | `count`, 0…65,536 | Resizes active NPC pool |
@@ -457,3 +458,42 @@ That starts the Bloom Tyrant's lash at the traveler; after the telegraph a `lash
 - `node tools/physics-world.ts` prints the M10 receipt.
 
 See [the M10 contract](ARCHITECTURE.md#m10-reactive-towns-and-authored-areas).
+
+## M11 generated encounters
+
+Areas 9+ are generated from the encounter grammar; `encounters` inspects and checks them without screenshots. Every action is read-only, works on guests (export reads the received scene) and is never recorded in replays.
+
+| Command | Fields and behavior |
+| --- | --- |
+| `{"op":"encounters"}` | `catalog`: the module kits (pieces, assembly, fields, surfaces, tags, switches), the 14 combinations (roles, chain rules, affinity, regional profile, how to start), profiles, warden armor and arena kits, slot geometry, route points, the cluster link reaches, warden moves and the selection/placement/fallback/persistence rules. |
+| `{"op":"encounters","action":"preview","index":13,"seed":142}` | Builds that area (default: this run's seed, the current area or 9) without a running game and returns its manifest. The manifest holds: <ul><li>`reproduce`: the `reset` and `encounter` commands that rebuild it;</li><li>`plan`: the grammar's intent;</li><li>`realized`: clusters with combination, modules, slot, heading, links (rule, distance, reach, ok), region and profile, plus the filler, arena, warden, routes, fallbacks, overlaps and body count;</li><li>`policies`: the cluster regions' values;</li><li>`rules`: the M08 rule parameters the combinations rely on;</li><li>`modules`: every generated body with family, position and assembly.</li></ul> Optional `plan`: an edited `EncounterPlan` to realize instead. |
+| `{"op":"encounters","action":"validate","seed":142,"plan":{…}}` or `{…,"manifest":{…}}` | Returns `{ok, errors, warnings, manifest}`. Errors: <ul><li>unknown references (`unknown module trebuchet`, `unknown combination …`, `unknown armor …`, `unknown boss move …`);</li><li>impossible placements (overlapping bodies, a broken chain link, a planned cluster that could not stand);</li><li>a route a module closed;</li><li>for a manifest, any difference from a fresh build of its seed (`manifest does not reproduce: …`).</li></ul> Fallbacks are warnings. |
+| `{"op":"encounters","action":"export","index":10}` | The current land's realized manifest as built (default: the current area), the live values of its cluster regions, and `mutations` since the land was built: destroyed module pieces (cause, owner, tick), missing ones and those moved more than 1 unit. A land saved before M11 answers "saved before generated encounters (M11); it keeps its earlier content". |
+
+Ids in a generated area:
+- cluster pieces: `prop-<family>-<area>-c<k>-<n>-<tag>` (cluster k, module n), for example `prop-brazier-12-c0-0-0`, `prop-barricade-12-c0-2-front`, `prop-coil-10-c1-0-0`;
+- filler pieces: `prop-<family>-<area>-m-<module>-<tag>`;
+- arena pieces: `prop-<family>-<area>-a<n>-<tag>`;
+- assemblies: `<kind>-<area>-c<k>` (cart, chain, launcher, vine, vane, gate), `<kind>-<area>-m` and `chain-<area>-a<n>n`;
+- pools: `pool-<area>-c<k>-<n>`;
+- fields: `gale-<area>-c<k>-<n>-lane`, `maelstrom-<area>-c<k>-<n>-eye` and `-pull`;
+- regions: `combo-<area>-<k>`;
+- warden armor: `prop-armor-<enemy>-<k>`, each held by a `mount` restraint in `actors showcase` (body, anchor `enemy-<id>`, rest, load).
+
+Events: `assembly` `mount:armed:<armor>` (amount = pieces), `mount:snapped`; `rig` `warden:armored:<armor>`.
+
+```json
+{"op":"reset","seed":142}
+{"op":"encounters","action":"preview","index":12}
+{"op":"encounter","index":12}
+{"op":"actors","action":"monster","rig":"stalker","x":2500,"y":200,"hp":10,"passive":true,"clear":true}
+{"op":"adventure","action":{"type":"grab","id":"prop-jar-12-c0-0-0"}}
+```
+
+The preview names the Burning palisade cluster (`fire-stockade`) and its pieces; throwing the camp's oil jar into its brazier (`adventure release {throw:true}` aimed at it) starts the chain: `heat`, `ignite`, `spill`, `coat`, `flare` and `spread`. The stockade burns through in about 150 ticks (`encounters export` lists the destroyed boards). Use the ids your preview returns.
+
+- No new policy values; cluster regions use existing ones. Saves write adventure envelope 9 / world 9; rooms use protocol 12.
+- `npm run verify:run` now runs 12 areas (areas 9–12 are generated); in each generated area the bot first sets off one combination with ordinary inputs (`leadIn`).
+- `node tools/physics-encounters.ts` prints the M11 receipt.
+
+See [the M11 contract](ARCHITECTURE.md#m11-generated-encounters-and-modular-wardens).
