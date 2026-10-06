@@ -783,7 +783,15 @@ export class Simulation {
     );
     for (const patch of [...this.world.patches.values()].sort((a, b) => a[0] - b[0] || a[1] - b[1]))
       h = checksum(patch, h);
-    const adventure = JSON.stringify(this.adventure.state);
+    // Presentation-only state stays out of the hash (M09): the wayfarer's recoil and lantern and
+    // the foliage bend never feed back into the simulation and are saved and replicated only for
+    // display. They pass through Math.sin, whose last bits differ between JavaScript engines, so
+    // hashing them would fail browser-to-Node replays of otherwise identical runs.
+    const state = this.adventure.state;
+    const heroes = Object.fromEntries(
+      Object.entries(state.heroes).map(([id, { recoil: _recoil, ...hero }]) => [id, hero]),
+    );
+    const adventure = JSON.stringify({ ...state, heroes });
     for (let i = 0; i < adventure.length; i++)
       h = Math.imul(h ^ adventure.charCodeAt(i), 16777619) >>> 0;
     // Raw Rapier bytes enter through the snapshot's own checksum field. Serializing the byte
@@ -799,6 +807,7 @@ export class Simulation {
       const physics = JSON.stringify({
         ...saved,
         world: { ...saved.world, bytes: saved.world.bytes.length },
+        rigs: saved.rigs && { ...saved.rigs, foliage: undefined },
       });
       for (let i = 0; i < physics.length; i++)
         h = Math.imul(h ^ physics.charCodeAt(i), 16777619) >>> 0;

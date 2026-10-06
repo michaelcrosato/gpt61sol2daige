@@ -1092,7 +1092,12 @@ Chrome. After the merge, the M06 held-attack check measures
 responsiveness in simulation time: a new slash within 36 ticks of the
 press. Its old 2 s wall-clock window was about 25 ticks on a slow runner
 (local 3× CPU throttling; M08 and M09 run at the same browser tick
-rate), which main CI missed once.</li>
+rate), which main CI missed once. The state hash now leaves out
+presentation-only hero recoil and foliage bend (<a
+href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/physics/DECISIONS.md">D69</a>). Main CI’s browser-to-Node replay
+check (M01) had diverged about 1 run in 8, only in the lantern’s last
+digits, because Chromium’s and Node’s <code>Math.sin</code> differ for
+about 3.7% of inputs. 42 local attempts matched afterwards.</li>
 <li><code>npm run verify:run</code> cleared all nine areas (level 18,
 2,659 gold; <a href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/evidence/physics-m09-route.jsonl">route</a>).
 Staggers and knockdowns now interrupt monster attacks.</li>

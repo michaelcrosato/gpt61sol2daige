@@ -1118,7 +1118,10 @@ death, and never enter land archives.</li>
 <ul>
 <li><code>Hero.recoil</code> holds a lean and a lantern pendulum stepped
 from the traveler’s acceleration and blows. It is presentation-only in
-effect: input and movement are untouched.</li>
+effect: input and movement are untouched. It is saved and replicated
+but, like foliage bend, stays out of <code>stateHash</code> (<a
+href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/physics/DECISIONS.md">D69</a>): its <code>Math.sin</code> differs
+in the last bits between browser and Node engines.</li>
 <li>In town, each townsperson is a physical actor
 (<code>npc-&lt;id&gt;</code>, mass 0.8). Travelers always touch them,
 whatever the town’s crowd contacts. A motor walks them back along their
