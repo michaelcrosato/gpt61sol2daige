@@ -16,6 +16,8 @@ import {
   DEFAULT_TUNING,
   type Tuning,
 } from "../game/types.ts";
+import { WARDENS } from "../game/wardens.ts";
+import { SHOWCASE } from "../physics/showcase.ts";
 import { spriteSvg } from "../render/sprites.ts";
 import { icon } from "./ui.ts";
 
@@ -393,15 +395,25 @@ export class AdventureUI {
     if (boss) {
       el("boss-name").textContent = boss.name;
       el("boss-health").style.width = `${Math.max(0, boss.hp / boss.maxHp) * 100}%`;
+      const warden = boss.warden,
+        identity = WARDENS[s.recipe.signature];
       el("boss-phase").textContent =
-        boss.hp / boss.maxHp < 0.5 ? "ENRAGED · PHASE II" : "WARDEN OF THE AREA";
+        warden && warden.exposedUntil > sim.tick
+          ? `EXPOSED · ${identity.exposedBy.toUpperCase()}`
+          : warden?.move && boss.phase === "windup"
+            ? `${identity.name.toUpperCase()} · DODGE THE ${identity.telegraph === "ring" ? "RING" : identity.telegraph === "marker" ? "MARKED ARCH" : "LINE"}`
+            : boss.hp / boss.maxHp < 0.5
+              ? "ENRAGED · PHASE II"
+              : "WARDEN OF THE AREA";
     }
     const p = sim.players.get(id);
     let hint = "";
     if (p) {
       if (s.mode === "town") {
-        const npc = TOWN_NPCS.find((n) => {
-          const at = npcPosition(n, sim.tick);
+        // Services follow their townsperson's body (M09); the prompt follows it too.
+        const folk = sim.townsfolk();
+        const npc = TOWN_NPCS.find((n, k) => {
+          const at = folk[k] ?? npcPosition(n, sim.tick);
           return Math.hypot(at.x - p.x, at.y - p.y) < 43;
         });
         if (npc) hint = `[E] ${npc.name} · ${npc.role}`;
@@ -418,7 +430,11 @@ export class AdventureUI {
           const m = s.mechanics.find(
             (m) => ["blood", "rift"].includes(m.kind) && Math.hypot(m.x - p.x, m.y - p.y) < 48,
           );
-          if (m) hint = `[E] ${mechanicOf(m.kind).name}`;
+          if (m)
+            hint =
+              m.kind === "blood"
+                ? `[E] ${mechanicOf(m.kind).name} · trade life; vines snare the pack`
+                : `[E] ${mechanicOf(m.kind).name} · loose props on the pad travel with you`;
         }
       }
     }
@@ -528,11 +544,12 @@ export class AdventureUI {
         `<p class="mechanic-intro">Defeat creatures and their warden to clear this area. These mechanics are optional: ignore them, or use them to clear faster and earn more.</p><div class="mechanic-guide">${recipe.mechanics
           .map((kind) => {
             const m = mechanicOf(kind);
-            return `<article><span style="color:${m.color}">${m.icon}</span><div><h3>${m.name} ${kind === recipe.signature ? "<small>AREA SIGNATURE</small>" : ""}</h3><p>${m.description}</p><strong>${m.advantage}</strong></div></article>`;
+            const physical = SHOWCASE[kind];
+            return `<article><span style="color:${m.color}">${m.icon}</span><div><h3>${m.name} ${kind === recipe.signature ? "<small>AREA SIGNATURE</small>" : ""}</h3><p>${m.description}</p><p class="mechanic-physical"><b>${physical.name}.</b> ${physical.physical}</p><strong>${m.advantage}</strong></div></article>`;
           })
           .join(
             "",
-          )}</div>${recipe.combination ? `<div class="combination-note">NEW COMBINATION: ${mechanicOf(recipe.combination.from).name} also triggers ${mechanicOf(recipe.combination.into).name} after a short delay.</div>` : ""}<div class="area-facts"><span>Land ${recipe.land + 1} · ${themeOf(recipe.theme).name}</span><span>${recipe.killGoal} creatures + ${recipe.boss}</span><span>${recipe.procedural ? "PROCEDURALLY COMPOSED" : "AUTHORED INTRODUCTION"}</span></div>`;
+          )}</div>${recipe.combination ? `<div class="combination-note">NEW COMBINATION: ${mechanicOf(recipe.combination.from).name} also triggers ${mechanicOf(recipe.combination.into).name} after a short delay.</div>` : ""}<div class="combination-note warden-note">${esc(recipe.boss).toUpperCase()} · ${WARDENS[recipe.signature].name}: ${WARDENS[recipe.signature].summary} Weakness: ${WARDENS[recipe.signature].exposedBy}.</div><p class="mechanic-intro">One ${mechanicOf(recipe.signature).name} spot is calm (its physical effects are off) and one is wild (stronger); the rest follow the area.</p><div class="area-facts"><span>Land ${recipe.land + 1} · ${themeOf(recipe.theme).name}</span><span>${recipe.killGoal} creatures + ${recipe.boss}</span><span>${recipe.procedural ? "PROCEDURALLY COMPOSED" : "AUTHORED INTRODUCTION"}</span></div>`;
     } else if (this.panel === "death") {
       el("adventure-panel").innerHTML =
         `<div class="death-summary">${icon("fire", 45)}<p>The wild keeps ${h.goldLost} gold.<br>Your levels, skills and equipment stay with you.</p><div><span>AREA <strong>${s.area}</strong></span><span>LEVEL <strong>${h.level}</strong></span><span>DEFEATED <strong>${h.kills}</strong></span></div><button class="primary-button" data-action="respawn">${sim.players.size > 1 && [...sim.players.keys()].some((other) => other !== id && !sim.adventure.hero(other).dead) ? "Rejoin at the trailhead" : `Return to ${esc(townName(s.townLand))}`} ${icon("arrow", 17)}</button></div>`;

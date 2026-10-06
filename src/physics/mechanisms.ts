@@ -73,6 +73,27 @@ export const MECHANISMS: Record<MechanismKind, MechanismInfo> = {
     event: "deck",
     joints: "hinges; lashings 900 load / 25 cut, plank joints 1300 / 40",
   },
+  stall: {
+    name: "Market stall",
+    summary:
+      "A fixed counter under a raised cloth awning on a sprung pivot: blows, Whorl and the breeze twist the canopy and it swings back. Town fixture.",
+    event: "none",
+    joints: "hinge with a return spring (14/s², 5/s); 900 load / 30 cut",
+  },
+  lamp: {
+    name: "Hanging lamp",
+    summary:
+      "A lantern on a bracket arm around its post: knocks set it swinging and a spring settles it. Its light follows the lamp. Town fixture.",
+    event: "none",
+    joints: "hinge on a 10-unit arm with a return spring (10/s², 3/s); 700 load / 20 cut",
+  },
+  bunting: {
+    name: "Bunting",
+    summary:
+      "Pennants on ropes strung between two posts across the square; the breeze and passing blows make them flutter. Town fixture.",
+    event: "none",
+    joints: "ropes between posts and pennants; 400 load / 10 cut each",
+  },
 };
 /** Reproducible registry export for agents and documentation. */
 export function mechanismExport() {

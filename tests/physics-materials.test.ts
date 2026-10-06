@@ -174,9 +174,15 @@ test("disabling destruction keeps damage and prevents breakage; disabling dynami
     sim.step(5);
     for (const id of pot.pieces) assert.equal(physical.world.pose(id).frozen, true);
     // Every family's fracture starts disjoint: pieces frozen at the instant of breaking wake.
+    // (M10's calm region keeps its thorn hedges whole: destruction is off there.)
     const parents = physical
       .props()
-      .filter((p) => p.areaId === "area-1" && FAMILIES[p.blueprint!.family].toughness > 0)
+      .filter(
+        (p) =>
+          p.areaId === "area-1" &&
+          FAMILIES[p.blueprint!.family].toughness > 0 &&
+          p.policy.effective.destruction,
+      )
       .map((p) => p.id);
     const pieces = parents.flatMap((id) => strike(sim, id, 10_000)[0].broken!.pieces);
     assert.ok(pieces.length > 40);
@@ -345,7 +351,7 @@ test("save/load, replay, recall and late-join replicas preserve the same destruc
     } finally {
       guest.dispose();
     }
-    assert.equal(PROTOCOL_VERSION, 10);
+    assert.equal(PROTOCOL_VERSION, 11);
     assert.ok(encodeSnapshot(sim, "local").byteLength > 0);
     assert.throws(
       () =>
@@ -418,7 +424,7 @@ test("real M04 checkpoints migrate: exact legacy bodies, M05 content added once,
       assert.equal(physical.destroyedRecords().length, 0);
       assert.ok(physical.world.has("prop-tree-5-0"), "M05 scenery joins the active land");
       const saved = sim.save();
-      assert.equal(saved.actorPhysics!.version, 7);
+      assert.equal(saved.actorPhysics!.version, 8);
       assert.equal(saved.actorPhysics!.world.version, 9);
       const archive = saved.actorPhysics!.archives.find((a) => a.id === "land-1-0")!;
       assert.ok(archive.props.some((p) => p.id === "prop-wagon-1-0"));

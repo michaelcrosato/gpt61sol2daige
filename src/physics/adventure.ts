@@ -7,7 +7,13 @@ import {
   WORLD_LIMIT,
   World,
 } from "../engine/world.ts";
-import { areaRecipe, npcPosition, TOWN_NPCS } from "../game/content.ts";
+import {
+  type AreaRecipe,
+  areaRecipe,
+  mechanicLayout,
+  npcPosition,
+  TOWN_NPCS,
+} from "../game/content.ts";
 import type { AttackTeam } from "../game/interactions.ts";
 import { enemyPose, rigOf } from "../game/rigs.ts";
 import type { AdventureState, Enemy } from "../game/types.ts";
@@ -20,9 +26,16 @@ import {
   PALETTES,
   PROP_FAMILIES,
   type PropFamily,
+  propRecipe,
   shapeReach,
 } from "./blueprints.ts";
-import { CombatPhysics, type CombatPhysicsState, isPropId, lootBodyId } from "./combat.ts";
+import {
+  CombatPhysics,
+  type CombatPhysicsState,
+  GRAB_MAX_MASS,
+  isPropId,
+  lootBodyId,
+} from "./combat.ts";
 import { isMaterial, MATERIALS, type MaterialId, materialDamage } from "./materials.ts";
 import {
   areaMechanisms,
@@ -36,6 +49,9 @@ import {
   PolicyController,
   type PolicyLayout,
   type PolicyTransaction,
+  presetValues,
+  type RegionProfile,
+  reauthorLayout,
 } from "./policies.ts";
 import {
   areaReactions,
@@ -64,6 +80,19 @@ import {
   validateJointEntry,
   validatePhysicsSnapshot,
 } from "./runtime.ts";
+import {
+  areaShowcase,
+  BLOOM_SNARE,
+  FREIGHT_PAD,
+  LASH,
+  type Restraint,
+  ShowcasePhysics,
+  type ShowcaseState,
+  THORNBURST,
+  TOWN_MARKET,
+  townScene,
+  validateShowcase,
+} from "./showcase.ts";
 import {
   type ChunkCoordinate,
   occupiedChunks,
@@ -120,6 +149,8 @@ interface LandArchive {
   mechanisms?: MechanismState;
   /** M08: statuses, surfaces, fields and pending reactions, with relative timers. */
   reactions?: ReactionArchive;
+  /** M10 (envelope 8): showcase state; its presence means the land's M10 scene is authored. */
+  showcase?: ShowcaseState;
 }
 /** Persistent destruction fact. The parent body is gone; its pieces are ordinary props. */
 export interface DestroyedRecord {
@@ -176,6 +207,8 @@ export interface PropAttack {
   chain?: string;
   /** M08: a prop this area attack leaves alone (an explosion's own barrel). */
   except?: string;
+  /** M10: props this area attack leaves alone (rift freight it just delivered). */
+  spare?: readonly string[];
   /** Strike each prop at most once per key (a charge, a sweep) within the repeat window. */
   once?: string;
 }
@@ -187,7 +220,7 @@ interface NavigationState {
   turn: number;
 }
 export interface AdventurePhysicsSnapshot {
-  version: 1 | 2 | 3 | 4 | 5 | 6 | 7;
+  version: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
   backend: string;
   landId: string;
   run: number;
@@ -209,7 +242,50 @@ export interface AdventurePhysicsSnapshot {
   reactions?: ReactionState;
   /** Envelope 7 (M09): ragdoll remains records, foliage bend and pending rig events. */
   rigs?: RigState;
+  /** Envelope 8 (M10): living-vine restraints, the showcase sequence and pending events. */
+  showcase?: ShowcaseState;
 }
+const round = (value: number) => Math.round(value * 1000) / 1000;
+/** M10: the authored town is a Sanctuary; before M10 it only dropped actor blocking. */
+export const TOWN_VALUES = presetValues("Sanctuary");
+export const LEGACY_TOWN_VALUES = { crowdContacts: false, propBlocking: false };
+const M10_REPLACED = [{ scope: "area" as const, id: "town", from: LEGACY_TOWN_VALUES }];
+/**
+ * M10 calm regions use the Quiet preset's feature switches; the world-reactions master stays
+ * with the area, so ambient creature selection there is unchanged.
+ */
+export const CALM_VALUES = (() => {
+  const { worldReactions: _master, ...values } = presetValues("Quiet");
+  return values;
+})();
+/** M10 regions of one area: its signature's second mechanic is Wild, its third is calm. */
+export function showcaseRegions(r: AreaRecipe): RegionProfile[] {
+  const spots = mechanicLayout(r).filter((m) => m.k === 0);
+  return [
+    {
+      id: `wild-${r.index}`,
+      areaId: `area-${r.index}`,
+      priority: 20,
+      shape: { kind: "circle", x: round(spots[1].x), y: round(spots[1].y), radius: 64 },
+      values: presetValues("Wild"),
+    },
+    {
+      id: `calm-${r.index}`,
+      areaId: `area-${r.index}`,
+      priority: 20,
+      shape: { kind: "circle", x: round(spots[2].x), y: round(spots[2].y), radius: 64 },
+      values: structuredClone(CALM_VALUES),
+    },
+  ];
+}
+/** The town's market square: loose goods there block and get pushed around. */
+export const MARKET_REGION: RegionProfile = {
+  id: "market",
+  areaId: "town",
+  priority: 10,
+  shape: { kind: "rectangle", ...TOWN_MARKET },
+  values: { propBlocking: true },
+};
 function layout(sim: Simulation): PolicyLayout {
   const s = sim.adventure.state,
     landId = `land-${s.run}-${s.townLand}`;
@@ -217,26 +293,36 @@ function layout(sim: Simulation): PolicyLayout {
   return {
     lands: [{ id: landId, values: {} }],
     areas: [
-      { id: "town", landId, values: { crowdContacts: false, propBlocking: false } },
+      { id: "town", landId, values: structuredClone(TOWN_VALUES) },
       { id: "wilderness", landId, values: {} },
       ...areas.map((r) => ({ id: `area-${r.index}`, landId, values: {} })),
     ],
-    regions: areas.flatMap((r) => [
-      {
-        id: `quiet-${r.index}`,
-        areaId: `area-${r.index}`,
-        priority: 10,
-        shape: { kind: "rectangle" as const, x: r.x - 170, y: r.y - 150, width: 110, height: 90 },
-        values: { crowdContacts: false, ambientPhysics: false },
-      },
-      {
-        id: `reactive-${r.index}`,
-        areaId: `area-${r.index}`,
-        priority: 10,
-        shape: { kind: "circle" as const, x: r.x + 75, y: r.y - 110, radius: 70 },
-        values: { crowdContacts: true, ambientPhysics: true },
-      },
-    ]),
+    regions: [
+      structuredClone(MARKET_REGION),
+      ...areas.flatMap((r) => [
+        {
+          id: `quiet-${r.index}`,
+          areaId: `area-${r.index}`,
+          priority: 10,
+          shape: {
+            kind: "rectangle" as const,
+            x: r.x - 170,
+            y: r.y - 150,
+            width: 110,
+            height: 90,
+          },
+          values: { crowdContacts: false, ambientPhysics: false },
+        },
+        {
+          id: `reactive-${r.index}`,
+          areaId: `area-${r.index}`,
+          priority: 10,
+          shape: { kind: "circle" as const, x: r.x + 75, y: r.y - 110, radius: 70 },
+          values: { crowdContacts: true, ambientPhysics: true },
+        },
+        ...showcaseRegions(r),
+      ]),
+    ],
   };
 }
 function freshPolicies(sim: Simulation, previous?: PolicyCheckpoint): PolicyCheckpoint {
@@ -336,6 +422,8 @@ export class AdventurePhysics {
   readonly reactions = new ReactionPhysics();
   /** M09 ragdoll remains, landing events and foliage bend. */
   readonly rigs = new RigPhysics();
+  /** M10 living-vine restraints and showcase events. */
+  readonly showcase = new ShowcasePhysics();
   /** Foliage props of this land (trees and brush), rebuilt when scenery changes. */
   private plants: string[] | null = null;
   /** Debris with an explicit lifetime: id -> cleanup tick. Derived from recipes on restore. */
@@ -375,6 +463,8 @@ export class AdventurePhysics {
       }
       this.ensureMechanisms(sim);
       this.ensureReactions(sim, archive.reactions === undefined);
+      this.ensureShowcase(sim, archive.showcase === undefined);
+      this.world.settle();
       return;
     }
     const palette = sim.adventure.state.townLand % PALETTES,
@@ -414,6 +504,8 @@ export class AdventurePhysics {
     }
     this.ensureMechanisms(sim);
     this.ensureReactions(sim, true);
+    this.ensureShowcase(sim, true);
+    this.world.settle();
   }
   /**
    * M07 mechanisms and their companion scenery for every area of this land. Only content that
@@ -457,6 +549,40 @@ export class AdventurePhysics {
         for (const field of yard.fields)
           if (!this.reactions.hasField(field.id)) this.reactions.addField(field);
     }
+  }
+  /**
+   * M10 town scene and area set pieces. Like mechanisms and reaction yards, bodies and
+   * assemblies are added only where they never existed (destroyed pieces never return);
+   * authored fields and pools are added once, when the land first gets its M10 scene.
+   */
+  private ensureShowcase(sim: Simulation, authored: boolean): void {
+    const s = sim.adventure.state,
+      palette = s.townLand % PALETTES,
+      blocked = solidTerrain(sim.world),
+      present = new Set(this.world.assemblyList().map((a) => a.id)),
+      scenes = [
+        townScene(palette),
+        ...Array.from({ length: 4 }, (_, i) =>
+          areaShowcase(areaRecipe(s.seed, s.townLand * 4 + i + 1), palette, blocked),
+        ),
+      ];
+    for (const scene of scenes) {
+      for (const m of scene.mechanisms) {
+        if (present.has(m.recipe.id)) continue;
+        for (const body of m.bodies) if (!this.world.has(body.id)) this.world.spawn(body);
+        this.world.addAssembly(m.recipe, m.joints);
+        this.mechanisms.track(m.recipe);
+      }
+      for (const body of scene.bodies)
+        if (body.assembly === undefined && !this.world.has(body.id) && !this.destroyed.has(body.id))
+          this.world.spawn(body);
+      if (!authored) continue;
+      for (const field of scene.fields)
+        if (!this.reactions.hasField(field.id)) this.reactions.addField(field);
+      for (const surface of scene.surfaces)
+        if (!this.reactions.hasSurface(surface.id)) this.reactions.addSurface(surface);
+    }
+    this.plants = null;
   }
   /** The hooks reactions use: water terrain, areas and burnt-out ash. */
   reactionHost(sim: Simulation): ReactionHost {
@@ -531,6 +657,7 @@ export class AdventurePhysics {
         joints: this.world.jointList().filter((j) => !j.recipe.assembly.startsWith("remains-")),
         mechanisms: this.mechanisms.save(),
         reactions,
+        showcase: this.showcase.archive(),
       });
     } else this.archives.clear();
     const archive = this.archives.get(id);
@@ -538,6 +665,9 @@ export class AdventurePhysics {
     if (archive) {
       archive.policies.state.masterWorldReactions = previous.state.masterWorldReactions;
       archive.policies.state.boundaryMargin = previous.state.boundaryMargin;
+      // A land archived before M10 gains its Sanctuary town and calm/wild regions.
+      if (archive.showcase === undefined)
+        archive.policies.state = reauthorLayout(archive.policies.state, layout(sim), M10_REPLACED);
     }
     this.world.dispose();
     this.world = new PhysicsWorld(undefined, {
@@ -558,6 +688,7 @@ export class AdventurePhysics {
     this.mechanisms.restore(archive?.mechanisms);
     this.reactions.unarchive(archive?.reactions, sim.tick);
     this.rigs.clear();
+    this.showcase.restore(archive?.showcase);
     this.plants = null;
     this.spawnProps(sim, archive);
   }
@@ -732,6 +863,7 @@ export class AdventurePhysics {
   removeActor(id: string): void {
     this.world.remove(id);
     this.actors.delete(id);
+    this.showcase.release(id);
   }
   /**
    * M09 death transfer. The dead monster's actor body leaves the solver and, in the same tick,
@@ -923,6 +1055,19 @@ export class AdventurePhysics {
       },
     );
   }
+  /** Whether solid scenery (not actors) lies within `reach` ahead of a monster (M10 crash). */
+  blockedAhead(enemy: Enemy, reach: number): boolean {
+    const id = enemyBodyId(enemy.id);
+    if (!this.world.has(id)) return false;
+    return (
+      this.world.obstacleFraction(
+        id,
+        Math.cos(enemy.facing) * (enemy.radius + reach),
+        Math.sin(enemy.facing) * (enemy.radius + reach),
+        enemy.radius,
+      ) < 1
+    );
+  }
   ambientIntent(sim: Simulation, slot: number, x: number, y: number): void {
     this.world.motor(ambientBodyId(slot, sim.generation[slot]), x, y, 0.035);
   }
@@ -1056,6 +1201,13 @@ export class AdventurePhysics {
     this.combat.beforeStep(sim, this.world);
     // Field forces are velocity changes before the solve, so strain and projection see them.
     this.reactions.applyFields(this.reactionHost(sim));
+    // M10 living vines pull the same way.
+    this.showcase.update(sim.tick, {
+      has: (id) => this.world.has(id),
+      motionOf: (id) => this.world.motionOf(id),
+      policy: (id) => this.world.policyOf(id).effective,
+      pull: (id, dvx, dvy) => this.world.velocityChange(id, dvx, dvy),
+    });
     const contacts = this.world.contacts;
     this.world.step(true);
     sim.metrics.contacts += this.world.contacts - contacts;
@@ -1198,6 +1350,7 @@ export class AdventurePhysics {
       if (!(id.startsWith("crate-") || id.startsWith("wheel-") || id.startsWith("prop-"))) continue;
       if (attack.only !== undefined && id !== attack.only) continue;
       if (attack.except !== undefined && id === attack.except) continue;
+      if (attack.spare?.includes(id)) continue;
       const pose = this.world.pose(id);
       if (!pose.blueprint || !pose.material) continue;
       const reach =
@@ -1385,6 +1538,204 @@ export class AdventurePhysics {
     return onDeck(planks, x, y);
   }
   /**
+   * M10 Thornburst: a burst seedpod's shove (a short pressure field that spares the bursting
+   * team) and a ring of thorn splinters, owned by whoever burst it, that hurt what they strike.
+   * No splinters where dynamic props are off; the field is gated per body like any field.
+   */
+  thornburst(
+    sim: Simulation,
+    burst: { x: number; y: number; owner: string; team: AttackTeam; cause: string },
+  ): string[] {
+    const areaId = this.areaAt(sim, burst.x, burst.y),
+      policy = this.world.policyAt(areaId, burst.x, burst.y).effective,
+      seq = this.showcase.sequence++,
+      palette = sim.adventure.state.townLand % PALETTES,
+      ids: string[] = [];
+    this.reactions.addField({
+      id: `thornburst-${seq}`,
+      kind: "pressure",
+      areaId,
+      shape: { kind: "circle", x: round(burst.x), y: round(burst.y), radius: THORNBURST.radius },
+      strength: THORNBURST.pressure,
+      ticks: THORNBURST.pressureTicks,
+      gust: 0,
+      actors: true,
+      owner: burst.owner,
+      team: burst.team,
+      source: burst.cause,
+      spare: burst.team === "enemy" ? "enemy" : "party",
+    });
+    if (!policy.dynamicProps) return ids;
+    for (let k = 0; k < THORNBURST.splinters; k++) {
+      const angle = (k / THORNBURST.splinters) * Math.PI * 2 + (seq % 8) * 0.39,
+        id = `prop-thorn-${seq}-${k}`,
+        recipe = propRecipe(
+          id,
+          "debris",
+          palette,
+          round(burst.x + Math.cos(angle) * 14),
+          round(burst.y + Math.sin(angle) * 14),
+          areaId,
+          {
+            angle: round(angle),
+            material: "vegetation",
+            shape: { kind: "box", width: 9, height: 3 },
+          },
+        );
+      // Dense thorn bolts: heavy enough that a strike at speed hurts (M06 impact damage).
+      recipe.mass = THORNBURST.mass;
+      recipe.blueprint = {
+        family: "debris",
+        palette,
+        piece: "thorn",
+        parent: `thornburst-${seq}`,
+        expiresAt: sim.tick + THORNBURST.lifetime,
+      };
+      this.world.spawn(recipe);
+      if (this.world.motionOf(id).frozen) continue;
+      const speed = THORNBURST.speed * policy.impulseStrength;
+      this.world.motion(id, Math.cos(angle) * speed, Math.sin(angle) * speed, (k % 2 ? 1 : -1) * 9);
+      this.combat.instigate(id, burst.owner, burst.team, burst.cause, sim.tick);
+      this.track(recipe);
+      ids.push(id);
+    }
+    return ids;
+  }
+  /**
+   * M10 Rift freight: loose props on the departure arch's pad travel with the traveler. Each
+   * unanchored part moves whole with its joints and motion; anchored, frozen, too heavy or
+   * someone else's held props stay. The arrival field then bursts them outward.
+   */
+  freight(
+    sim: Simulation,
+    player: string,
+    pad: { x: number; y: number },
+    dx: number,
+    dy: number,
+  ): string[] {
+    const moved = new Set<string>(),
+      held = this.combat.holding(player);
+    for (const id of this.world.ids()) {
+      if (!isPropId(id) || moved.has(id) || id === held) continue;
+      const recipe = this.world.recipeOf(id);
+      if (recipe.motion !== "dynamic" || isRemains(recipe)) continue;
+      const m = this.world.motionOf(id);
+      if (m.frozen || m.mass > GRAB_MAX_MASS * 1.5) continue;
+      if (Math.hypot(m.x - pad.x, m.y - pad.y) > FREIGHT_PAD) continue;
+      const holder = this.combat.holderOf(id);
+      if (holder !== null && holder !== player) continue;
+      const part = this.world.partOf(id);
+      if (part?.anchored) continue;
+      const members = this.world.partMembers(id);
+      if (members.some((member) => this.combat.holderOf(member) !== null)) continue;
+      if (!this.world.policyOf(id).effective.dynamicProps) continue;
+      this.world.transport(members, dx, dy);
+      for (const member of members) {
+        moved.add(member);
+        this.combat.instigate(member, player, "party", "rift", sim.tick);
+      }
+    }
+    const ids = [...moved].sort();
+    if (ids.length)
+      this.showcase.emit({
+        tick: sim.tick,
+        text: "freight:carried",
+        owner: player,
+        x: round(pad.x + dx),
+        y: round(pad.y + dy),
+        amount: ids.length,
+      });
+    return ids;
+  }
+  /**
+   * M10 Bloom snare: living vines from a bloom to the nearest monsters. Each holds its monster
+   * elastically toward the bloom (see `ShowcasePhysics.update`). Mechanisms off at the bloom:
+   * no vines grow (the bloom's damage and experience bonus is gameplay and still applies).
+   */
+  snare(
+    sim: Simulation,
+    bloom: { x: number; y: number; owner: string },
+    targets: Enemy[],
+  ): Restraint[] {
+    const policy = this.policyAt(sim, bloom.x, bloom.y).effective;
+    if (!policy.mechanisms) return [];
+    const out: Restraint[] = [];
+    for (const e of targets) {
+      const body = enemyBodyId(e.id);
+      if (!this.world.has(body)) continue;
+      const d = Math.hypot(e.x - bloom.x, e.y - bloom.y),
+        r = this.showcase.add({
+          kind: "bloom",
+          body,
+          x: round(bloom.x),
+          y: round(bloom.y),
+          anchor: "",
+          rest: round(Math.max(BLOOM_SNARE.minimum, d * BLOOM_SNARE.share)),
+          stiffness: BLOOM_SNARE.stiffness,
+          breakLoad: BLOOM_SNARE.breakLoad,
+          until: sim.tick + BLOOM_SNARE.ticks,
+          born: sim.tick,
+          owner: bloom.owner,
+          team: "party",
+        });
+      if (r) out.push(r);
+    }
+    if (out.length)
+      this.showcase.emit({
+        tick: sim.tick,
+        text: "snare:grown",
+        owner: bloom.owner,
+        x: round(bloom.x),
+        y: round(bloom.y),
+        amount: out.length,
+      });
+    return out;
+  }
+  /** M10 Bloom Tyrant's lash: an elastic vine from the warden to a caught traveler. */
+  lash(sim: Simulation, warden: Enemy, player: string): Restraint | null {
+    const body = playerBodyId(player),
+      anchor = enemyBodyId(warden.id);
+    if (!this.world.has(body) || !this.world.has(anchor)) return null;
+    if (!this.world.policyOf(body).effective.mechanisms) return null;
+    const r = this.showcase.add({
+      kind: "lash",
+      body,
+      x: round(warden.x),
+      y: round(warden.y),
+      anchor,
+      rest: LASH.rest,
+      stiffness: LASH.stiffness,
+      breakLoad: LASH.breakLoad,
+      until: sim.tick + LASH.ticks,
+      born: sim.tick,
+      owner: anchor,
+      team: "enemy",
+    });
+    if (r) {
+      const at = this.world.motionOf(body);
+      this.showcase.emit({
+        tick: sim.tick,
+        text: "lash:caught",
+        owner: player,
+        x: round(at.x),
+        y: round(at.y),
+        amount: 1,
+      });
+    }
+    return r;
+  }
+  /** A dash tears free of every lash holding this traveler; returns the wardens it frees from. */
+  breakLashes(sim: Simulation, player: string): string[] {
+    const body = playerBodyId(player),
+      wardens: string[] = [];
+    for (const r of this.showcase.holding(body))
+      if (r.kind === "lash") {
+        wardens.push(r.anchor);
+        this.showcase.remove(r.id, "lash:snapped", sim.tick, this.world.motionOf(body));
+      }
+    return wardens;
+  }
+  /**
    * A traveler moved by a rift carries the prop they hold. An unanchored jointed part travels
    * whole, with its joints and motion; an anchored one cannot follow, so the hold is released.
    */
@@ -1497,8 +1848,9 @@ export class AdventurePhysics {
     }));
   }
   save(portable = false): AdventurePhysicsSnapshot {
+    this.showcase.prune((id) => this.world.has(id));
     return {
-      version: 7,
+      version: 8,
       backend: RAPIER_VERSION,
       landId: this.landId,
       run: this.run,
@@ -1518,10 +1870,11 @@ export class AdventurePhysics {
       mechanisms: this.mechanisms.save(),
       reactions: this.reactions.save(),
       rigs: this.rigs.save(),
+      showcase: this.showcase.save(),
     };
   }
   static restore(sim: Simulation, snapshot: AdventurePhysicsSnapshot): AdventurePhysics {
-    const migrated = ![3, 4, 5, 6, 7].includes(snapshot?.version);
+    const migrated = ![3, 4, 5, 6, 7, 8].includes(snapshot?.version);
     snapshot = upgradeAdventurePhysics(snapshot, sim);
     validateAdventurePhysics(snapshot, sim);
     const result = new AdventurePhysics(sim);
@@ -1544,6 +1897,7 @@ export class AdventurePhysics {
       result.mechanisms.restore(snapshot.mechanisms);
       result.reactions.restore(snapshot.reactions);
       result.rigs.restore(snapshot.rigs);
+      result.showcase.restore(snapshot.showcase);
       for (const assembly of result.world.assemblyList()) result.mechanisms.track(assembly);
       for (const id of result.world.ids()) {
         const pose = result.world.pose(id);
@@ -1566,6 +1920,12 @@ export class AdventurePhysics {
       if (snapshot.version < 5) result.ensureMechanisms(sim);
       // M08 reaction yards and wind lanes did not exist in older checkpoints: add them once.
       if (snapshot.version < 6) result.ensureReactions(sim, true);
+      // M10 town scene, set pieces and regions likewise.
+      if (snapshot.version < 8) {
+        result.world.reauthor(layout(sim), M10_REPLACED);
+        result.ensureShowcase(sim, true);
+        result.world.settle();
+      }
       result.navigation = new Map(snapshot.navigation.map((s) => [s.id, structuredClone(s)]));
       result.appliedTransition = snapshot.appliedTransition;
       result.actors = new Set(
@@ -1822,13 +2182,14 @@ export function validateAdventurePhysics(
 ): void {
   if (
     !snapshot ||
-    ![1, 2, 3, 4, 5, 6, 7].includes(snapshot.version) ||
+    ![1, 2, 3, 4, 5, 6, 7, 8].includes(snapshot.version) ||
     (snapshot.version === 2 && snapshot.world?.version !== 4) ||
     (snapshot.version === 3 && snapshot.world?.version !== 5) ||
     (snapshot.version === 4 && snapshot.world?.version !== 6) ||
     (snapshot.version === 5 && snapshot.world?.version !== 7) ||
     (snapshot.version === 6 && snapshot.world?.version !== 8) ||
     (snapshot.version === 7 && snapshot.world?.version !== 9) ||
+    (snapshot.version === 8 && snapshot.world?.version !== 9) ||
     snapshot.backend !== snapshot.world?.backend ||
     (snapshot.version === 1 && snapshot.backend !== RAPIER_VERSION) ||
     !/^land-\d+-\d+$/.test(snapshot.landId) ||
@@ -1871,6 +2232,10 @@ export function validateAdventurePhysics(
     if (!snapshot.rigs) throw new Error("Missing rig state");
     validateRigState(snapshot.rigs, (id) => entries.has(id));
   } else if (snapshot.rigs !== undefined) throw new Error("Rig state requires envelope 7");
+  if (snapshot.version >= 8) {
+    if (!snapshot.showcase) throw new Error("Missing showcase state");
+    validateShowcase(snapshot.showcase, (id) => entries.has(id));
+  } else if (snapshot.showcase !== undefined) throw new Error("Showcase state requires envelope 8");
   for (const entry of entries.values())
     if (
       entry.recipe.actorKind === "npc" &&
@@ -1974,6 +2339,10 @@ export function validateAdventurePhysics(
         ![p.x, p.y, p.angle, p.vx, p.vy, p.angularVelocity].every(Number.isFinite)
       )
         throw new Error("Invalid archived prop");
+    }
+    if (a.showcase !== undefined) {
+      if (snapshot.version < 8) throw new Error("Archived showcase requires envelope 8");
+      validateShowcase(a.showcase, () => false);
     }
     // A land archived before M08 has no reaction state; its yard is added when it is entered.
     if (a.reactions !== undefined) {

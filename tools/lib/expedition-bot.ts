@@ -1,5 +1,29 @@
 import type { Simulation } from "../../src/engine/simulation.ts";
 
+/**
+ * Controller pathfinding (M10): when solid scenery (a hedge, a stockade, a stall) lies just
+ * ahead, turn to the freest nearby heading, like monsters do. Still only a direction input.
+ */
+function steer(sim: Simulation, id: string, heading: number, radius: number): number {
+  const world = sim.physical?.world,
+    body = `player-${id}`;
+  if (!world?.has(body)) return heading;
+  const reach = 34,
+    free = (a: number) =>
+      world.obstacleFraction(body, Math.cos(a) * reach, Math.sin(a) * reach, radius + 1);
+  if (free(heading) >= 1) return heading;
+  let best = heading,
+    score = -Infinity;
+  for (const offset of [0.5, -0.5, 1, -1, 1.5, -1.5, 2.1, -2.1]) {
+    const a = heading + offset,
+      value = free(a) * 3 + Math.cos(offset);
+    if (value > score) {
+      score = value;
+      best = a;
+    }
+  }
+  return best;
+}
 /** Deterministic QA controller: only ordinary inputs and validated character actions. */
 export function fightArea(
   sim: Simulation,
@@ -28,9 +52,11 @@ export function fightArea(
     const danger =
       nearest?.phase === "windup" && nearest.timer < 13 && distance < 135 && player.energy >= 29;
     const move = distance > 32 || danger;
+    let heading = Math.atan2(dy, dx) + (danger ? Math.PI : 0);
+    if (move) heading = steer(sim, player.id, heading, player.radius);
     sim.setInput(player.id, {
-      x: move ? (dx / Math.max(distance, 1)) * (danger ? -1 : 1) : 0,
-      y: move ? (dy / Math.max(distance, 1)) * (danger ? -1 : 1) : 0,
+      x: move ? Math.cos(heading) : 0,
+      y: move ? Math.sin(heading) : 0,
       attack: true,
       pulse: distance < 98 && player.energy > 28,
       lance: distance > 80 && player.energy > 22,

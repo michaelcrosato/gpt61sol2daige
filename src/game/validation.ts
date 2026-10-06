@@ -3,6 +3,7 @@ import { type AreaRecipe, BEHAVIORS, LAYOUTS, MECHANICS, RIGS, THEMES } from "./
 import { type Item, RARITIES, SLOTS } from "./loot.ts";
 import { SKILLS, STAT_LABELS } from "./skills.ts";
 import { type AdventureState, DEFAULT_TUNING } from "./types.ts";
+import { WARDEN_MOVES, WARDEN_WEAKNESSES } from "./wardens.ts";
 
 function check(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(`Invalid adventure: ${message}`);
@@ -274,6 +275,18 @@ export function validateAdventure(s: AdventureState): void {
             integer(enemy.reaction[key], 0, 1e15),
           ) &&
           [-1, 1].includes(enemy.reaction.side))) &&
+        (enemy.warden === undefined ||
+          (enemy.boss &&
+            enemy.warden &&
+            typeof enemy.warden === "object" &&
+            Object.keys(enemy.warden).length === 7 &&
+            ["", ...WARDEN_MOVES].includes(enemy.warden.move) &&
+            ["", ...WARDEN_WEAKNESSES].includes(enemy.warden.exposedBy) &&
+            finite(enemy.warden.tx, WORLD_LIMIT + 1024) &&
+            finite(enemy.warden.ty, WORLD_LIMIT + 1024) &&
+            integer(enemy.warden.echoAt, 0, 1e15) &&
+            integer(enemy.warden.exposedUntil, 0, 1e15) &&
+            integer(enemy.warden.lastExposed, -1e6, 1e15))) &&
         ["walk", "windup", "charge", "recover", "dead"].includes(enemy.phase) &&
         typeof enemy.boss === "boolean" &&
         typeof enemy.elite === "boolean" &&

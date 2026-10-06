@@ -725,7 +725,7 @@ test("a real M08 checkpoint migrates: rigs start at rest, the dead stay dead, ve
       false,
     );
     const saved = sim.save();
-    assert.equal(saved.actorPhysics!.version, 7);
+    assert.equal(saved.actorPhysics!.version, 8);
     assert.equal(saved.actorPhysics!.world.version, 9);
     const again = Simulation.restore(structuredClone(saved));
     again.dispose();

@@ -2,6 +2,7 @@ import type { Body } from "../engine/physics.ts";
 import type { AreaRecipe, BehaviorId, MechanicId, RigKind, ThemeId } from "./content.ts";
 import type { GearSlot, Item } from "./loot.ts";
 import type { HeroRecoil, RigReaction } from "./rigs.ts";
+import type { WardenState } from "./wardens.ts";
 
 export interface Tuning {
   difficulty: number;
@@ -92,6 +93,8 @@ export interface Enemy extends Body {
   tier: number;
   /** M09: lean spring, poise, stagger, knockdown, the killing blow and shed armor. */
   reaction: RigReaction;
+  /** M10: a warden's signature move, telegraph target and exposure (bosses only). */
+  warden?: WardenState;
 }
 export interface Projectile {
   id: number;

@@ -68,7 +68,13 @@ test("every area carries six registered mechanisms with joints, members and auth
       ["vane", "none"],
       ["vine", "none"],
     ]);
-    assert.equal(world.assemblyList().length, 24, "four areas per land");
+    // M07's six per area; M10 adds town fixtures and tailwind vanes under their own ids.
+    assert.equal(
+      world.assemblyList().filter((a) => /^(gate|chain|vine|launcher|vane|bridge)-\d+$/.test(a.id))
+        .length,
+      24,
+      "four areas per land",
+    );
     const joints = world.jointList().filter((j) => j.recipe.assembly.endsWith("-1"));
     assert.deepEqual([...new Set(joints.map((j) => j.recipe.kind))].sort(), [
       "hinge",
@@ -90,6 +96,10 @@ test("every area carries six registered mechanisms with joints, members and auth
       "launcher",
       "vane",
       "bridge",
+      // M10 town fixtures.
+      "stall",
+      "lamp",
+      "bunting",
     ]);
     const agent = new AgentRuntime(sim);
     const exported = agent.execute({ op: "actors", action: "mechanisms" }) as {
@@ -132,10 +142,13 @@ test("a gate swings around its hinge, latches open as an authored event and the 
         restored.dispose();
       }
     }
-    // A slow, deliberate push closes it again and the spring holds it shut.
+    // A slow, deliberate push closes it again and the spring holds it shut. The push turns the
+    // leaf about its hinge pin (its centre moves with the turn), not just about its own centre.
     for (let t = 0; t < 90 && Math.abs(world.pose("prop-gate-1-leaf").angle) > 0.3; t++) {
-      const p = world.pose("prop-gate-1-leaf");
-      world.motion(p.id, p.vx, p.vy, -1.5);
+      const entry = world.joint("gate-1:hinge"),
+        p = world.pose("prop-gate-1-leaf"),
+        pin = jointAnchors(entry.recipe, world.pose(entry.recipe.a), p);
+      world.motion(p.id, 1.5 * (p.y - pin.ay), -1.5 * (p.x - pin.ax), -1.5);
       sim.step(1);
     }
     sim.step(60);
@@ -641,10 +654,14 @@ test("real M06 checkpoints migrate: mechanisms join once, archived lands gain th
   try {
     const world = sim.physical!.world;
     assert.deepEqual(sim.physical!.destroyedRecords(), legacy.actorPhysics!.destroyed);
-    assert.equal(world.assemblyList().length, 24);
+    assert.equal(
+      world.assemblyList().filter((a) => /^(gate|chain|vine|launcher|vane|bridge)-\d+$/.test(a.id))
+        .length,
+      24,
+    );
     assert.ok(world.has("prop-gate-5-leaf"));
     const saved = sim.save();
-    assert.equal(saved.actorPhysics!.version, 7);
+    assert.equal(saved.actorPhysics!.version, 8);
     assert.equal(saved.actorPhysics!.world.version, 9);
     const archive = saved.actorPhysics!.archives.find((a) => a.id === "land-1-0")!;
     assert.equal(archive.assemblies, undefined, "an archived pre-M07 land stays as it was saved");

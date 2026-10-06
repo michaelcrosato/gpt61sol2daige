@@ -226,6 +226,13 @@ export class PropRenderer {
     else if (family === "jar") jar(ctx, look);
     else if (family === "brush") brush(ctx, look);
     else if (family === "fan") fan(ctx, look);
+    else if (family === "stall") stall(ctx, look);
+    else if (family === "awning") awning(ctx, look);
+    else if (family === "lamp") lamp(ctx, look);
+    else if (family === "pennant") pennant(ctx, look);
+    else if (family === "basket") basket(ctx, look);
+    else if (family === "hedge") hedge(ctx, look);
+    else if (family === "barricade") barricade(ctx, look);
     else debris(ctx, look);
   }
   /**
@@ -1297,5 +1304,171 @@ function fan(ctx: Ctx, { prop, palette, time, active }: Look): void {
   ctx.beginPath();
   ctx.moveTo(r * 0.5, 0);
   ctx.lineTo(r + 4, 0);
+  ctx.stroke();
+}
+
+// M10 town fixtures and area set pieces.
+/** A market counter with its goods laid out (the awning above is its own body). */
+function stall(ctx: Ctx, { prop, palette, seed }: Look): void {
+  const { w, h } = size(prop),
+    wood = tone("wood", palette, 0.25),
+    cloth = tone("cloth", palette, 0.45);
+  ctx.fillStyle = wood.dark;
+  ctx.fillRect(-w / 2, -h / 2, w, h);
+  ctx.fillStyle = wood.base;
+  ctx.fillRect(-w / 2 + 1, -h / 2 + 1, w - 2, h - 3);
+  ctx.fillStyle = cloth.light;
+  ctx.fillRect(-w / 2 + 2, -h / 2 + 1, w - 4, 2.5);
+  const goods = ["#d8794f", "#e8c35f", "#8fb86a", "#b884c9", "#e6e0c2"];
+  for (let k = 0; k < 6; k++) {
+    ctx.fillStyle = goods[(seed + k) % goods.length];
+    ctx.beginPath();
+    ctx.arc(-w / 2 + 5 + k * ((w - 10) / 5), 0.5, 1.7, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+/** A striped cloth canopy; it twists on its sprung pivot and ripples with its motion. */
+function awning(ctx: Ctx, { prop, palette, sway, time, seed }: Look): void {
+  const { w, h } = size(prop),
+    cloth = tone("cloth", palette, 0.5),
+    stripes = 6,
+    ripple = Math.sin(time * 3 + (seed % 40)) * 0.6 + sway * 0.5;
+  ctx.fillStyle = "#10201933";
+  ctx.fillRect(-w / 2 + 2, -h / 2 + 4, w, h);
+  for (let k = 0; k < stripes; k++) {
+    ctx.fillStyle = k % 2 ? cloth.light : cloth.base;
+    const x = -w / 2 + (k * w) / stripes;
+    ctx.beginPath();
+    ctx.moveTo(x, -h / 2);
+    ctx.lineTo(x + w / stripes, -h / 2);
+    ctx.lineTo(x + w / stripes, h / 2 + (k % 2 ? ripple : -ripple));
+    ctx.lineTo(x, h / 2 + (k % 2 ? -ripple : ripple));
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.strokeStyle = cloth.dark;
+  ctx.lineWidth = 0.8;
+  ctx.strokeRect(-w / 2, -h / 2, w, h);
+  // Scalloped valance.
+  ctx.fillStyle = cloth.dark;
+  for (let x = -w / 2 + 2; x < w / 2; x += 4) {
+    ctx.beginPath();
+    ctx.arc(x, h / 2 + 0.5, 1.6, 0, Math.PI);
+    ctx.fill();
+  }
+}
+/** A hanging lamp on its bracket arm (the arm points back to the post's pin). */
+function lamp(ctx: Ctx, { prop, palette, time, seed }: Look): void {
+  const r = radius(prop),
+    metal = tone("metal", palette, 0.25),
+    glass = tone("glass", palette, 0.5),
+    flicker = 0.75 + Math.sin(time * 9 + (seed % 50)) * 0.15 + Math.sin(time * 23) * 0.1;
+  ctx.strokeStyle = metal.dark;
+  ctx.lineWidth = 1.4;
+  ctx.beginPath();
+  ctx.moveTo(-10, 0);
+  ctx.lineTo(0, 0);
+  ctx.stroke();
+  const light = ctx.createRadialGradient(0, 0, 0, 0, 0, 34);
+  light.addColorStop(
+    0,
+    `#ffd98a${Math.round(flicker * 70)
+      .toString(16)
+      .padStart(2, "0")}`,
+  );
+  light.addColorStop(1, "#ffd98a00");
+  ctx.fillStyle = light;
+  ctx.fillRect(-34, -34, 68, 68);
+  ctx.fillStyle = metal.base;
+  ctx.fillRect(-r, -r, r * 2, r * 2);
+  ctx.fillStyle = mix(glass.light, "#ffd98a", 0.65);
+  ctx.fillRect(-r + 1.2, -r + 1.2, r * 2 - 2.4, r * 2 - 2.4);
+  ctx.strokeStyle = metal.light;
+  ctx.lineWidth = 0.8;
+  ctx.strokeRect(-r, -r, r * 2, r * 2);
+}
+/** A bunting pennant: a cloth flag hanging from its rope. */
+function pennant(ctx: Ctx, { prop, palette, seed, time }: Look): void {
+  const { w, h } = size(prop),
+    colors = ["#d8564b", "#e8c35f", "#5f9fc8", "#8fbf6a", "#c47ac2"],
+    flutter = Math.sin(time * 7 + (seed % 30)) * 1.2;
+  ctx.fillStyle = mix(colors[seed % colors.length], TINTS[palette % TINTS.length], 0.15);
+  ctx.beginPath();
+  ctx.moveTo(-w / 2, -h / 2);
+  ctx.lineTo(w / 2, -h / 2);
+  ctx.lineTo(flutter * 0.5, h / 2 + 2 + flutter);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = "#3b3226aa";
+  ctx.lineWidth = 0.6;
+  ctx.stroke();
+}
+/** A woven reed basket with produce. */
+function basket(ctx: Ctx, { prop, palette, seed }: Look): void {
+  const r = radius(prop),
+    reed = tone("vegetation", palette, 0.1);
+  ctx.fillStyle = "#8a6a3a";
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = "#c9a565";
+  ctx.lineWidth = 0.8;
+  for (const k of [0.45, 0.8]) {
+    ctx.beginPath();
+    ctx.arc(0, 0, r * k, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  ctx.fillStyle = ["#d8794f", "#e8c35f", reed.light][seed % 3];
+  for (let k = 0; k < 3; k++) {
+    ctx.beginPath();
+    ctx.arc(Math.cos(k * 2.1) * r * 0.35, Math.sin(k * 2.1) * r * 0.35, 1.6, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+/** A thorn hedge: a dense green mass bristling with spines. */
+function hedge(ctx: Ctx, { prop, palette, seed, sway }: Look): void {
+  const { w, h } = size(prop),
+    leaf = FOLIAGE[palette % FOLIAGE.length];
+  ctx.fillStyle = leaf[0];
+  ctx.fillRect(-w / 2, -h / 2, w, h);
+  for (let k = 0; k < 7; k++) {
+    const x = -w / 2 + ((k + 0.5) / 7) * w;
+    ctx.fillStyle = k % 2 ? leaf[1] : leaf[2];
+    ctx.beginPath();
+    ctx.arc(x, -h / 2 + (hash(seed, k) % 3), 3.2, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.strokeStyle = "#e6dcb0";
+  ctx.lineWidth = 0.7;
+  for (let k = 0; k < 10; k++) {
+    const x = -w / 2 + ((k + 0.5) / 10) * w,
+      tip = k % 2 ? -1 : 1;
+    ctx.beginPath();
+    ctx.moveTo(x, tip * (h / 2 - 1));
+    ctx.lineTo(x + sway * 0.4 + tip, tip * (h / 2 + 3));
+    ctx.stroke();
+  }
+}
+/** A weakened, scorched stockade board. */
+function barricade(ctx: Ctx, { prop, palette, seed }: Look): void {
+  const { w, h } = size(prop),
+    wood = tone("wood", palette, 0.15);
+  for (let k = 0; k < 4; k++) {
+    const x = -w / 2 + (k * w) / 4;
+    ctx.fillStyle = k % 2 ? wood.base : wood.dark;
+    ctx.fillRect(x + 0.4, -h / 2, w / 4 - 0.8, h);
+  }
+  ctx.fillStyle = "#1c1612aa";
+  for (let k = 0; k < 4; k++) {
+    const x = -w / 2 + ((hash(seed, k) % 100) / 100) * w;
+    ctx.beginPath();
+    ctx.ellipse(x, ((hash(seed, k, 2) % 7) - 3) * 0.5, 3, 1.6, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.strokeStyle = "#e3a35c88";
+  ctx.lineWidth = 0.6;
+  ctx.beginPath();
+  ctx.moveTo(-w / 2, h / 2 - 0.5);
+  ctx.lineTo(w / 2, h / 2 - 0.5);
   ctx.stroke();
 }

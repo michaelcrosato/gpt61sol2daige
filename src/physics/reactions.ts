@@ -262,6 +262,10 @@ export interface FieldRecipe {
   team: AttackTeam;
   /** The authored layout, a struck fan, a mechanic, an explosion or the agent. */
   source: string;
+  /** M10: actors of this team are left alone (a knot's pull spares the party). */
+  spare?: AttackTeam;
+  /** M10: the field's shape moves at this velocity (units/s) while it lasts (a drifting knot). */
+  drift?: { x: number; y: number };
 }
 export interface ReactionStatus {
   /** Physics body id: a prop or `enemy-<id>`. */
@@ -291,7 +295,7 @@ export interface ReactionSurface {
   x: number;
   y: number;
   radius: number;
-  /** Remaining ticks before it soaks away. */
+  /** Remaining ticks before it soaks away; -1 is an authored, permanent pool (M10). */
   ticks: number;
   /** Oil slicks: remaining burning ticks. */
   burning: number;
@@ -708,6 +712,27 @@ export class ReactionPhysics {
   }
   removeField(id: string): void {
     this.fields.delete(id);
+  }
+  /** An authored surface (M10 Stormglass pools): permanent, owned by the world. */
+  addSurface(surface: ReactionSurface): void {
+    validateReactions({
+      statuses: [],
+      surfaces: [surface],
+      fields: [],
+      delayed: [],
+      chains: [],
+      history: [],
+      events: [],
+      damage: [],
+      coils: [],
+      sequence: 0,
+    });
+    if (!this.surfaces.has(surface.id) && this.surfaces.size >= LIMITS.surfaces)
+      throw new Error("Too many surfaces");
+    this.surfaces.set(surface.id, { ...surface });
+  }
+  hasSurface(id: string): boolean {
+    return this.surfaces.has(id);
   }
 
   // ---- Sampling -------------------------------------------------------------------------
@@ -1405,6 +1430,8 @@ export class ReactionPhysics {
       for (const c of candidates) {
         if (!field.actors && (c.kind === "player" || c.kind === "monster" || c.kind === "boss"))
           continue;
+        if (field.spare === "party" && c.kind === "player") continue;
+        if (field.spare === "enemy" && (c.kind === "monster" || c.kind === "boss")) continue;
         const accel = fieldAcceleration(field, c.x, c.y, tick);
         if (!accel) continue;
         const policy = world.policyOf(c.id).effective;
@@ -1435,6 +1462,11 @@ export class ReactionPhysics {
     for (const [id, field] of [...this.fields]) {
       if (field.ticks > 0) field.ticks--;
       if (field.ticks === 0) this.fields.delete(id);
+      else if (field.drift) {
+        // A drifting field (M10 knot) carries what it holds; its shape moves after the solve.
+        field.shape.x = round(field.shape.x + field.drift.x / 60);
+        field.shape.y = round(field.shape.y + field.drift.y / 60);
+      }
     }
     // Wading: water terrain soaks and puts out what stands in it (every 6 ticks).
     if (tick % 6 === 0)
@@ -1548,9 +1580,10 @@ export class ReactionPhysics {
     for (const surface of [...this.surfaces.values()].sort((a, b) => compareIds(a.id, b.id))) {
       const policy = this.surfacePolicy(world, surface);
       if (!policy.materialReactions) continue;
-      surface.ticks--;
+      // Authored pools (M10) are permanent: -1 never counts down.
+      if (surface.ticks > 0) surface.ticks--;
       if (surface.burning) surface.burning--;
-      if (surface.ticks <= 0) {
+      if (surface.ticks === 0) {
         this.surfaces.delete(surface.id);
         continue;
       }
@@ -1919,6 +1952,8 @@ export function validateField(f: FieldRecipe): void {
       "owner",
       "team",
       "source",
+      "spare",
+      "drift",
     ],
     "field",
   );
@@ -1947,6 +1982,12 @@ export function validateField(f: FieldRecipe): void {
   str(f.owner, "field owner", 80);
   if (!TEAMS.includes(f.team)) throw new Error("Invalid field team");
   str(f.source, "field source");
+  if (f.spare !== undefined && !TEAMS.includes(f.spare)) throw new Error("Invalid field spare");
+  if (f.drift !== undefined) {
+    plain(f.drift, ["x", "y"], "field drift");
+    num(f.drift.x, "field drift x", -2000, 2000);
+    num(f.drift.y, "field drift y", -2000, 2000);
+  }
 }
 export function validateReactions(state: ReactionState | ReactionArchive, archived = false): void {
   plain(
@@ -2063,8 +2104,8 @@ export function validateReactions(state: ReactionState | ReactionArchive, archiv
     num(s.x, "surface x", -1e6, 1e6);
     num(s.y, "surface y", -1e6, 1e6);
     num(s.radius, "surface radius", 1, 500);
-    for (const k of ["ticks", "burning", "depth"] as const)
-      int(s[k], `surface ${k}`, 0, 10_000_000);
+    if (s.ticks !== -1) int(s.ticks, "surface ticks", 0, 10_000_000);
+    for (const k of ["burning", "depth"] as const) int(s[k], `surface ${k}`, 0, 10_000_000);
     str(s.chain, "surface chain");
     str(s.owner, "surface owner", 80);
     if (!TEAMS.includes(s.team)) throw new Error("Invalid surface team");

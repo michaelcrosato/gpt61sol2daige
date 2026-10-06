@@ -7,11 +7,22 @@ import { LOOT_SETTLE_TICKS, type PendingImpact } from "../physics/combat.ts";
 import { MATERIALS } from "../physics/materials.ts";
 import { insidePen } from "../physics/mechanisms.ts";
 import { type FieldRecipe, REACTION_COLORS } from "../physics/reactions.ts";
+import {
+  ARC_STRENGTH,
+  BLOOM_SNARE,
+  GUST,
+  KNOT,
+  TAILWIND,
+  THORNBURST,
+  tailwindLane,
+  VENT_RADIUS,
+} from "../physics/showcase.ts";
 import type { AreaRecipe, BehaviorId, RigKind } from "./content.ts";
 import {
   ARCHETYPES,
   areaRecipe,
   encounterPosition,
+  mechanicLayout,
   mechanicOf,
   npcPosition,
   RIGS,
@@ -43,8 +54,19 @@ import {
   type Tuning,
 } from "./types.ts";
 import { validateAdventure, validateArea } from "./validation.ts";
+import {
+  ECHO_DELAY,
+  EXPOSED,
+  freshWarden,
+  WARDEN_WINDUP,
+  WARDENS,
+  type WardenWeakness,
+} from "./wardens.ts";
 
 export const INVENTORY_LIMIT = 40;
+const round3 = (value: number) => Math.round(value * 1000) / 1000;
+/** A gale charge slowed below this (units/s) has run into something solid. */
+const CRASH_SPEED = 90;
 export const MAX_ENEMIES = 100;
 export const xpForLevel = (level: number) => Math.floor(80 + 25 * level ** 1.35);
 export function freshHero(level = 1): Hero {
@@ -356,20 +378,17 @@ export class Adventure {
       hero.hp = Math.max(hero.hp, this.stats(player.id).health * 0.5);
       this.place(player, s.recipe.x - 230, s.recipe.y + (player.color - 2) * 12, sim);
     }
-    for (let k = 0; k < s.recipe.mechanics.length; k++)
-      for (let n = 0; n < 3; n++) {
-        const angle = (n / 3 + k * 0.18) * Math.PI * 2;
-        s.mechanics.push({
-          id: s.nextId++,
-          kind: s.recipe.mechanics[k],
-          x: s.recipe.x + Math.cos(angle) * (125 + k * 42),
-          y: s.recipe.y + Math.sin(angle) * (125 + k * 42),
-          radius: s.recipe.mechanics[k] === "wind" ? 38 : 25,
-          readyAt: 0,
-          activeUntil: 0,
-          pair: null,
-        });
-      }
+    for (const m of mechanicLayout(s.recipe))
+      s.mechanics.push({
+        id: s.nextId++,
+        kind: m.kind,
+        x: m.x,
+        y: m.y,
+        radius: m.radius,
+        readyAt: 0,
+        activeUntil: 0,
+        pair: null,
+      });
     const rifts = s.mechanics.filter((m) => m.kind === "rift");
     for (let i = 0; i < rifts.length; i++)
       rifts[i].pair = rifts[(i + 1) % rifts.length]?.id ?? null;
@@ -691,6 +710,11 @@ export class Adventure {
     h.lastDash = sim.tick;
     h.invulnerableUntil = Math.max(h.invulnerableUntil, sim.tick + 16);
     if (stats.powers.includes("gale")) p.dashCooldown *= 0.75;
+    // A dash tears free of a Bloom Tyrant's lash, and the torn vine exposes it (M10).
+    for (const body of sim.physical?.breakLashes(sim, p.id) ?? []) {
+      const warden = this.state.enemies.find((e) => enemyBodyId(e.id) === body);
+      if (warden) this.expose(sim, warden, "lash", p.id);
+    }
     // Dash shoulders loose props out of the path (no damage); they stay this hero's for impacts.
     if (sim.physical)
       sim.physical.damageProps(sim, {
@@ -855,6 +879,7 @@ export class Adventure {
     angle = 0,
     arc = Math.PI,
     cause = "attack",
+    spare: readonly string[] = [],
   ): void {
     for (const enemy of [...this.state.enemies]) {
       const dx = enemy.x - x,
@@ -891,6 +916,7 @@ export class Adventure {
           team: spec.team,
           // M08: burning strikes (Cinderwake, burn skills) set flammable scenery alight.
           ...(stats && stats.burn > 0 ? { element: "fire" as const } : {}),
+          ...(spare.length ? { spare } : {}),
         }),
       );
     }
@@ -961,6 +987,34 @@ export class Adventure {
       e.nextAttack = 1e11;
     }
     sim.physical?.teleport(enemyBodyId(e.id), x, y);
+    return e;
+  }
+  /**
+   * Agent/QA (M10): use an area mechanic as this hero through its ordinary activation (the
+   * mechanic must be ready). Returns the mechanic.
+   */
+  useMechanic(sim: Simulation, owner: string, id: number): Mechanic {
+    const m = this.state.mechanics.find((mechanic) => mechanic.id === id);
+    if (!m) throw new Error("Unknown mechanic");
+    if (!sim.players.has(owner)) throw new Error("Unknown traveler");
+    if (m.readyAt > sim.tick) throw new Error("Mechanic is not ready");
+    this.activate(sim, m, owner);
+    return structuredClone(m);
+  }
+  /**
+   * Agent/QA (M10): a living warden starts telegraphing its signature move on its next attack,
+   * which is due now. Returns the warden.
+   */
+  wardenSignature(sim: Simulation, id: number): Enemy {
+    const e = this.state.enemies.find((enemy) => enemy.id === id && enemy.hp > 0);
+    if (!e?.boss) throw new Error("No living warden with that id");
+    e.attacks = 0;
+    e.nextAttack = sim.tick;
+    if (e.phase !== "charge") {
+      e.phase = "walk";
+      e.timer = 0;
+    }
+    e.warden ??= freshWarden();
     return e;
   }
   /** Agent/QA (M09): a blow to a monster through the ordinary hit path, credited to `owner`. */
@@ -1116,6 +1170,9 @@ export class Adventure {
         if (d.team === "enemy") continue;
         const e = this.state.enemies.find((en) => enemyBodyId(en.id) === d.target);
         if (!e || e.hp <= 0) continue;
+        // Vyr is exposed by a shock that reaches it while it is wet.
+        if (e.boss && d.cause === "shock" && (physical.reactions.status(d.target)?.wet ?? 0) > 0)
+          this.expose(sim, e, "shock", owner);
         this.hit(
           sim,
           e,
@@ -1183,6 +1240,8 @@ export class Adventure {
           impact.damage,
           impact.angle,
         );
+        // The Hollow Atlas is exposed by a prop a traveler launched into it.
+        if (e.boss && owner) this.expose(sim, e, "impact", owner);
         this.hit(sim, e, impact.damage, owner, impact.x, impact.y, true);
       } else if (impact.target.startsWith("player-")) {
         const p = sim.players.get(impact.target.slice(7));
@@ -1222,7 +1281,9 @@ export class Adventure {
       stats = h ? this.stats(owner, sim.tick) : null;
     const critical =
       stats && random(e.id, sim.tick + this.state.nextEvent, this.state.seed) < stats.crit;
-    const amount = Math.max(1, Math.round(damage * (critical ? stats!.critPower : 1)));
+    // An exposed warden (M10) takes more damage while its weakness lasts.
+    const exposed = (e.warden?.exposedUntil ?? 0) > sim.tick ? EXPOSED.damage : 1;
+    const amount = Math.max(1, Math.round(damage * exposed * (critical ? stats!.critPower : 1)));
     e.hp -= amount;
     e.hurtUntil = sim.tick + 7;
     if (!e.boss && e.phase === "windup") {
@@ -1250,6 +1311,22 @@ export class Adventure {
       0,
       critical ? "#f4d98d" : "#e9ebd6",
     );
+    // M10 Conductor yard: in a Stormglass area a hero's strike on a wet monster arcs through
+    // the wet pack. An arced monster stays charged for a moment, so one strike arcs once.
+    if (h && !secondary && sim.physical && this.state.recipe.mechanics.includes("glass")) {
+      const body = enemyBodyId(e.id),
+        status = sim.physical.reactions.status(body);
+      if (status && status.wet > 0 && !status.charged && sim.physical.world.has(body))
+        sim.physical.stimulate(sim, "shock", {
+          x: e.x,
+          y: e.y,
+          target: body,
+          owner,
+          team: "party",
+          cause: "stormglass:arc",
+          strength: ARC_STRENGTH,
+        });
+    }
     if (h && stats) {
       h.hp = Math.min(stats.health, h.hp + stats.leech);
       if (stats.burn > 0 && !secondary) {
@@ -1558,6 +1635,7 @@ export class Adventure {
       counted,
       tier: s.area,
       reaction: freshReaction(),
+      ...(boss ? { warden: freshWarden() } : {}),
     });
     if (boss) this.emit(sim, "boss", x, y, "", s.recipe.boss);
   }
@@ -1594,18 +1672,271 @@ export class Adventure {
       scenery: [],
     });
   }
+  /** A warden's attack cycle: summon, slam (its M10 signature), volley, and charge in phase II. */
+  private bossBehavior(e: Enemy, attacks: number): BehaviorId {
+    const phase2 = e.hp / e.maxHp < 0.5;
+    return attacks % (phase2 ? 4 : 3) === 0
+      ? "summoner"
+      : attacks % 3 === 1
+        ? "sentinel"
+        : attacks % 3 === 2
+          ? "spitter"
+          : "charger";
+  }
+  /**
+   * M10: a warden about to slam telegraphs its signature move instead, for longer, with a
+   * locked target (lanes, lines and markers do not follow the traveler).
+   */
+  private beginSignature(sim: Simulation, e: Enemy, target: Player): void {
+    if (this.bossBehavior(e, e.attacks + 1) !== "sentinel") return;
+    const s = this.state,
+      w = (e.warden ??= freshWarden()),
+      recipe = WARDENS[s.recipe.signature];
+    w.move = recipe.move;
+    e.timer = Math.max(30, Math.round(WARDEN_WINDUP / Math.sqrt(s.tuning.enemySpeed)));
+    w.tx = e.x;
+    w.ty = e.y;
+    if (w.move === "gale" || w.move === "lash" || w.move === "breath") {
+      const reach = w.move === "gale" ? 300 : w.move === "lash" ? 230 : 150;
+      w.tx = round3(e.x + Math.cos(e.facing) * reach);
+      w.ty = round3(e.y + Math.sin(e.facing) * reach);
+    } else if (w.move === "blink") {
+      // The marked arch nearest the traveler that is not where the King already stands.
+      const arches = s.mechanics
+        .filter((m) => m.kind === "rift" && Math.hypot(m.x - e.x, m.y - e.y) > 60)
+        .sort(
+          (a, b) =>
+            Math.hypot(a.x - target.x, a.y - target.y) -
+              Math.hypot(b.x - target.x, b.y - target.y) || a.id - b.id,
+        );
+      const arch = arches[0];
+      w.tx = round3(arch ? arch.x : e.x + Math.cos(e.facing) * 140);
+      w.ty = round3(arch ? arch.y : e.y + Math.sin(e.facing) * 140);
+    } else if (w.move === "collapse" && sim.physical)
+      sim.physical.reactions.addField({
+        id: `collapse:${e.id}`,
+        kind: "attract",
+        areaId: sim.physical.areaAt(sim, e.x, e.y),
+        shape: { kind: "circle", x: round3(e.x), y: round3(e.y), radius: 210 },
+        strength: 320,
+        ticks: e.timer,
+        gust: 0,
+        actors: true,
+        owner: `enemy-${e.id}`,
+        team: "enemy",
+        source: "warden:collapse",
+        spare: "enemy",
+      });
+    this.emit(sim, "mechanic", e.x, e.y, "", `warden:${w.move}`, e.timer, e.facing, "#f0b88a");
+  }
+  /** A warden's slam on every traveler in reach (the ordinary sentinel strike). */
+  private slam(sim: Simulation, e: Enemy, x: number, y: number, reach: number, scale = 1.3): void {
+    for (const p of sim.players.values())
+      if (Math.hypot(p.x - x, p.y - y) < reach) this.damageHero(sim, p, e.damage * scale, x, y);
+    this.emit(sim, "mechanic", x, y, "", "hostile", reach, e.facing, "#e8a08a");
+  }
+  /** A short field around a warden's strike that spares monsters (M10 arena physics). */
+  private wardenField(
+    sim: Simulation,
+    e: Enemy,
+    id: string,
+    kind: FieldRecipe["kind"],
+    x: number,
+    y: number,
+    radius: number,
+    strength: number,
+    ticks: number,
+  ): void {
+    const physical = sim.physical;
+    if (!physical) return;
+    physical.reactions.addField({
+      id,
+      kind,
+      areaId: physical.areaAt(sim, x, y),
+      shape: { kind: "circle", x: round3(x), y: round3(y), radius },
+      strength,
+      ticks,
+      gust: 0,
+      actors: true,
+      owner: `enemy-${e.id}`,
+      team: "enemy",
+      source: "warden",
+      spare: "enemy",
+    });
+  }
+  /** M10: resolve a warden's telegraphed signature move. */
+  private signature(sim: Simulation, e: Enemy): void {
+    const w = e.warden!,
+      owner = `enemy-${e.id}`,
+      physical = sim.physical,
+      tick = sim.tick;
+    e.phase = "recover";
+    e.timer = 36;
+    const move = w.move;
+    w.move = "";
+    if (move === "thornburst") {
+      this.slam(sim, e, e.x, e.y, 125);
+      physical?.thornburst(sim, { x: e.x, y: e.y, owner, team: "enemy", cause: "warden" });
+      if (physical)
+        this.propEffects(
+          sim,
+          owner,
+          0,
+          physical.damageProps(sim, {
+            owner,
+            cause: "warden",
+            x: e.x,
+            y: e.y,
+            radius: THORNBURST.radius,
+            damage: e.damage,
+            impulse: 0,
+            material: 1,
+            team: "enemy",
+          }),
+        );
+    } else if (move === "gale") {
+      // The charge follows its locked lane with a gale at its back.
+      e.facing = Math.atan2(w.ty - e.y, w.tx - e.x);
+      e.phase = "charge";
+      e.timer = 32;
+      w.move = "gale";
+      if (physical)
+        physical.reactions.addField({
+          id: `gale:${e.id}:${tick}`,
+          kind: "wind",
+          areaId: physical.areaAt(sim, e.x, e.y),
+          shape: {
+            kind: "lane",
+            x: round3(e.x),
+            y: round3(e.y),
+            angle: round3(e.facing),
+            length: 300,
+            width: 70,
+          },
+          strength: 420,
+          ticks: 40,
+          gust: 0,
+          actors: true,
+          owner,
+          team: "enemy",
+          source: "warden:gale",
+          spare: "enemy",
+        });
+    } else if (move === "discharge") {
+      this.slam(sim, e, e.x, e.y, 125);
+      physical?.stimulate(sim, "shock", {
+        x: e.x,
+        y: e.y,
+        radius: 70,
+        owner,
+        team: "enemy",
+        cause: "warden",
+      });
+    } else if (move === "echo") {
+      this.slam(sim, e, e.x, e.y, 125);
+      w.echoAt = tick + ECHO_DELAY;
+      w.tx = round3(e.x);
+      w.ty = round3(e.y);
+    } else if (move === "breath") {
+      const cone = Math.cos(0.45);
+      for (const p of sim.players.values()) {
+        const d = Math.hypot(p.x - e.x, p.y - e.y);
+        if (d < 150 && (d < 1 || Math.cos(Math.atan2(p.y - e.y, p.x - e.x) - e.facing) > cone))
+          this.damageHero(sim, p, e.damage * 1.2, e.x, e.y);
+      }
+      this.emit(sim, "mechanic", e.x, e.y, "", "hostile", 150, e.facing, "#f39a62");
+      for (const reach of [40, 80, 120])
+        physical?.stimulate(sim, "fire", {
+          x: e.x + Math.cos(e.facing) * reach,
+          y: e.y + Math.sin(e.facing) * reach,
+          radius: 26,
+          owner,
+          team: "enemy",
+          cause: "warden",
+        });
+    } else if (move === "lash") {
+      const dx = w.tx - e.x,
+        dy = w.ty - e.y,
+        length = Math.hypot(dx, dy) || 1;
+      for (const p of sim.players.values()) {
+        const along = ((p.x - e.x) * dx + (p.y - e.y) * dy) / length,
+          across = Math.abs((p.x - e.x) * dy - (p.y - e.y) * dx) / length;
+        if (along < -10 || along > length + 10 || across > 24 || this.hero(p.id).dead) continue;
+        this.damageHero(sim, p, e.damage * 0.6, e.x, e.y);
+        physical?.lash(sim, e, p.id);
+      }
+      this.emit(sim, "mechanic", e.x, e.y, "", "hostile", length, Math.atan2(dy, dx), "#d97b93");
+    } else if (move === "collapse") {
+      physical?.reactions.removeField(`collapse:${e.id}`);
+      this.slam(sim, e, e.x, e.y, 125);
+      this.wardenField(sim, e, `collapse:${e.id}:burst`, "pressure", e.x, e.y, 140, 1800, 5);
+    } else if (move === "blink") {
+      sim.physical?.teleport(enemyBodyId(e.id), w.tx, w.ty);
+      e.x = e.px = w.tx;
+      e.y = e.py = w.ty;
+      this.wardenField(sim, e, `blink:${e.id}:${tick}`, "repel", e.x, e.y, 115, 1400, 8);
+      this.slam(sim, e, e.x, e.y, 100);
+    }
+  }
+  /** Each tick: the Echo Matron's pending echo slam, and Cinderjaw being doused. */
+  private wardenUpkeep(sim: Simulation, e: Enemy): void {
+    const w = e.warden!;
+    if (w.echoAt && sim.tick >= w.echoAt) {
+      w.echoAt = 0;
+      this.slam(sim, e, w.tx, w.ty, 110);
+      this.wardenField(sim, e, `echo:${e.id}:${sim.tick}`, "repel", w.tx, w.ty, 120, 1300, 8);
+    }
+    if (
+      this.state.recipe.signature === "cinder" &&
+      (sim.physical?.reactions.status(enemyBodyId(e.id))?.wet ?? 0) > 0
+    )
+      this.expose(sim, e, "water", "");
+  }
+  /**
+   * M10 warden weakness: the area's own rule used against its warden staggers it, breaks its
+   * current telegraph and makes it take more damage for a moment. Only its own weakness counts.
+   */
+  private expose(sim: Simulation, e: Enemy, cause: WardenWeakness, owner: string): void {
+    const s = this.state,
+      tick = sim.tick;
+    if (!e.boss || e.hp <= 0 || s.mode !== "area" || WARDENS[s.recipe.signature].weakness !== cause)
+      return;
+    const w = (e.warden ??= freshWarden());
+    if (w.exposedUntil > tick || tick - w.lastExposed < EXPOSED.cooldown) return;
+    w.exposedUntil = tick + EXPOSED.ticks;
+    w.exposedBy = cause;
+    w.lastExposed = tick;
+    e.reaction.staggerUntil = Math.max(e.reaction.staggerUntil, tick + EXPOSED.stagger);
+    if (e.phase === "windup") {
+      e.phase = "recover";
+      e.timer = EXPOSED.stagger;
+      if (w.move === "collapse") sim.physical?.reactions.removeField(`collapse:${e.id}`);
+      w.move = "";
+    }
+    this.emit(
+      sim,
+      "rig",
+      e.x,
+      e.y - 24,
+      owner,
+      `warden:exposed:${cause}`,
+      EXPOSED.ticks,
+      0,
+      "#f6e39a",
+    );
+  }
   private enemyAttack(sim: Simulation, e: Enemy, target: Player): void {
     e.attacks++;
+    if (e.boss && e.warden?.move) {
+      this.signature(sim, e);
+      e.nextAttack =
+        sim.tick +
+        Math.floor(ARCHETYPES[e.behavior].cooldown * (e.hp / e.maxHp < 0.5 ? 0.48 : 0.65));
+      e.target = target.id;
+      return;
+    }
     const phase2 = e.boss && e.hp / e.maxHp < 0.5;
-    const behavior = e.boss
-      ? e.attacks % (phase2 ? 4 : 3) === 0
-        ? "summoner"
-        : e.attacks % 3 === 1
-          ? "sentinel"
-          : e.attacks % 3 === 2
-            ? "spitter"
-            : "charger"
-      : e.behavior;
+    const behavior = e.boss ? this.bossBehavior(e, e.attacks) : e.behavior;
     if (behavior === "charger") {
       e.phase = "charge";
       e.timer = e.boss ? 32 : 25;
@@ -1682,9 +2013,14 @@ export class Adventure {
       mechanicOf(kind).color,
     );
     if (kind === "bramble") {
+      // M10 Thornburst: the shove and splinters leave before the roots take hold.
+      sim.physical?.thornburst(sim, { x, y, owner, team: "party", cause: "bramble" });
       this.damageArea(sim, owner, x, y, 115, stats.damage * 3.4, 0, Math.PI, "bramble");
       for (const e of s.enemies)
-        if (Math.hypot(e.x - x, e.y - y) < 130) e.rootUntil = sim.tick + 100;
+        if (Math.hypot(e.x - x, e.y - y) < 130) {
+          e.rootUntil = sim.tick + 100;
+          if (e.boss && e.hp > 0) this.expose(sim, e, "bramble", owner);
+        }
     }
     if (kind === "glass") {
       const targets = s.enemies
@@ -1722,20 +2058,91 @@ export class Adventure {
           e.rootUntil = sim.tick + 40;
         }
       }
-      // M08: the knot's field also gathers loose props, debris and loot (monsters, above).
-      this.field(sim, mechanic, "attract", { x, y, radius: 170 }, 340, 80, false, owner);
+      // M10 Drifting knot: the struck knot's pull rolls away along the blow, dragging the
+      // gathered monsters, loose material and loot with it (it spares the party).
+      const heading = Math.atan2(y - p.y, x - p.x) || 0;
+      this.field(
+        sim,
+        mechanic,
+        "attract",
+        { x, y, radius: KNOT.radius },
+        KNOT.strength,
+        KNOT.ticks,
+        true,
+        owner,
+        {
+          spare: "party",
+          drift: {
+            x: Math.round(Math.cos(heading) * KNOT.drift * 1000) / 1000,
+            y: Math.round(Math.sin(heading) * KNOT.drift * 1000) / 1000,
+          },
+        },
+      );
     }
     if (kind === "wind") {
       // M08: crossing a lane whirls the air around it for the activation's duration.
       this.field(sim, mechanic, "vortex", { x, y, radius: 90 }, 360, 80, true, owner);
+      // M10 Tailwind: a strong gust down the lane, owned by the crosser (what it throws hurts).
+      sim.physical?.reactions.addField({
+        id: `gust:${mechanic.id}`,
+        kind: "wind",
+        areaId: sim.physical.areaAt(sim, x, y),
+        shape: { kind: "lane", ...tailwindLane(s.recipe, { x, y }), width: TAILWIND.width },
+        strength: GUST.strength,
+        ticks: GUST.ticks,
+        gust: 0,
+        actors: true,
+        owner,
+        team: "party",
+        source: "mechanic:wind",
+      });
       h.hasteUntil = sim.tick + 180;
       p.energy = Math.min(100, p.energy + 30);
       p.dashCooldown = Math.min(p.dashCooldown, 0.1);
     }
-    if (kind === "cinder") h.burnUntil = sim.tick + 300;
+    if (kind === "cinder") {
+      h.burnUntil = sim.tick + 300;
+      // M10 Vent eruption: fire at the vent, and up its own brush fuse wherever the set piece
+      // had to stand, runs on into the weakened barricade.
+      const physical = sim.physical;
+      if (physical) {
+        const chain = physical.stimulate(sim, "fire", {
+          x,
+          y,
+          radius: VENT_RADIUS,
+          owner,
+          team: "party",
+          cause: "vent",
+        });
+        const spot = mechanicLayout(s.recipe).find((l) => Math.hypot(l.x - x, l.y - y) < 1),
+          fuse = spot ? `prop-brush-${s.recipe.index}-cinder-${spot.n}-0` : "";
+        if (fuse && physical.world.has(fuse)) {
+          const at = physical.world.motionOf(fuse);
+          physical.reactions.stimulate(physical.reactionHost(sim), "fire", {
+            x: at.x,
+            y: at.y,
+            target: fuse,
+            chain,
+          });
+        }
+      }
+    }
     if (kind === "blood") {
       h.hp = Math.max(1, h.hp - stats.health * 0.18);
       h.bloodUntil = sim.tick + 900;
+      // M10 Bloom snare: the sacrifice grows living vines to the nearest monsters.
+      if (sim.physical) {
+        const targets = s.enemies
+          .filter((e) => e.hp > 0 && Math.hypot(e.x - x, e.y - y) < BLOOM_SNARE.radius)
+          .sort(
+            (a, b) => Math.hypot(a.x - x, a.y - y) - Math.hypot(b.x - x, b.y - y) || a.id - b.id,
+          )
+          .slice(0, BLOOM_SNARE.targets);
+        for (const r of sim.physical.snare(sim, { x, y, owner }, targets)) {
+          const e = targets.find((t) => enemyBodyId(t.id) === r.body);
+          if (e && !e.boss) e.rootUntil = Math.max(e.rootUntil, r.until);
+        }
+      }
     }
     if (kind === "echo")
       s.delayed.push({
@@ -1750,8 +2157,12 @@ export class Adventure {
     if (kind === "rift") {
       const other = s.mechanics.find((m) => m.id === mechanic.pair);
       if (other) {
-        // An unanchored held part rides along through the rift as one unit.
+        // An unanchored held part rides along through the rift as one unit; M10 freight on the
+        // arch's pad travels with it, keeping its place around the arch.
         sim.physical?.carry(sim, p.id, other.x - p.x, other.y - p.y);
+        const freight =
+          sim.physical?.freight(sim, p.id, mechanic, other.x - mechanic.x, other.y - mechanic.y) ??
+          [];
         this.place(p, other.x, other.y, sim);
         // M08: the arrival shockwave is a short repelling field around the partner arch.
         this.field(
@@ -1766,7 +2177,23 @@ export class Adventure {
         );
         h.invulnerableUntil = sim.tick + 20;
         other.readyAt = Math.max(other.readyAt, sim.tick + 60);
-        this.damageArea(sim, owner, other.x, other.y, 115, stats.damage * 2.2, 0, Math.PI, "rift");
+        // The arrival strikes what waited there; the freight it brought only gets the push.
+        this.damageArea(
+          sim,
+          owner,
+          other.x,
+          other.y,
+          115,
+          stats.damage * 2.2,
+          0,
+          Math.PI,
+          "rift",
+          freight,
+        );
+        // The Riftbound King cannot bear a traveler's arrival beside it.
+        for (const e of s.enemies)
+          if (e.boss && e.hp > 0 && Math.hypot(e.x - other.x, e.y - other.y) < 115)
+            this.expose(sim, e, "rift", owner);
       }
     }
     if (!chained && s.recipe.combination?.from === kind && s.delayed.length < 40)
@@ -1790,6 +2217,7 @@ export class Adventure {
     ticks: number,
     actors: boolean,
     owner: string,
+    extra: Pick<FieldRecipe, "spare" | "drift"> = {},
   ): void {
     const physical = sim.physical;
     if (!physical) return;
@@ -1805,6 +2233,7 @@ export class Adventure {
       owner,
       team: "party",
       source: `mechanic:${mechanic.kind}`,
+      ...extra,
     });
   }
   step(sim: Simulation): void {
@@ -1819,6 +2248,9 @@ export class Adventure {
       // Remains reaching the ground and travelers bumping townsfolk (M09).
       for (const e of sim.physical.rigs.take())
         this.emit(sim, "rig", e.x, e.y, e.owner, e.text, e.amount, 0, "#d9cfa8");
+      // Living vines growing, snapping and withering; rift freight arriving (M10).
+      for (const e of sim.physical.showcase.take())
+        this.emit(sim, "assembly", e.x, e.y, e.owner, e.text, e.amount, 0, "#c9e39a");
       this.applyReactions(sim);
     }
     for (const p of sim.players.values()) {
@@ -1885,7 +2317,12 @@ export class Adventure {
               ATTACKS.lance.pierce,
               Object.hasOwn(s.heroes, effect.owner) ? this.stats(effect.owner, tick).ricochet : 0,
             );
-          else
+          else {
+            // M10 Resonant echo: the repeat carries the ability's own physical force, owned by
+            // the original caster; what the first cast broke or claimed is not paid again.
+            for (const e of s.enemies)
+              if (e.boss && e.hp > 0 && Math.hypot(e.x - effect.x, e.y - effect.y) < effect.radius)
+                this.expose(sim, e, "echo", effect.owner);
             this.damageArea(
               sim,
               effect.owner,
@@ -1895,8 +2332,9 @@ export class Adventure {
               effect.damage,
               0,
               Math.PI,
-              effect.kind,
+              effect.ability ? `echo:${effect.ability}` : effect.kind,
             );
+          }
           this.emit(
             sim,
             effect.ability ?? "nova",
@@ -1934,6 +2372,7 @@ export class Adventure {
         this.hit(sim, e, e.burnDamage, e.burnOwner, e.x, e.y, true);
         if (e.hp <= 0) continue;
       }
+      if (e.warden) this.wardenUpkeep(sim, e);
       // Knocked down (M09): no steering and no attack until it is back on its feet.
       if (e.reaction.toppleUntil > tick) {
         if (sim.physical) sim.physical.enemyIntent(sim, e, 0, 0, false);
@@ -1957,6 +2396,22 @@ export class Adventure {
       } else if (e.phase === "charge") {
         intentX = Math.cos(e.facing) * (e.boss ? 280 : 240);
         intentY = Math.sin(e.facing) * (e.boss ? 280 : 240);
+        // M10 Gale Stag: a gale charge that runs into something solid crashes (its weakness).
+        if (
+          e.warden?.move === "gale" &&
+          sim.physical &&
+          e.timer < 28 &&
+          Math.hypot(e.vx, e.vy) < CRASH_SPEED &&
+          sim.physical.blockedAhead(e, 14)
+        ) {
+          e.warden.move = "";
+          e.phase = "recover";
+          e.timer = 50;
+          this.emit(sim, "rig", e.x, e.y, "", "warden:crash", 1, e.facing, "#e8d6a0");
+          this.expose(sim, e, "crash", "");
+          if (sim.physical) sim.physical.enemyIntent(sim, e, 0, 0, false);
+          continue;
+        }
         // A charge ploughs props ahead of it once each; they then belong to this enemy.
         if (sim.physical)
           this.propEffects(
@@ -1985,6 +2440,7 @@ export class Adventure {
         if (--e.timer <= 0) {
           e.phase = "recover";
           e.timer = 25;
+          if (e.warden?.move === "gale") e.warden.move = "";
         }
       } else if (e.phase === "recover") {
         if (!sim.physical) {
@@ -2002,6 +2458,7 @@ export class Adventure {
             16,
             Math.round((e.boss ? 46 : archetype.windup) / Math.sqrt(s.tuning.enemySpeed)),
           );
+          if (e.boss) this.beginSignature(sim, e, target);
           if (!sim.physical) e.vx = e.vy = 0;
         } else {
           let direction = angle,

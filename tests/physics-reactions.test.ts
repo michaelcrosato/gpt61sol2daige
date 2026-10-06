@@ -65,7 +65,7 @@ test("every area carries a reaction yard and an authored wind lane; the registry
     assert.deepEqual(
       physical.reactions
         .fieldList()
-        .filter((f) => f.source === "authored")
+        .filter((f) => f.source === "authored" && f.id.startsWith("wind-"))
         .map((f) => f.id),
       ["wind-1", "wind-2", "wind-3", "wind-4"],
     );
@@ -132,7 +132,8 @@ test("a struck coil conducts through rods and a spilled puddle into wet monsters
     // Break the cask: its water spills over the first rod and the monster standing beside it.
     sim.adventure.strikeProp(sim, "local", cask.id, 500);
     sim.step(1);
-    const puddle = physical.reactions.surfaceList().find((s) => s.kind === "water")!;
+    // The spill, not an M10 Stormglass pool (those are permanent: ticks -1).
+    const puddle = physical.reactions.surfaceList().find((s) => s.kind === "water" && s.ticks > 0)!;
     assert.ok(puddle, "the cask spilled a puddle");
     const wet = monster(sim, puddle.x - 10, puddle.y + 4),
       dry = monster(sim, cask.x - 140, cask.y - 30);
@@ -506,7 +507,7 @@ test("real M07 checkpoints migrate: yards and wind lanes join once, archived lan
     assert.ok(sim.physical!.reactions.hasField("wind-5"));
     assert.deepEqual(sim.physical!.destroyedRecords(), legacy.actorPhysics!.destroyed);
     const saved = sim.save();
-    assert.equal(saved.actorPhysics!.version, 7);
+    assert.equal(saved.actorPhysics!.version, 8);
     assert.equal(saved.actorPhysics!.world.version, 9);
     const archive = saved.actorPhysics!.archives.find((a) => a.id === "land-1-0")!;
     assert.equal(archive.reactions, undefined, "an archived pre-M08 land stays as it was saved");

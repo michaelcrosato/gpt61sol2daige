@@ -1,4 +1,4 @@
-import type { EventQueue, RigidBody, World } from "@dimforge/rapier2d-compat";
+import type { EventQueue, RigidBody, Vector, World } from "@dimforge/rapier2d-compat";
 import { checksum } from "../engine/math.ts";
 import { WORLD_LIMIT } from "../engine/world.ts";
 import { FAMILIES, validateBlueprint } from "./blueprints.ts";
@@ -8,8 +8,11 @@ import {
   POLICY_DEFAULTS,
   type PolicyCheckpoint,
   PolicyController,
+  type PolicyLayout,
   type PolicyTransaction,
+  type PolicyValues,
   policyId,
+  type RegionProfile,
   type ResolvedPolicy,
 } from "./policies.ts";
 import {
@@ -314,6 +317,9 @@ export const ASSEMBLY_KINDS = [
   "bridge",
   "lab",
   "remains",
+  "stall",
+  "lamp",
+  "bunting",
 ] as const;
 function plain(value: unknown, allowed: string[], name: string): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value))
@@ -827,14 +833,33 @@ export class PhysicsWorld {
           Math.sin(b.rotation() - a.rotation()),
           Math.cos(b.rotation() - a.rotation()),
         );
-        let w = b.angvel() - a.angvel();
+        // The moving part's turn about the pin from its angular momentum about the pin: its
+        // own spin and its linear motion around the pin both count (a blow to the centre of a
+        // part hung off-centre, like a lamp on its bracket, swings it instead of vanishing).
+        const pin = this.anchorPoint(sign > 0 ? r.a : r.b, sign > 0 ? r.anchorA : r.anchorB),
+          arm = rotate(
+            sign > 0 ? r.anchorB.x : r.anchorA.x,
+            sign > 0 ? r.anchorB.y : r.anchorA.y,
+            moving.rotation(),
+          ),
+          m = moving.mass(),
+          inertia = moving.principalInertia() * UNITS * UNITS,
+          v = moving.linvel(),
+          rx = -arm.x,
+          ry = -arm.y,
+          spin =
+            (m * (rx * (v.y * UNITS - pin.vy) - ry * (v.x * UNITS - pin.vx)) +
+              inertia * moving.angvel()) /
+            Math.max(1e-9, inertia + m * (rx * rx + ry * ry)),
+          other = moving === b ? a.angvel() : b.angvel();
+        let w = (spin - other) * sign;
         const motor = entry.motor;
         if (motor?.mode === "position")
           w += (motor.stiffness * (motor.target - angle) - motor.damping * w) * PHYSICS_STEP;
         else if (motor) w += (motor.target - w) * (1 - Math.exp(-motor.damping * PHYSICS_STEP));
         if (r.limits) w = limitSpeed(angle, w, r.limits);
         const target = moving === b ? a.angvel() + w : b.angvel() - w;
-        if (target !== moving.angvel()) {
+        if (target !== moving.angvel() || spin !== moving.angvel()) {
           // Spin about the pin: the moving part's anchor keeps the other anchor's velocity.
           const fixedAnchor = this.anchorPoint(
               sign > 0 ? r.a : r.b,
@@ -1223,6 +1248,10 @@ export class PhysicsWorld {
   policyState() {
     return this.policies.inspect();
   }
+  /** Applied region profiles for drawing (read-only, no copy). */
+  regions(): readonly RegionProfile[] {
+    return this.policies.regions();
+  }
   spawn(recipe: BodyRecipe): void {
     this.alive();
     validateBody(recipe, this.scene === "adventure");
@@ -1393,6 +1422,51 @@ export class PhysicsWorld {
       for (const value of [p.x, p.y, body.rotation(), v.x, v.y, body.angvel()])
         if (!Number.isFinite(value)) throw new Error("Nonfinite physical state");
     }
+  }
+  /**
+   * Settle a freshly built world (M10). Rapier keeps newly added bodies and joints in
+   * hash-ordered pending queues until its next step, and that order does not survive a
+   * snapshot round trip, so a new land would save differently from its own restore. One
+   * internal step drains them; every body's pose and velocity are then put back exactly, so
+   * nothing has moved. No tick, contact or event is recorded. Returns contacts begun (ignored).
+   */
+  settle(): number {
+    this.alive();
+    const saved: [RigidBody, Vector, number, Vector, number][] = [];
+    for (const { handle } of this.registry.values()) {
+      const body = this.world.getRigidBody(handle);
+      saved.push([body, body.translation(), body.rotation(), body.linvel(), body.angvel()]);
+    }
+    this.world.step(this.queue);
+    // Only what the step changed is written back (rewriting an unchanged rotation would round
+    // its stored sine and cosine).
+    for (const [body, translation, rotation, linvel, angvel] of saved) {
+      const p = body.translation(),
+        v = body.linvel();
+      if (p.x !== translation.x || p.y !== translation.y) body.setTranslation(translation, false);
+      if (body.rotation() !== rotation) body.setRotation(rotation, false);
+      if (body.isDynamic()) {
+        if (v.x !== linvel.x || v.y !== linvel.y) body.setLinvel(linvel, false);
+        if (body.angvel() !== angvel) body.setAngvel(angvel, false);
+      }
+    }
+    let begun = 0;
+    this.queue.drainCollisionEvents((_a, _b, started) => {
+      if (started) begun++;
+    });
+    return begun;
+  }
+  /**
+   * M10: re-author an older saved policy layout (new regions, a new town profile) and resolve
+   * every body again under it, as one load-time boundary.
+   */
+  reauthor(
+    layout: PolicyLayout,
+    replaced: { scope: "land" | "area" | "region"; id: string; from: PolicyValues }[],
+  ): void {
+    this.alive();
+    this.policies.reauthor(layout, replaced);
+    this.synchronizePolicies();
   }
   private validatePose(pose: BodyPose): void {
     for (const value of [pose.x, pose.y, pose.angle, pose.vx, pose.vy, pose.angularVelocity])
