@@ -18,7 +18,7 @@ import { type AdventureActor, CombatRenderer } from "./combat.ts";
 import { PropRenderer } from "./props.ts";
 import { drawFields, drawStatus, drawSurfaces } from "./reactions.ts";
 import { remainsGroups } from "./rigs.ts";
-import { drawRestraints } from "./showcase.ts";
+import { drawInspection, drawRestraints } from "./showcase.ts";
 import { PALETTE, type SpriteRecipe, spritePixels } from "./sprites.ts";
 
 /** Raised town cloth and lamps (M10) sort as if standing a little lower. */
@@ -75,6 +75,8 @@ export class Renderer {
   grabHint: { x: number; y: number; text: string } | null = null;
   /** Prop the local traveler holds, outlined in the world. */
   heldProp: string | null = null;
+  /** M12 inspector highlight (local presentation): a selected body and policy region. */
+  inspection: { body: string | null; region: string | null } = { body: null, region: null };
   metrics = { drawn: 0, candidates: 0, limited: 0, renderMs: 0, terrainCanvases: 0, lod: "detail" };
   private readonly visible = new EntityVisibility(MAX_NPCS);
   private readonly terrainCache = new Map<string, HTMLCanvasElement>();
@@ -631,6 +633,7 @@ export class Renderer {
     this.props.links(ctx, links, time);
     // M10 living vines over the actors they hold.
     drawRestraints(ctx, sim, alpha, time);
+    drawInspection(ctx, sim, this.inspection, alpha, time);
     // Monster statuses (burning, soaked, oiled, charged) over the actors.
     if (reactions.statuses.size)
       for (const e of sim.adventure.state.enemies) {

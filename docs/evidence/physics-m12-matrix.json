@@ -1,0 +1,200 @@
+{
+  "command": "MATRIX_REPORT=1 node --test tests/physics-matrix.test.ts",
+  "seed": 142,
+  "area": "area-1 Brambleburst",
+  "contract": "on -> off in a region -> off after save/restore -> off on a late-join replica -> on again",
+  "cases": [
+    {
+      "key": "worldReactions",
+      "onEffect": 14.73,
+      "offEffect": 0,
+      "restoredEffect": 0,
+      "guestValue": false,
+      "againEffect": 14.73
+    },
+    {
+      "key": "dynamicProps",
+      "onEffect": 14.73,
+      "offEffect": 0,
+      "restoredEffect": 0,
+      "guestValue": false,
+      "againEffect": 14.73
+    },
+    {
+      "key": "propBlocking",
+      "onEffect": 73.01,
+      "offEffect": 0,
+      "restoredEffect": 0,
+      "guestValue": false,
+      "againEffect": 72.97
+    },
+    {
+      "key": "impulseStrength",
+      "onEffect": 17.2,
+      "offEffect": 0,
+      "restoredEffect": 0,
+      "guestValue": 0,
+      "againEffect": 17.2
+    },
+    {
+      "key": "crowdContacts",
+      "onEffect": 86.96,
+      "offEffect": 0,
+      "restoredEffect": 0,
+      "guestValue": false,
+      "againEffect": 86.96
+    },
+    {
+      "key": "ambientPhysics",
+      "onEffect": 6,
+      "offEffect": 0,
+      "restoredEffect": 0,
+      "guestValue": false,
+      "againEffect": 6
+    },
+    {
+      "key": "sweptCollision",
+      "onEffect": 1,
+      "offEffect": 0,
+      "restoredEffect": 0,
+      "guestValue": false,
+      "againEffect": 1
+    },
+    {
+      "key": "destruction",
+      "onEffect": 50,
+      "offEffect": 0,
+      "restoredEffect": 0,
+      "guestValue": false,
+      "againEffect": 50
+    },
+    {
+      "key": "materialDurability",
+      "onEffect": 50,
+      "offEffect": 2.5,
+      "restoredEffect": 2.5,
+      "guestValue": 20,
+      "againEffect": 50
+    },
+    {
+      "key": "debrisLifetime",
+      "onEffect": 4,
+      "offEffect": 0,
+      "restoredEffect": 0,
+      "guestValue": 0,
+      "againEffect": 4
+    },
+    {
+      "key": "impactDamage",
+      "onEffect": 27,
+      "offEffect": 0,
+      "restoredEffect": 0,
+      "guestValue": false,
+      "againEffect": 27
+    },
+    {
+      "key": "impactStrength",
+      "onEffect": 27,
+      "offEffect": 0,
+      "restoredEffect": 0,
+      "guestValue": 0,
+      "againEffect": 27
+    },
+    {
+      "key": "projectileWorld",
+      "onEffect": 1,
+      "offEffect": 0,
+      "restoredEffect": 0,
+      "guestValue": false,
+      "againEffect": 1
+    },
+    {
+      "key": "physicalLoot",
+      "onEffect": 2,
+      "offEffect": 0,
+      "restoredEffect": 0,
+      "guestValue": false,
+      "againEffect": 2
+    },
+    {
+      "key": "mechanisms",
+      "onEffect": 88.95,
+      "offEffect": 0,
+      "restoredEffect": 0,
+      "guestValue": false,
+      "againEffect": 88.95
+    },
+    {
+      "key": "jointBreakage",
+      "onEffect": 1,
+      "offEffect": 0,
+      "restoredEffect": 0,
+      "guestValue": false,
+      "againEffect": 1
+    },
+    {
+      "key": "jointStrength",
+      "onEffect": 1,
+      "offEffect": 0,
+      "restoredEffect": 0,
+      "guestValue": 20,
+      "againEffect": 1
+    },
+    {
+      "key": "materialReactions",
+      "onEffect": 295,
+      "offEffect": 0,
+      "restoredEffect": 0,
+      "guestValue": false,
+      "againEffect": 295
+    },
+    {
+      "key": "chainReactions",
+      "onEffect": 3,
+      "offEffect": 0,
+      "restoredEffect": 0,
+      "guestValue": false,
+      "againEffect": 3
+    },
+    {
+      "key": "environmentalForces",
+      "onEffect": 61.6,
+      "offEffect": 0,
+      "restoredEffect": 0,
+      "guestValue": false,
+      "againEffect": 61.6
+    },
+    {
+      "key": "fieldStrength",
+      "onEffect": 61.6,
+      "offEffect": 0,
+      "restoredEffect": 0,
+      "guestValue": 0,
+      "againEffect": 61.6
+    },
+    {
+      "key": "ragdolls",
+      "onEffect": 1,
+      "offEffect": 0,
+      "restoredEffect": 0,
+      "guestValue": false,
+      "againEffect": 1
+    },
+    {
+      "key": "foliage",
+      "onEffect": 45.76,
+      "offEffect": 0,
+      "restoredEffect": 0,
+      "guestValue": false,
+      "againEffect": 45.76
+    },
+    {
+      "key": "reactionStrength",
+      "onEffect": 11.2,
+      "offEffect": 0,
+      "restoredEffect": 0,
+      "guestValue": 0,
+      "againEffect": 11.2
+    }
+  ]
+}

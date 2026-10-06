@@ -126,6 +126,24 @@ M11 adds no new policy values. A generated area's clusters use the existing swit
 
 Every generated area clears by kills alone: the reactions-off route clears areas 9–12 ([VERIFICATION](../VERIFICATION.md#m11-generated-encounters-evidence)).
 
+## M12 delivered controls
+
+M12 adds no new policy values. It puts every control in the game, with explanations, and proves each value the same way.
+
+- **World physics panel** (O; the HUD button; the game-mode menu; "World physics · O" in the pause menu). Keyboard, mouse and touch all reach it.
+  - **Where you stand:** each effective value at the traveler, its source, and the session master.
+  - **Scopes:** whole land, this area, or a named region of this area. Narrower scopes win.
+  - **Presets:** each card explains the preset and lists its exact differences from Reactive.
+  - **Switches:** every value has Default/On/Off, or a numeric field where empty means the default. A note shows where the value comes from ("changed here", "authored …", "inherited") and its effect where you stand.
+  - **Region editing:** Center on me, Larger, Smaller, Priority ±5, New region around me, Remove (custom regions only).
+  - **Resets:** Clear live changes here, Reset to authored, and Undo every live change (master on, overrides reset, custom regions removed, edited regions authored again).
+  - **Inspector:** for the object under the mouse when O is pressed, one chosen on the map, or one from the nearby list. It shows material, motion, durability, mechanism, regions, the values that differ from Reactive and their sources, reaction status, last reaction and last push.
+  - The panel explains what turning something off does: it freezes in place and discards motion, and turning it back on starts from rest, never a backlog.
+- **Profiles.** Adventure areas use the Reactive values (engine defaults); the town is Sanctuary. The M03 pass-through patches and creature circles, the M10 calm/wild rings and the M11 cluster regions keep their authored values and readable names. The Physics lab panel is a developer comparison surface.
+- **Co-op.** Only a solo player or the host edits. Guests see the same panel and values with every control disabled. A paused solo panel applies at once; a running host's edit applies at the next tick and reaches guests and late joiners with the scene.
+- **Every value proven the same way.** `tests/physics-matrix.test.ts` runs all 24 values through one cycle: observe the effect, switch it off in a region around the cause, repeat the cause (suppressed), save and restore (still suppressed), replicate to a late joiner (the off value arrives), switch back on (the effect recovers). Values whose default is off (`ambientPhysics`, `debrisLifetime`) are switched on and then off.
+- **Dependency combinations** that change meaning are tested once each, not as every boolean permutation. Master off with destruction and loose props requested on: the requested values stay visible, the master wins, and a heavy blow neither moves nor breaks a crate. Base combat still hurts and kills, with credit. Joints off with breakage on: the chain stays frozen, yet a cut still severs it. Destruction off with impact damage on: a thrown crate still hurts and stays whole. Region boundaries crossed in both directions and broader overrides are in `tests/physics-policies.test.ts`.
+
 ## Scope and precedence
 
 Resolve values in this order: engine defaults, land profile, area profile, containing named region, then applicable live debug overrides. A more specific live override wins over a broader live override; the session-wide master `worldReactions = false` is an absolute off switch. Within one specificity, use declared priority and stable region ID to break ties. Show the effective value and the source that supplied it.

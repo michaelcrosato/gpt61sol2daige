@@ -1,0 +1,245 @@
+{
+  "version": 1,
+  "name": "Fern reactive world showcase",
+  "about": "A tour of Brambleburst (seed 142, area 1) that shows each reactive system answering ordinary input. Run it headless with `npm run showcase` or in the browser with `npx playwright test e2e/showcase.spec.ts` (SHOWCASE_VIDEO=1 records it). Each beat starts from the same clean scene: the setup commands run again (a 6-HP passive stalker is the throw target and stops the area's waves) and the traveler is placed at the beat's `at` spot, so one beat's debris, fire or thornburst never changes the next. Everything after that is ordinary input: walking, aiming, slashing (LMB/J), grabbing (V), throwing (attack while holding), Whorl (Q) and the World physics panel (O).",
+  "seed": 142,
+  "area": 1,
+  "zoom": 2,
+  "setup": [
+    {
+      "op": "reset",
+      "seed": 142,
+      "count": 0
+    },
+    {
+      "op": "encounter",
+      "index": 1
+    },
+    {
+      "op": "step",
+      "ticks": 1
+    },
+    {
+      "op": "actors",
+      "action": "monster",
+      "rig": "stalker",
+      "x": 565,
+      "y": 12,
+      "hp": 6,
+      "passive": true,
+      "clear": true,
+      "as": "target"
+    },
+    {
+      "op": "step",
+      "ticks": 2
+    }
+  ],
+  "beats": [
+    {
+      "id": "scenery",
+      "title": "Destructible scenery",
+      "say": "Slash the pen's wooden fence until it splits into owned debris.",
+      "at": [565, -288],
+      "steps": [
+        {
+          "slash": "prop-fence-1-pen0",
+          "until": "destroyed",
+          "ticks": 400
+        }
+      ],
+      "expect": [
+        {
+          "destroyed": "prop-fence-1-pen0"
+        }
+      ]
+    },
+    {
+      "id": "launched-kill",
+      "title": "Launched prop kill",
+      "say": "Grab a crate from the pile with V, turn toward the stalker and throw it (attack while holding): the impact kills it, credited to you.",
+      "at": [665, 16],
+      "steps": [
+        {
+          "grab": "crate-1-0"
+        },
+        {
+          "carry": "$target",
+          "ticks": 6
+        },
+        {
+          "wait": 20
+        },
+        {
+          "throw": "$target"
+        },
+        {
+          "wait": 60
+        }
+      ],
+      "expect": [
+        {
+          "dead": "$target"
+        },
+        {
+          "event": {
+            "type": "impact",
+            "text": "impact:hit",
+            "owner": "local"
+          }
+        }
+      ]
+    },
+    {
+      "id": "rig-death",
+      "title": "Physical rig death",
+      "say": "Throw a crate at the stalker; it falls as a jointed ragdoll and Whorl flings it.",
+      "steps": [
+        {
+          "grab": "crate-1-0"
+        },
+        {
+          "carry": "$target",
+          "ticks": 6
+        },
+        {
+          "wait": 20
+        },
+        {
+          "throw": "$target"
+        },
+        {
+          "wait": 40
+        },
+        {
+          "walk": "$target",
+          "offset": [-30, 0],
+          "near": 10
+        },
+        {
+          "whorl": true
+        },
+        {
+          "wait": 40
+        }
+      ],
+      "expect": [
+        {
+          "remains": "$target"
+        },
+        {
+          "moved": "$target",
+          "min": 12
+        }
+      ],
+      "at": [665, 16]
+    },
+    {
+      "id": "mechanism",
+      "title": "Jointed mechanism",
+      "say": "Grab the sprung launcher's sled, drag it back against its spring and set it down: it fires its stone.",
+      "at": [886, -256],
+      "steps": [
+        {
+          "grab": "prop-launcher-1-sled"
+        },
+        {
+          "drag": [0, -1],
+          "ticks": 30
+        },
+        {
+          "release": "drop"
+        },
+        {
+          "wait": 30
+        }
+      ],
+      "expect": [
+        {
+          "event": {
+            "type": "assembly",
+            "text": "launcher:fired",
+            "owner": "local"
+          }
+        }
+      ]
+    },
+    {
+      "id": "material-chain",
+      "title": "Material chain",
+      "say": "Carry an oil jar into the brazier's coals: it bursts alight and the burning slick spreads.",
+      "at": [816, 134],
+      "steps": [
+        {
+          "grab": "prop-jar-1-0"
+        },
+        {
+          "carry": "prop-brazier-1-0",
+          "ticks": 120,
+          "until": "burning"
+        },
+        {
+          "release": "drop"
+        },
+        {
+          "walk": [790, 70],
+          "near": 12
+        },
+        {
+          "wait": 90
+        }
+      ],
+      "expect": [
+        {
+          "rules": ["spill", "ignite"]
+        }
+      ]
+    },
+    {
+      "id": "region",
+      "title": "Regional off/on",
+      "say": "In the calm ring a slash leaves the pot cache whole. Switch the ring to Reactive in World physics and the same slash breaks it; Reset to authored makes the ring calm again.",
+      "at": [629, -128],
+      "steps": [
+        {
+          "slash": "prop-pot-1-bramble-2-cache",
+          "ticks": 70
+        },
+        {
+          "check": [
+            {
+              "intact": "prop-pot-1-bramble-2-cache"
+            }
+          ]
+        },
+        {
+          "region": "calm-1",
+          "preset": "Reactive"
+        },
+        {
+          "slash": "prop-pot-1-bramble-2-cache",
+          "until": "destroyed",
+          "ticks": 300
+        },
+        {
+          "region": "calm-1",
+          "reset": "authored"
+        }
+      ],
+      "expect": [
+        {
+          "destroyed": "prop-pot-1-bramble-2-cache"
+        },
+        {
+          "policy": {
+            "at": "calm-1",
+            "values": {
+              "destruction": false,
+              "dynamicProps": false
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

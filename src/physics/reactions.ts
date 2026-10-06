@@ -549,6 +549,12 @@ export class ReactionPhysics {
     const s = this.statuses.get(id);
     return s ? { ...s } : null;
   }
+  /** The most recent recorded reaction aimed at a body (M12 inspector), or null. */
+  lastFor(id: string): ReactionEvent | null {
+    for (let i = this.history.length - 1; i >= 0; i--)
+      if (this.history[i].target === id) return { ...this.history[i] };
+    return null;
+  }
   /**
    * M09: a monster's fire, water, oil and charge carry into the bodies of its remains (keeping
    * the chain, owner and remaining ticks); the creature's own status ends with it.

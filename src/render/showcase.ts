@@ -182,6 +182,77 @@ export function drawRegionRings(ctx: Ctx, sim: Simulation, time: number, zoom: n
 }
 
 /**
+ * M12 inspector highlight: the selected policy region's true bounds (the shape membership uses)
+ * and a ring on the selected body. Local presentation only.
+ */
+export function drawInspection(
+  ctx: Ctx,
+  sim: Simulation,
+  selection: { body: string | null; region: string | null },
+  alpha: number,
+  time: number,
+): void {
+  if (selection.region) {
+    const region = sim.physicalRegions().find((r) => r.id === selection.region);
+    if (region) {
+      const shape = region.shape;
+      ctx.save();
+      ctx.strokeStyle = "#f4e3a1";
+      ctx.fillStyle = "#f4e3a114";
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([6, 4]);
+      ctx.lineDashOffset = -time * 10;
+      ctx.beginPath();
+      if (shape.kind === "circle") ctx.arc(shape.x, shape.y, shape.radius, 0, Math.PI * 2);
+      else if (shape.kind === "rectangle") ctx.rect(shape.x, shape.y, shape.width, shape.height);
+      else {
+        ctx.moveTo(shape.points[0].x, shape.points[0].y);
+        for (const p of shape.points.slice(1)) ctx.lineTo(p.x, p.y);
+        ctx.closePath();
+      }
+      ctx.fill();
+      ctx.stroke();
+      ctx.setLineDash([]);
+      const top =
+        shape.kind === "circle"
+          ? { x: shape.x, y: shape.y - shape.radius }
+          : shape.kind === "rectangle"
+            ? { x: shape.x + shape.width / 2, y: shape.y }
+            : shape.points.reduce((a, b) => (b.y < a.y ? b : a));
+      ctx.font = "7px monospace";
+      ctx.textAlign = "center";
+      ctx.fillStyle = "#f4e3a1";
+      ctx.fillText(`${region.id.toUpperCase()} · P${region.priority}`, top.x, top.y - 4);
+      ctx.restore();
+    }
+  }
+  if (selection.body) {
+    const id = selection.body;
+    const p =
+      id.startsWith("prop-") || id.startsWith("crate-") || id.startsWith("wheel-")
+        ? sim.physicalProps(alpha).find((b) => b.id === id)
+        : bodyAt(sim, id, alpha);
+    if (p) {
+      const pulse = 13 + Math.sin(time * 5) * 2;
+      ctx.save();
+      ctx.strokeStyle = "#f4e3a1";
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, pulse, 0, Math.PI * 2);
+      ctx.stroke();
+      for (let k = 0; k < 4; k++) {
+        const a = (k * Math.PI) / 2 + time;
+        ctx.beginPath();
+        ctx.moveTo(p.x + Math.cos(a) * (pulse + 2), p.y + Math.sin(a) * (pulse + 2));
+        ctx.lineTo(p.x + Math.cos(a) * (pulse + 6), p.y + Math.sin(a) * (pulse + 6));
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+  }
+}
+
+/**
  * A warden's signature telegraph (M10): a filling ring, a locked lane or line, or a marker at
  * the arch it will arrive at. Its length is the dodge window.
  */

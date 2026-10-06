@@ -302,6 +302,8 @@ On 2026-10-06:
 
 Main-CI follow-up ([D93](physics/DECISIONS.md)): the Burning palisade's fuse now starts within a slick's reach from almost any side of the coals. The receipt is unchanged, both routes were rerun (numbers above), and the browser scenario passed 20 of 20 local repeats.
 
+Two later main-CI follow-ups changed browser scenarios only. PR #23 made the M10 town scenario rest at the hearth and reach Rowan from a settled stand (24 of 24 repeats). PR #24 cleared Brambleburst's waves in the M07 WebRTC vine scenario (20 of 20 repeats). Main CI then passed on `5a73ad4` (run 37530019535).
+
 The numbers below come from the [receipt](evidence/physics-m11.json) (`node tools/physics-encounters.ts`) and `tests/physics-encounters.test.ts`.
 
 | M11 acceptance | Evidence |
@@ -318,3 +320,61 @@ Composed wardens (receipt, four armor kits):
 - Stripped of armor, the warden takes the full blow.
 - Mount tethers snap under a 900 units/s yank; every mount is released when the warden dies.
 - With mechanisms off at its ground, the warden spawns unarmored.
+
+## M12 controls, showcase and release evidence
+
+On 2026-10-06:
+
+- `npm run check` passed **190 headless tests**, 30 of them new: 4 in `tests/physics-controls.test.ts` and 26 in `tests/physics-matrix.test.ts` (24 values, the dependency combinations and a coverage check). `npm run build` produced the bundle.
+- `npm run test:e2e` passed **48 browser scenarios** twice, with one worker: in 20.2 minutes, and in 17.8 minutes on the final tree carrying the M11 main-CI follow-ups (PRs #23 and #24). Five are new: four in `e2e/physics-controls.spec.ts` and the showcase in `e2e/showcase.spec.ts`. The existing WebRTC smoke checks also pass ([D53](physics/DECISIONS.md)).
+- Both routes were rerun on the M12 tree and are byte-identical to M11's: M12 changes no simulation rule.
+  - `npm run verify:run`, reactions on: level 23, 4,826 gold, 5,350 area ticks.
+  - `node tools/adventure.ts playthrough 12 --reactions off`: level 24, 4,772 gold, 4,850 area ticks.
+  - The committed route files are [physics-m11-route.jsonl](evidence/physics-m11-route.jsonl) and [physics-m11-route-reactions-off.jsonl](evidence/physics-m11-route-reactions-off.jsonl).
+- `npm run showcase` passes all six beats ([receipt](evidence/physics-m12-showcase.json)). The browser showcase passed 5 of 5 local runs plus one recorded run.
+- The M12 PR also steadies the M11 Burning palisade scenario. In CI its slow key-holding loop circled the coals and smashed fuse brushes with the carried jar, so the fire stopped short of the stockade. It now steps the jar in short key pulses: 20 of 20 local repeats pass, and 10 of 10 under 3× CPU throttling, against 4 failures in 26 instrumented repeats before.
+
+### Functional matrix
+
+| M12 matrix item | Evidence |
+| --- | --- |
+| Authored outward run | Both routes clear authored areas 1–8 by ordinary inputs and rest, sell and buy in each town. `e2e/adventure.spec.ts` plays the build, combat, loot, outward-travel and resupply loop in the browser. |
+| Generated continuation | The same routes continue through generated areas 9–12 and the third town. Area 10's coil slash and area 12's jar-in-the-coals chain are started by input (M11 above). |
+| Controls disabled | The reactions-off route clears all twelve areas with the session master off. The matrix switches each of the 24 values off in a region and measures the suppressed effect ([measured](evidence/physics-m12-matrix.json)). The browser scenario turns loose props and destruction off in the panel: a crate struck there stays put and whole. |
+| Dependency combinations | One test each, not every permutation: <ul><li>master off with destruction and loose props requested on: the values stay visible, the master wins, and a 5,000 blow neither moves nor breaks the crate;</li><li>base combat without reactions: a monster is still hurt and killed, with credit;</li><li>joints off with breakage on: the chain is frozen, a cut still severs it;</li><li>destruction off with impact damage on: a thrown crate still hurts and stays whole.</li></ul> Region boundaries crossed both ways and broader overrides: `tests/physics-policies.test.ts`. |
+| Save during an active reaction | Each matrix case saves its off state and restores it with the effect still suppressed. Mid-chain timers, mid-fall ragdolls and an M11 powder trail saved 30 ticks into its chain resume exactly (`tests/physics-reactions.test.ts`, `tests/physics-rigs.test.ts`, the M11 receipt). |
+| Legacy save migration | Real checkpoints from M02, M05, M06, M07, M08, M09 and M10 migrate in their milestones' tests. M12 changes no save, protocol or world version. |
+| Scoped overrides | The panel tests edit the area, a calm region (Wild preset, grown, raised, reset to authored), a new custom region and the session master, then undo everything. A browser scenario does the same with touch in the wild ring. |
+| Same-build replay and debugging | `e2e/game.spec.ts` replays deterministically in the browser. The panel's inspector reports an object's material, motion, policy source, mechanism, last reaction and last push (headless test and browser pick). |
+| Co-op over real WebRTC | `e2e/physics-controls.spec.ts` covers a host and a guest over a real data channel. The guest's panel shows the host's values, read-only. A host edit reaches the guest and a late joiner, and after the guest disconnects the host and the late joiner keep it. `e2e/game.spec.ts` joins eight clients, the party size the game supports, rejects a ninth and releases slots. |
+
+### Milestone experiences
+
+Every milestone's experience is reachable in the game or a deliberate tool:
+
+| Milestone | Where to find it |
+| --- | --- |
+| M01 Rapier foundation | The Agent lab tab's "Physics lab · developer tools" panel; `physics` agent commands |
+| M02 Regional policies | World physics panel scopes and regions; `actors policy` |
+| M03 Actors and world | Prop pushes, crowd contacts and dash in every area; creature circles turn on ambient bodies |
+| M04 Saves and co-op | Save trail and Load trail in Agent lab, or the `save` and `restore` commands; "Invite a friend" and "Join an expedition" for up to eight travelers |
+| M05 Materials and destruction | Breakable scenery everywhere; showcase beat 1 (the pen fence) |
+| M06 Combat forces and loot | V to grab and throw; showcase beat 2 (a thrown-crate kill); bouncing loot |
+| M07 Jointed mechanisms | Gates, chains, vines, launchers, vanes and causeways; showcase beat 4 (the launcher) |
+| M08 Reactions and fields | Fire, water, oil, shock, blasts and wind; showcase beat 5 (oil jar in the coals) |
+| M09 Physical rigs | Leaning, stagger, knockdown and ragdoll deaths; showcase beat 3 (Whorl flings the remains) |
+| M10 Towns and authored areas | The Sanctuary market and each area's extension; showcase beat 6 (the calm ring switched and reset) |
+| M11 Generated encounters | Areas 9 and beyond; `encounters catalog/preview/validate/export` |
+| M12 Controls and release | O, the HUD button, the game-mode menu or the pause menu; `npm run showcase` |
+
+### Captures
+
+- [Panel](evidence/physics-m12-panel.png): loose props and destruction off for area 1; the inspector on the crate shows it frozen, with both sources.
+- [Touch](evidence/physics-m12-touch.png): the wild ring selected on a phone-sized screen, with its bounds and region tools.
+- [Guest](evidence/physics-m12-guest.png): "The host's settings", every control disabled.
+- [Showcase sheet](evidence/physics-m12-showcase.png) and [video](evidence/physics-m12-showcase.webm): the six beats in the browser.
+
+### Observations, not gates
+
+- In normal play the controls stay responsive. The browser showcase with video capture in game mode ran at about 29 FPS on this container, so the recorded run uses the default view at 960×600. Per D53 this is reported as information, not as a release gate.
+- Production cannot be loaded from the implementing container (its network policy denies `*.vercel.app`; the Vercel connector's protected fetch returns 403). The release is verified as the READY production deployment for the merge commit. The live browser scenarios (`BASE_URL=… npm run test:e2e`) were not run against production.

@@ -21,9 +21,9 @@ export function mountPhysicsUI(options: {
 }) {
   const panel = document.createElement("section");
   panel.className = "physics-panel lab-panel";
-  panel.setAttribute("aria-label", "Solo physics playground");
-  panel.innerHTML = `<div class="panel-heading">Physics playground <span>SOLO · EXPERIMENTAL</span></div>
-    <p class="field-help">Push the crate pile, spin the wheel, or launch a fast body at the wall. This scene is separate from your adventure.</p>
+  panel.setAttribute("aria-label", "Physics lab developer tools");
+  panel.innerHTML = `<div class="panel-heading">Physics lab <span>DEVELOPER TOOLS</span></div>
+    <p class="field-help">A developer comparison surface with every raw control: the separate Playground scene (push the crate pile, spin the wheel, launch a fast body at the wall) or the Playable adventure's own bodies and policies. In the game, World physics (O) offers the same policies with explanations.</p>
     <div class="physics-controls">
       <label>Physics scene <select id="physics-scene" aria-label="Physics scene"><option value="playground">Playground</option><option value="adventure">Playable adventure</option></select></label>
       <button class="secondary-button" id="physics-open">Open / reset playground</button>

@@ -25,7 +25,8 @@
     "docs": "node tools/docs.ts",
     "signal": "node tools/signal.ts",
     "adventure": "node tools/adventure.ts",
-    "verify:run": "node tools/adventure.ts playthrough 12"
+    "verify:run": "node tools/adventure.ts playthrough 12",
+    "showcase": "node tools/showcase.ts"
   },
   "dependencies": {
     "@dimforge/rapier2d-compat": "0.21.0",

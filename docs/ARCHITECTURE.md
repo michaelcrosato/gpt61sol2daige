@@ -424,3 +424,23 @@ Areas 9+ (`recipe.procedural`) build their physical content from an **encounter 
   - `src/render/props.ts` draws bark plates, ward shards, pillars and censers;
   - the mechanic guide lists the generated encounter (each combination and how to start it) and the composed warden (moves, weaknesses, armor and its counter, arena);
   - the boss HUD shows `ARMORED ×N` while armor holds.
+
+## M12 controls, showcase and release
+
+M12 finishes the reactive world as a product: its controls are in the game, one route shows every system, and a matrix proves each switch the same way ([D94–D97](physics/DECISIONS.md)).
+
+- **World physics panel** (`src/app/world-physics.ts`, mounted by `AdventureUI` as the `physics` panel).
+  - **Opening it:** O (with the mouse over an object, that object is inspected), the HUD button beside I/K/P, the game-mode menu, or "World physics · O" in the pause menu. Solo menus pause time.
+  - **Where you stand:** every effective value at the traveler, with its source; the session master; "Undo every live change".
+  - **Choose where a change applies:** whole land, this area, or a region of this area. Regions carry readable names: the combination's name for an M11 cluster, Calm/Wild ring, Market, Pass-through patch, Creature circle, Your region.
+  - **Presets and switches:** four preset cards with an explanation and their exact differences from Reactive. Each switch has an explanation, Default/On/Off buttons and a note of where its value comes from. Numeric fields accept a value, or empty for the default.
+  - **Region editing:** Center on me, Larger, Smaller, Priority ±5, New region around me, Remove (custom regions only), Clear live changes here, Reset to authored.
+  - **Inspect an object:** pick on the map (the next click or tap chooses it; Esc returns), "Nearest to me", or a list of objects within 240 units. It shows kind and material, motion (free, fixed, frozen, reactivation blocked), durability, mechanism, regions, every effective value that differs from Reactive with its source, reaction status, last reaction and last push.
+  - **Guests:** the same view with every control disabled ("The host controls shared physics").
+  - **Implementation:** every control is an agent command (`actors policies|policy|body|configure|apply`). Paused panels apply at once; a running co-op host's edit commits at the next tick.
+- **Highlight** (`Renderer.inspection`, drawn by `drawInspection` in `src/render/showcase.ts`): the selected region's true bounds and priority, and a ring on the selected body. It is local presentation, outside saves and replays, and cleared when the panel closes.
+- **Profiles.** The adventure's areas inherit the engine defaults, which are the Reactive preset; the town is Sanctuary (D70). The M03 `quiet-<n>` and `reactive-<n>` patches stay as authored comparison regions with honest names. `ambientPhysics` stays off by default: the creature circles turn it on. The lab panel is labelled "Physics lab · developer tools": a comparison surface, not a rollout switch.
+- **Showcase route.**
+  - The scene recipe is [`examples/showcase.json`](../examples/showcase.json), in Brambleburst at seed 142. It has six beats, each starting from the same clean scene: destructible scenery (the pen fence), a launched prop kill (a thrown crate), a physical rig death (the ragdoll, flung by Whorl), a jointed mechanism (the sprung launcher), a material chain (an oil jar in the brazier) and a regional off/on (the calm ring switched to Reactive in the panel, then reset).
+  - `tools/lib/showcase.ts` plays it headless (`npm run showcase`); `e2e/showcase.spec.ts` plays it with real input. The capture is in `docs/evidence/physics-m12-showcase.{png,webm}`.
+- **Functional matrix** (`tests/physics-matrix.test.ts`): each of the 24 policy values gets a cause and a measured effect, checked on, off in a priority-900 region, after save/restore, on a late-join replica, and on again. A separate test covers the dependency combinations that change meaning.

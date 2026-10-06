@@ -1249,6 +1249,10 @@ export class PhysicsWorld {
   policyState() {
     return this.policies.inspect();
   }
+  /** Applied and projected policy revisions (cheap change detection for menus). */
+  policyRevision(): string {
+    return this.policies.revisions();
+  }
   /** Applied region profiles for drawing (read-only, no copy). */
   regions(): readonly RegionProfile[] {
     return this.policies.regions();
