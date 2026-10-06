@@ -44,6 +44,15 @@ export const PROP_FAMILIES = [
   "fan",
   // M09 ragdoll remains: a dead monster's jointed parts and its loose armor, bark and lanterns.
   "remains",
+  // M10 town fixtures (stall counters, awnings, hanging lamps, bunting, baskets) and the
+  // authored areas' thorn hedges and weakened barricades.
+  "stall",
+  "awning",
+  "lamp",
+  "pennant",
+  "basket",
+  "hedge",
+  "barricade",
 ] as const;
 export type PropFamily = (typeof PROP_FAMILIES)[number];
 export const PALETTES = 5;
@@ -607,6 +616,92 @@ export const FAMILIES: Record<PropFamily, FamilyRecipe> = {
     reward: 0,
     pieces: [],
     solid: "low: travelers walk through it",
+  },
+  // M10 town fixtures: counters never break; canopies, lamps and bunting are raised (travelers
+  // pass under them) and swing on sprung hinges or rope. Baskets are harmless loose props.
+  stall: part(
+    "Market stall",
+    ["Moss stall", "Ember stall", "Tide stall", "Dusk stall", "Frost stall"],
+    "wood",
+    box(34, 10),
+    1,
+    { motion: "fixed", trim: "cloth" },
+  ),
+  awning: part(
+    "Awning",
+    ["Moss awning", "Ember awning", "Tide awning", "Dusk awning", "Frost awning"],
+    "cloth",
+    box(40, 16),
+    3,
+    { trim: "wood", actors: false, raised: true, solid: "raised: travelers pass under it" },
+  ),
+  lamp: part(
+    "Hanging lamp",
+    ["Moss lamp", "Ember lamp", "Tide lamp", "Dusk lamp", "Frost lamp"],
+    "metal",
+    circle(4.5),
+    1,
+    { trim: "glass", actors: false, raised: true, solid: "raised: travelers pass under it" },
+  ),
+  pennant: part(
+    "Pennant",
+    ["Moss pennant", "Ember pennant", "Tide pennant", "Dusk pennant", "Frost pennant"],
+    "cloth",
+    box(9, 6),
+    4,
+    { actors: false, raised: true, solid: "raised: travelers pass under it" },
+  ),
+  basket: {
+    name: "Basket",
+    variants: ["Reed basket", "Ember basket", "Kelp basket", "Plum basket", "Willow basket"],
+    material: "vegetation",
+    motion: "dynamic",
+    shape: circle(6),
+    massScale: 1.4,
+    toughness: 16,
+    reward: 1,
+    pieces: ring("reed", 3, box(5, 2), 3.5),
+    solid: "gameplay solid",
+  },
+  // M10 area set pieces: fragile thorn hedges (Brambleburst) and weakened barricades
+  // (Cinderwake) that open optional routes when burst or burnt.
+  hedge: {
+    name: "Thorn hedge",
+    variants: ["Briar hedge", "Ember thorns", "Salt bramble", "Dusk briar", "Frost thorns"],
+    material: "vegetation",
+    trim: "wood",
+    motion: "fixed",
+    shape: box(20, 7),
+    massScale: 1,
+    toughness: 14,
+    reward: 0,
+    pieces: [-7, -2.5, 2.5, 7].map((x, k) => ({
+      kind: `thorn${k}`,
+      family: "debris" as const,
+      shape: box(3.5, 2),
+      x,
+      y: k % 2 ? 1.5 : -1.5,
+      angle: k % 2 ? 0.6 : -0.6,
+    })),
+    solid: "gameplay solid",
+  },
+  barricade: {
+    name: "Barricade",
+    variants: [
+      "Wattle barricade",
+      "Charred stockade",
+      "Driftwood barricade",
+      "Dusk palisade",
+      "Frost stockade",
+    ],
+    material: "wood",
+    motion: "fixed",
+    shape: box(26, 6),
+    massScale: 1,
+    toughness: 60,
+    reward: 0,
+    pieces: [plank(0, 12, 2.5, -6.5, -1.5), plank(1, 12, 2.5, 6.5, -1.5), plank(2, 24, 2, 0, 2)],
+    solid: "gameplay solid",
   },
 };
 const area = (shape: ShapeRecipe) =>

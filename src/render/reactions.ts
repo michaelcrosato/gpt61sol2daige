@@ -123,7 +123,8 @@ export function drawFlames(
 export function drawSurfaces(ctx: Ctx, surfaces: readonly ReactionSurface[], time: number): void {
   for (const s of surfaces) {
     const seed = [...s.id].reduce((h, c) => hash(h, c.charCodeAt(0)), 0x9e1);
-    const fade = Math.min(1, s.ticks / 240);
+    // Authored pools (M10, ticks -1) never fade.
+    const fade = s.ticks < 0 ? 1 : Math.min(1, s.ticks / 240);
     ctx.save();
     ctx.globalAlpha = 0.35 + 0.5 * fade;
     ctx.fillStyle = s.kind === "water" ? "#4d98c855" : "#2a1f3070";
@@ -201,6 +202,22 @@ export function drawFields(ctx: Ctx, fields: readonly FieldRecipe[], time: numbe
           ctx.stroke();
         }
       } else if (f.kind === "attract") {
+        if (f.drift) {
+          // A drifting knot (M10): a dark, turning core that carries the cluster.
+          const core = ctx.createRadialGradient(x, y, 0, x, y, 22);
+          core.addColorStop(0, "#1a0f2be6");
+          core.addColorStop(0.6, "#4a2f7a88");
+          core.addColorStop(1, "#4a2f7a00");
+          ctx.fillStyle = core;
+          ctx.fillRect(x - 22, y - 22, 44, 44);
+          ctx.strokeStyle = "#d9c2ffcc";
+          for (let k = 0; k < 4; k++) {
+            const a = -time * 4 + (k / 4) * Math.PI * 2;
+            ctx.beginPath();
+            ctx.ellipse(x, y, 14, 10, 0, a, a + 0.9);
+            ctx.stroke();
+          }
+        }
         ctx.strokeStyle = "#c7a8ef99";
         for (let k = 0; k < 3; k++) {
           const phase = 1 - ((time * 0.8 + k / 3) % 1);

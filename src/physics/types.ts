@@ -93,7 +93,11 @@ export type AssemblyKind =
   | "vane"
   | "bridge"
   | "lab"
-  | "remains";
+  | "remains"
+  // M10 town fixtures.
+  | "stall"
+  | "lamp"
+  | "bunting";
 export interface AssemblyRecipe {
   id: string;
   kind: AssemblyKind;

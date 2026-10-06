@@ -3,9 +3,11 @@ import type { Player, Simulation } from "../engine/simulation.ts";
 import { areaRecipe, mechanicOf, THEMES, TOWN_NPCS, themeOf, townName } from "../game/content.ts";
 import { RARITY_COLORS } from "../game/loot.ts";
 import type { Drop, Enemy } from "../game/types.ts";
+import { SHOWCASE } from "../physics/showcase.ts";
 import { drawMaterialEvent } from "./props.ts";
 import { drawReactionEvent } from "./reactions.ts";
 import { RigRenderer } from "./rigs.ts";
+import { drawRegionRings, drawWardenState, drawWardenTelegraph } from "./showcase.ts";
 import { spritePixels } from "./sprites.ts";
 
 export type AdventureActor =
@@ -56,18 +58,11 @@ export class CombatRenderer {
       ctx.textAlign = "center";
       ctx.fillStyle = "#dce6c1";
       ctx.fillText("OUTWARD GATE", 218, -24);
-      for (const [x, y] of [
-        [-145, 48],
-        [126, 52],
-        [-44, -130],
-        [54, 104],
-      ]) {
-        ctx.fillStyle = "#5f543b";
-        ctx.fillRect(x, y - 22, 2, 25);
-        ctx.fillStyle = "#f2ce8c";
-        ctx.fillRect(x - 2, y - 24, 6, 6);
-        this.light(ctx, x + 1, y - 20, 48, "#e9bf7e", 0.15);
-      }
+      // The town's lamps, stalls and bunting are physical props (M10); the market is marked.
+      ctx.strokeStyle = "#d8c08a30";
+      ctx.setLineDash([4, 6]);
+      ctx.strokeRect(-230, -178, 210, 103);
+      ctx.setLineDash([]);
     } else {
       this.portal(ctx, s.recipe.x - 265, s.recipe.y + 95, time, "#9fc8c2", true, zoom);
       this.portal(
@@ -175,8 +170,15 @@ export class CombatRenderer {
             m.activeUntil > this.tick ? 0.24 : 0.1,
           );
       }
+      drawRegionRings(ctx, sim, time, zoom);
+      for (const e of s.enemies) if (e.boss) drawWardenState(ctx, e, this.tick, time);
       for (const e of s.enemies)
         if (e.hp > 0 && e.phase === "windup") {
+          // A warden's signature move has its own, longer telegraph (M10).
+          if (e.boss && e.warden?.move) {
+            drawWardenTelegraph(ctx, e, time);
+            continue;
+          }
           const progress = clamp(1 - e.timer / (e.boss ? 46 : 70), 0, 1);
           const charge =
             (!e.boss && e.behavior === "charger") || (e.boss && (e.attacks + 1) % 3 === 0);
@@ -749,10 +751,17 @@ export class CombatRenderer {
     const land = sim.adventure.state.townLand,
       scale = 6;
     const points = [
-      { x: 0, y: 0, name: townName(land), ready: true },
+      { x: 0, y: 0, name: townName(land), ready: true, note: "Sanctuary · market and services" },
       ...Array.from({ length: 4 }, (_, i) => {
         const r = areaRecipe(sim.adventure.state.seed, land * 4 + i + 1);
-        return { x: r.x, y: r.y, name: r.name, ready: r.index <= sim.adventure.state.highest + 1 };
+        return {
+          x: r.x,
+          y: r.y,
+          name: r.name,
+          ready: r.index <= sim.adventure.state.highest + 1,
+          // M10: each area's physical showcase and its warden.
+          note: `${SHOWCASE[r.signature].name} · ${r.boss}`,
+        };
       }),
     ];
     ctx.strokeStyle = "#d4d89988";
@@ -775,7 +784,30 @@ export class CombatRenderer {
       ctx.font = "11px monospace";
       ctx.textAlign = "center";
       ctx.fillText(p.name, x, y - 14);
+      ctx.font = "9px monospace";
+      ctx.fillStyle = p.ready ? "#b9c79b" : "#7a8670";
+      ctx.fillText(p.note, x, y + 18);
     }
+    // Calm (Quiet) and wild regions of this land's areas.
+    for (const region of sim.physicalRegions()) {
+      if (region.shape.kind !== "circle") continue;
+      const calm = region.id.startsWith("calm-"),
+        wild = region.id.startsWith("wild-");
+      if (!calm && !wild) continue;
+      const x = width / 2 + (region.shape.x - centerX) / scale,
+        y = height / 2 + (region.shape.y - centerY) / scale;
+      ctx.strokeStyle = calm ? "#a9cfe0cc" : "#f0a25ecc";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(x, y, region.shape.radius / scale, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.textAlign = "left";
+    ctx.font = "10px monospace";
+    ctx.fillStyle = "#a9cfe0";
+    ctx.fillText("○ calm region", 18, height - 34);
+    ctx.fillStyle = "#f0a25e";
+    ctx.fillText("○ wild region", 18, height - 18);
     ctx.fillStyle = "#d8c793";
     ctx.font = "11px monospace";
     ctx.textAlign = "right";

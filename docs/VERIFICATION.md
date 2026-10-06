@@ -257,3 +257,29 @@ Also covered:
 - **M08 migration:** a real M08 checkpoint (envelope 6 / world 8, from `main` `a53af8d`) restores to envelope 7 / world 9 with rigs at rest, and its earlier death makes no remains.
 
 Captures: [Whorl](evidence/physics-m09-whorl.png), [settled with ragdolls off](evidence/physics-m09-settled.png), [town shove](evidence/physics-m09-town-shove.png), [touch stalker](evidence/physics-m09-touch-stalker.png).
+
+## M10 reactive towns and authored areas evidence
+
+On 2026-10-06:
+
+- `npm run check` passed **149 headless tests** (15 new in `tests/physics-world.test.ts`), and `npm run build` produced the bundle.
+- `npm run test:e2e` passed **41 browser scenarios**, including the three new M10 scenarios in `e2e/physics-world.spec.ts` and the preserved WebRTC smoke checks ([D53](physics/DECISIONS.md)).
+- Both routes cleared all nine areas without a death and visited both towns, where the bot rested, sold spares and bought an upgrade:
+  - `npm run verify:run`, reactions on: level 17, 3,599 gold, 5,017 area ticks ([route](evidence/physics-m10-route.jsonl)).
+  - `node tools/adventure.ts playthrough 9 --reactions off`, with the session master switch off: level 19, 3,729 gold, 4,818 area ticks ([route](evidence/physics-m10-route-reactions-off.jsonl)).
+
+The numbers below come from the [receipt](evidence/physics-m10.json) (`node tools/physics-world.ts`, seed 142).
+
+| M10 acceptance | Evidence |
+| --- | --- |
+| Areas 1–8 each show a distinct physical interaction, captured | [Area sheet](evidence/physics-m10-areas.png): each area's extension triggered by real input in the browser (slash, walking across, E, Q). Measured: <ul><li>Brambleburst: 8 owned splinters and a 28.8-unit shove (wild 47.9; calm 8.9, base hit only, 0 hedges);</li><li>Slipstream: lanes carry barrels 92.7 and 95.2 units in 2 s, the calm lane's 0;</li><li>Stormglass: 10 arcs through a wet pack;</li><li>Echo Wells: stones relaunched from 47.3 to 129.6 units/s with cause `echo:whorl`, 0 extra gold;</li><li>Cinderwake: 4/4 stockade boards burnt, calm 0;</li><li>Bloodbloom: 6 vines pull monsters in by 36–72 units;</li><li>Gravity Knots: material and pack travel 132 and 117 units, 9 apart;</li><li>Riftstep: 3/3 freight carried, all surviving the arrival and bursting 91–117 units outward.</li></ul> Area 9 combines echo, gravity and bramble set pieces. |
+| Enter the two following towns and keep the build and loot loop | Both routes rest, sell and buy in Emberrest and Tideglass Haven. The town is tactile ([capture](evidence/physics-m10-town.png), [lamp](evidence/physics-m10-town-lamp.png)): a slash swings a lamp 0.35 rad and it settles to 0.000; the bunting travels 5.3 units in 2 s; hard strikes on all ten goods destroy nothing. A browser scenario reaches the hearth, Rowan's shop and the gate by real keys. |
+| The route completes with optional reactions off; nothing can block progression or a service | The reactions-off route clears nine areas, so every area clears by kills alone. Headless, with the master off in Cinderwake: no fixed bramble or cinder set piece sits on the entry → centre → outward-gate line, the warden comes when the goal is met, and the outward gate leads on. Under a Reactive town with every good piled on the hearth and Rowan's post, the repel rings clear them within 5 s. Set pieces never spawn overlapping (seeds 142 and 7). |
+| Wardens: physical arena interactions with readable telegraphs and dodge windows | All eight telegraph for 64 ticks with the target locked at the start ([telegraph](evidence/physics-m10-warden-telegraph.png)). Each is exposed by its own area's rule (pod, crash, wet shock, echo, douse, lash dash, launched prop, rift arrival), taking 1.5× damage ([exposed](evidence/physics-m10-warden-exposed.png)). |
+| Late-join replica agrees with the host's scene and scope labels; WebRTC scenarios pass | Headless: a guest's portable scene holds the same set pieces, restraints and region labels as the host. Raw and portable saves round-trip the showcase state, and a real M09 checkpoint migrates. The existing WebRTC browser scenarios pass. |
+
+Also covered:
+- **Calm and wild regions:** the same mechanic plays three ways in one area. Calm keeps world reactions on for ambient selection.
+- **Canonical land build:** `settle()` makes a new land's save equal its own restore ([D76](physics/DECISIONS.md)).
+- **Hinge motor fix:** a lamp blow now swings it, 22.5 units/s against 3.3 before ([D77](physics/DECISIONS.md)).
+- **Engine-independent trig in per-tick physics** ([D82](physics/DECISIONS.md)): PR CI's lab replay check diverged once the town had motor-driven joints. Locally, the old trig code diverged in 7 of 12 repeats of that scenario; with `dsin`/`dcos`, 12 of 12 lab repeats and 8 of 8 town replay repeats match. The receipt is byte-identical, the reactions-off route is unchanged, and the reactions-on route differs only in area 9's clear time.

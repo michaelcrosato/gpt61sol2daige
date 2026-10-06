@@ -14,8 +14,10 @@ import {
 } from "../physics/adventure.ts";
 import { rapier } from "../physics/bootstrap.ts";
 import { type LinkView, linkViews, onDeck, replicaDeckPlanks } from "../physics/mechanisms.ts";
+import type { RegionProfile } from "../physics/policies.ts";
 import { type ReactionView, reactionView } from "../physics/reactions.ts";
 import { PhysicsWorld, validatePhysicsSnapshot } from "../physics/runtime.ts";
+import type { Restraint } from "../physics/showcase.ts";
 import type { JointEntry, PhysicsSnapshot } from "../physics/types.ts";
 import { MAX_NPCS } from "./limits.ts";
 import { checksum, clamp, distance, hash, random } from "./math.ts";
@@ -223,6 +225,18 @@ export class Simulation {
     return this.physical
       ? this.physical.reactions.view()
       : reactionView(this.replicaPhysics?.reactions);
+  }
+  /** M10 living-vine restraints from the live world or the received scene (read-only). */
+  physicalRestraints(): Iterable<Restraint> {
+    return this.physical
+      ? this.physical.showcase.view()
+      : (this.replicaPhysics?.showcase?.restraints ?? []);
+  }
+  /** The policy regions of the current land (live world or received scene), for drawing. */
+  physicalRegions(): readonly RegionProfile[] {
+    return this.physical
+      ? this.physical.world.regions()
+      : (this.replicaPhysics?.world.policies?.state.profiles.regions ?? []);
   }
   ownsPhysicalAmbient(slot: number): boolean {
     return this.physical?.ownsAmbient(slot) ?? this.replicaAmbient.has(slot);

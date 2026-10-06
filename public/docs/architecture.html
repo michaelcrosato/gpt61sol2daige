@@ -1155,7 +1155,189 @@ is sampled once per animation frame. A key pressed and released between
 two frames (a quick tap on a slow device) is latched until a simulation
 tick has consumed it, or until a guest has sent it to the host, so it
 still acts once. A tap that cannot apply (paused, a dialog open) is
-dropped rather than replayed later.</p></main>
+dropped rather than replayed later.</p>
+<h2 id="m10-reactive-towns-and-authored-areas">M10 reactive towns and
+authored areas</h2>
+<p><strong>Town Sanctuary</strong> (<code>townScene</code> in
+<code>src/physics/showcase.ts</code>). Each town’s policy is the
+Sanctuary preset’s values (<code>TOWN_VALUES</code>): things shove and
+swing but never break, and material reactions are off. A
+<code>market</code> region (x −230, y −178, 210 × 103) keeps prop
+blocking, so goods there stand in the way while the rest of the town
+stays soft. Town content:</p>
+<ul>
+<li>three <code>stall</code> assemblies (a counter and an awning on a
+position-motor hinge, limits ±0.9);</li>
+<li>four <code>lamp</code> assemblies (a post and a lamp on a 10-unit
+bracket arm);</li>
+<li>one <code>bunting</code> line (ten pennants on ropes between two
+posts), kept moving by a <code>breeze-town</code> wind strip;</li>
+<li>baskets in front of each stall, plus crates, a barrel and pots as
+loose goods.</li>
+</ul>
+<p>Services are protected by permanent
+<code>sanctuary-&lt;service&gt;</code> repel fields
+(<code>TOWN_SERVICES</code>: the hearth, the gate and each townsperson’s
+home), not by freezing the town. Services still follow their townsperson
+(M09).</p>
+<p><strong>Area showcases</strong> (<code>areaShowcase</code>, registry
+<code>SHOWCASE</code>, keyed by mechanic). Every area mechanic has three
+instances on rings (<code>mechanicLayout</code> in
+<code>src/game/content.ts</code>, shared with <code>startArea</code>).
+For every mechanic an area lists, each instance gets that mechanic’s set
+piece:</p>
+<ul>
+<li>bramble: a thorn-hedge arc and a pot cache;</li>
+<li>wind: a permanent tailwind lane with a barrel, a wheel and a driven
+vane;</li>
+<li>glass: a permanent pool, two conductor rods and a pylon;</li>
+<li>echo: resonance pots and stones;</li>
+<li>cinder: a dry-brush fuse into a weakened four-board stockade around
+a cache;</li>
+<li>blood: the bloom (vines anchor there);</li>
+<li>gravity: stones, a log and a barrel;</li>
+<li>rift: freight on the first arch’s pad.</li>
+</ul>
+<p>Placement (<code>placeFrame</code>): - Each frame turns around the
+full circle and pushes outward until it clears terrain, earlier reaction
+sources (30-unit berth) and the keep-clear spots (entry, portals, a
+22-unit warden spot). - Loose pieces relocate individually; a piece that
+still clashes is skipped. - Tailwind lanes route around ignition hazards
+(<a href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/physics/DECISIONS.md">D79</a>).</p>
+<p>Later areas combine mechanics automatically: area 9 gets three kinds
+of set piece.</p>
+<p><strong>Regions inside an area.</strong> Instance n=1 of the
+signature mechanic sits in <code>wild-&lt;area&gt;</code> (Wild values),
+n=2 in <code>calm-&lt;area&gt;</code> (<code>CALM_VALUES</code>: Quiet
+with world reactions left on). Both are circles (radius 64, priority
+20), drawn as dashed rings marked CALM and WILD.</p>
+<p><strong>Mechanic hooks</strong> (<code>Adventure.activate</code> and
+friends): - Bramble pods call <code>thornburst</code>: a 5-tick pressure
+field that spares the party, eight owned
+<code>prop-thorn-&lt;seq&gt;-&lt;k&gt;</code> splinters, and hedges
+breaking. - Wind mechanics add a <code>gust:&lt;id&gt;</code> lane field
+owned by the crosser. - Glass: hero strikes on wet monsters stimulate
+shock (<code>stormglass:arc</code>). - Echo repeats carry cause
+<code>echo:&lt;ability&gt;</code>. - Cinder vents ignite their own fuse.
+- Blood blooms call <code>snare</code>. - Gravity knots add an attract
+field with <code>spare: "party"</code> and a <code>drift</code> along
+the blow. - Rift arches carry <code>freight</code> and spare it from the
+arrival strike.</p>
+<p><strong>Fields and surfaces</strong> gain <code>spare</code>,
+<code>drift</code> and permanent <code>ticks: -1</code> surfaces
+(<code>addSurface</code>). <strong>Restraints</strong>
+(<code>ShowcasePhysics</code>) are Fern elastic tethers applied as
+velocity changes before each solve; they are saved, released with their
+actor and pruned on save (<a href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/physics/DECISIONS.md">D74</a>).</p>
+<p><strong>Wardens</strong> (<code>src/game/wardens.ts</code>).
+<code>Enemy.warden</code> (<code>WardenState</code>: move, locked
+target, echo time, exposure) is saved and replicated. Each boss’s
+signature move replaces the slam: windup <code>WARDEN_WINDUP</code> = 64
+ticks with the target locked at its start, then <code>signature()</code>
+resolves it:</p>
+<table>
+<colgroup>
+<col style="width: 25%" />
+<col style="width: 25%" />
+<col style="width: 25%" />
+<col style="width: 25%" />
+</colgroup>
+<thead>
+<tr>
+<th>Warden</th>
+<th>Move</th>
+<th>Telegraph</th>
+<th>Exposed by</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Brambleheart</td>
+<td>thornburst</td>
+<td>ring</td>
+<td>a pod bursting beside it</td>
+</tr>
+<tr>
+<td>The Gale Stag</td>
+<td>gale charge</td>
+<td>lane</td>
+<td>crashing into a solid prop, fence or tree</td>
+</tr>
+<tr>
+<td>Vyr, Glasskeeper</td>
+<td>discharge</td>
+<td>ring</td>
+<td>shock while wet</td>
+</tr>
+<tr>
+<td>The Echo Matron</td>
+<td>echo slam</td>
+<td>ring</td>
+<td>an Echo Well’s repeat</td>
+</tr>
+<tr>
+<td>Cinderjaw</td>
+<td>breath</td>
+<td>line</td>
+<td>being doused</td>
+</tr>
+<tr>
+<td>The Bloom Tyrant</td>
+<td>lash</td>
+<td>line</td>
+<td>a dash out of the lash</td>
+</tr>
+<tr>
+<td>The Hollow Atlas</td>
+<td>collapse</td>
+<td>ring (closing)</td>
+<td>a hero-launched prop</td>
+</tr>
+<tr>
+<td>The Riftbound King</td>
+<td>blink</td>
+<td>marker</td>
+<td>a traveler’s rift arrival beside it</td>
+</tr>
+</tbody>
+</table>
+<p>Exposure (<code>EXPOSED</code>): 180 ticks of 1.5× damage, a 40-tick
+stagger and a broken telegraph, then a 300-tick cooldown. Only the
+area’s own weakness counts.</p>
+<p><strong>Physics runtime.</strong> -
+<code>PhysicsWorld.settle()</code> canonicalizes a freshly built land
+(<a href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/physics/DECISIONS.md">D76</a>). - <code>reauthor</code> (with
+<code>PolicyController.reauthor</code>) migrates an older layout (<a
+href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/physics/DECISIONS.md">D80</a>). - <code>driveJoints</code> reads a
+hinged part’s turn from its angular momentum about the pin (<a
+href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/physics/DECISIONS.md">D77</a>). - Per-tick physics trig that feeds
+state (<code>rotate</code>, the hinge angle, wind fields) uses
+<code>dsin</code>/<code>dcos</code> from
+<code>src/engine/math.ts</code>: they agree bit for bit across
+JavaScript engines, so browser-to-Node replays of the jointed town stay
+exact (<a href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/physics/DECISIONS.md">D82</a>). - New assembly kinds:
+<code>stall</code>, <code>lamp</code> and <code>bunting</code>. - New
+families: <code>stall</code>, <code>awning</code>, <code>lamp</code>,
+<code>pennant</code>, <code>basket</code>, <code>hedge</code>
+(vegetation, thorn pieces) and <code>barricade</code> (wood, plank
+pieces).</p>
+<p><strong>Versions.</strong> Adventure envelope <strong>8</strong>:
+<code>showcase</code> (restraints, sequence, events; land archives keep
+it). Room protocol <strong>11</strong>. The physical world stays
+<strong>9</strong>. M09 checkpoints and archives are re-authored once
+(<a href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/physics/DECISIONS.md">D80</a>).</p>
+<p><strong>Presentation and tools.</strong> -
+<code>src/render/showcase.ts</code> draws vines, region rings, warden
+telegraphs, the pending echo and exposure. <code>combat.ts</code> marks
+the market and annotates the atlas. The HUD shows EXPOSED or the
+signature with its dodge hint. The mechanic guide explains each physical
+extension, warden and calm/wild ring. - <code>actors</code> actions:
+<code>showcase</code>, <code>mechanic</code> (id) and
+<code>warden</code> (<code>enemy-&lt;id&gt;</code>). - The QA bot steers
+around solid scenery.
+<code>node tools/adventure.ts playthrough 9 --reactions off</code> runs
+the route with the session master switch off.
+<code>node tools/physics-world.ts</code> writes the receipt.</p></main>
 <footer>Fern · A world engine built for agents · <a href="https://github.com/michaelcrosato/gpt61sol2daige">Source on GitHub</a></footer>
 </body>
 </html>

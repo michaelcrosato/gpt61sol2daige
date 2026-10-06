@@ -1207,10 +1207,30 @@ function processEvents(): void {
         audio.play(material as MaterialSound);
       if (event.type === "break") audio.play("crumble");
     } else if (event.type === "grab") audio.play(event.text.startsWith("throw") ? "dash" : "step");
-    else if (event.type === "assembly") {
+    else if (event.type === "mechanic" && event.text.startsWith("warden:")) {
+      // M10: each warden's signature telegraph announces itself in its own voice.
+      const move = event.text.slice(7);
+      audio.play(
+        move === "gale"
+          ? "gust"
+          : move === "discharge"
+            ? "zap"
+            : move === "breath"
+              ? "ignite"
+              : move === "lash"
+                ? "flutter"
+                : move === "blink"
+                  ? "pulse"
+                  : "thud",
+      );
+    } else if (event.type === "assembly") {
       // Mechanism changes: snapped or cut links ring by material; launches whoosh; latches click.
+      // M10 vines rustle as they grow and wither; freight whooshes through a rift.
       const kind = event.text.split(":")[0];
-      if (event.text.endsWith(":snapped") || event.text.endsWith(":cut"))
+      if (event.text === "snare:grown" || event.text.endsWith(":withered")) audio.play("flutter");
+      else if (event.text === "lash:caught") audio.play("dash");
+      else if (event.text === "freight:carried") audio.play("pulse");
+      else if (event.text.endsWith(":snapped") || event.text.endsWith(":cut"))
         audio.play(kind === "chain" || kind === "launcher" ? "metal" : "wood");
       else if (event.text === "launcher:fired") audio.play("dash");
       else if (event.text === "bridge:span-lost") audio.play("crumble");
@@ -1237,6 +1257,8 @@ function processEvents(): void {
       else if (kind === "shed" && (MATERIAL_SOUNDS as readonly string[]).includes(material))
         audio.play(material as MaterialSound);
       else if (kind === "npc") audio.play("cloth");
+      // M10: a warden's weakness rings out; a gale charge crashing thuds.
+      else if (kind === "warden") audio.play(event.text === "warden:crash" ? "thud" : "beacon");
     }
   }
   if (runtime.sim.adventure.state.events.length)

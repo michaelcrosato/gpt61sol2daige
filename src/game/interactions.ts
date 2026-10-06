@@ -180,6 +180,8 @@ export const ATTACKS = {
 export type AttackKind = keyof typeof ATTACKS;
 /** Mechanic/delayed causes share one recipe; named hero abilities have their own. */
 export function attackRecipe(cause: string): AttackRecipe {
+  // M10: an Echo Well's repeat (`echo:whorl`) carries the repeated ability's own force.
+  if (cause.startsWith("echo:")) cause = cause.slice(5);
   return (ATTACKS as Record<string, AttackRecipe>)[cause] ?? ATTACKS.mechanic;
 }
 /** Hard scenery stops a piercing projectile (or bounces it while ricochets remain). */

@@ -57,7 +57,7 @@ test("v2 saves retain moving crate, actor knockback, disabled region, queue and 
   const restored = Simulation.restore(structuredClone(state));
   try {
     assert.equal(state.version, 2);
-    assert.equal(state.actorPhysics!.version, 7);
+    assert.equal(state.actorPhysics!.version, 8);
     assert.equal(state.actorPhysics!.world.version, 9);
     assert.ok(world.pose("crate-1-0").vx > 0);
     assert.ok(
@@ -349,6 +349,8 @@ test("legacy game checkpoints retain builds/terrain; CLI imports files beyond it
     const output = execFileSync(process.execPath, ["tools/agent.ts", "--count", "0"], {
       input: `${JSON.stringify({ op: "restore-file", file: path })}\n`,
       encoding: "utf8",
+      // The observation lists every prop of the land (M10 adds the town and set pieces).
+      maxBuffer: 64 * 1024 * 1024,
     });
     assert.equal(JSON.parse(output).ok, true);
   } finally {

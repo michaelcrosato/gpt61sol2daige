@@ -1059,6 +1059,17 @@
   font-weight: 400;
   color: #d6c28a;
 }
+.mechanic-guide .mechanic-physical {
+  color: #c7d8b0;
+}
+.mechanic-guide .mechanic-physical b {
+  color: #e6dcae;
+  font-weight: 600;
+}
+.warden-note {
+  border-color: #c98d6a5c;
+  background: #44302780;
+}
 .combination-note {
   border: 1px solid #a9a5705c;
   padding: 17px;

@@ -132,6 +132,14 @@ export const POLICY_PRESETS = {
   },
 };
 export type PresetName = keyof typeof POLICY_PRESETS;
+/** A preset as profile values: only the fields that differ from the defaults (M10 authoring). */
+export function presetValues(name: PresetName): PolicyValues {
+  const preset = POLICY_PRESETS[name] as typeof POLICY_DEFAULTS,
+    out: Record<string, unknown> = {};
+  for (const key of Object.keys(POLICY_DEFAULTS) as (keyof typeof POLICY_DEFAULTS)[])
+    if (preset[key] !== POLICY_DEFAULTS[key]) out[key] = preset[key];
+  return out as PolicyValues;
+}
 export const compareIds = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
 const listKey = (scope: PolicyScope) =>
   (({ land: "lands", area: "areas", region: "regions" }) as const)[scope];
@@ -675,4 +683,50 @@ export class PolicyController {
   save(): PolicyCheckpoint {
     return { state: structuredClone(this.state), pending: structuredClone(this.pending) };
   }
+  /** Applied region profiles, read-only and shared (presentation; never mutate). */
+  regions(): readonly RegionProfile[] {
+    return this.state.profiles.regions;
+  }
+  /** Load-time re-authoring of an older layout (see `reauthorLayout`); queued edits re-apply. */
+  reauthor(
+    layout: PolicyLayout,
+    replaced: { scope: PolicyScope; id: string; from: PolicyValues }[],
+  ) {
+    this.state = reauthorLayout(this.state, layout, replaced);
+    validatePolicyState(this.state);
+    let projected = this.state;
+    for (const transaction of this.pending) projected = editPolicies(projected, transaction);
+    this.projected = projected;
+  }
+}
+/**
+ * M10 migration of a saved layout: profiles and regions the new authored layout has but the
+ * saved one lacks are added (to both the authored baseline and the live profiles), and an
+ * authored profile still holding its old default values takes the new ones; a live profile is
+ * only updated where nobody changed it from that old default. Overrides stay as they were.
+ */
+export function reauthorLayout(
+  state: PolicyState,
+  layout: PolicyLayout,
+  replaced: { scope: PolicyScope; id: string; from: PolicyValues }[],
+): PolicyState {
+  const next = structuredClone(state),
+    same = (a: PolicyValues, b: PolicyValues) =>
+      JSON.stringify(Object.entries(a).sort()) === JSON.stringify(Object.entries(b).sort());
+  for (const scope of scopes) {
+    const key = listKey(scope);
+    for (const profile of layout[key]) {
+      for (const list of [next.authored[key], next.profiles[key]] as LandProfile[][]) {
+        const index = list.findIndex((p) => p.id === profile.id);
+        if (index < 0) {
+          list.push(structuredClone(profile));
+          continue;
+        }
+        const old = replaced.find((r) => r.scope === scope && r.id === profile.id);
+        if (old && same(list[index].values, old.from))
+          list[index] = { ...list[index], values: structuredClone(profile.values) };
+      }
+    }
+  }
+  return next;
 }

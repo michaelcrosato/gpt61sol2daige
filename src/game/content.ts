@@ -326,6 +326,30 @@ export const npcPosition = (npc: (typeof TOWN_NPCS)[number], tick: number) => ({
   x: npc.x + Math.sin(tick / 160 + npc.x) * 5,
   y: npc.y + Math.sin(tick / 220 + npc.y) * 3,
 });
+/**
+ * Where an area's mechanics stand: three of each kind on a ring around the clearing (the k-th
+ * kind on a wider ring, turned a little further). Gameplay creates its mechanics here and the
+ * M10 physical set pieces are authored around the same points.
+ */
+export function mechanicLayout(
+  recipe: Pick<AreaRecipe, "x" | "y" | "mechanics">,
+): { kind: MechanicId; k: number; n: number; x: number; y: number; radius: number }[] {
+  const out: { kind: MechanicId; k: number; n: number; x: number; y: number; radius: number }[] =
+    [];
+  for (let k = 0; k < recipe.mechanics.length; k++)
+    for (let n = 0; n < 3; n++) {
+      const angle = (n / 3 + k * 0.18) * Math.PI * 2;
+      out.push({
+        kind: recipe.mechanics[k],
+        k,
+        n,
+        x: recipe.x + Math.cos(angle) * (125 + k * 42),
+        y: recipe.y + Math.sin(angle) * (125 + k * 42),
+        radius: recipe.mechanics[k] === "wind" ? 38 : 25,
+      });
+    }
+  return out;
+}
 export function encounterPosition(recipe: AreaRecipe, ordinal: number): { x: number; y: number } {
   const angle = random(ordinal, 47, recipe.seed) * Math.PI * 2;
   const radius = 100 + Math.sqrt(random(ordinal, 65, recipe.seed)) * 205;

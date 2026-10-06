@@ -18,7 +18,11 @@ import { type AdventureActor, CombatRenderer } from "./combat.ts";
 import { PropRenderer } from "./props.ts";
 import { drawFields, drawStatus, drawSurfaces } from "./reactions.ts";
 import { remainsGroups } from "./rigs.ts";
+import { drawRestraints } from "./showcase.ts";
 import { PALETTE, type SpriteRecipe, spritePixels } from "./sprites.ts";
+
+/** Raised town cloth and lamps (M10) sort as if standing a little lower. */
+const RAISED_OVER = new Set(["awning", "lamp", "pennant"]);
 
 const GROUND = ["#304f39", "#486747", "#818164", "#34666a", "#294f59", "#8a8766", "#6a7662"];
 const SHADES = ["#36563d", "#4d6c48", "#89896b", "#386d6e", "#2d5660", "#949171", "#73806b"];
@@ -504,7 +508,15 @@ export class Renderer {
         prop.y > top - 40 &&
         prop.y < bottom + 70
       )
-        items.push({ kind: "physical", x: prop.x, y: prop.y, type: 0, variant: 0, physical: prop });
+        items.push({
+          kind: "physical",
+          x: prop.x,
+          // Raised town cloth and lamps (M10) draw over whatever stands beneath them.
+          y: prop.y + (RAISED_OVER.has(prop.blueprint?.family ?? "") ? 24 : 0),
+          type: 0,
+          variant: 0,
+          physical: prop,
+        });
     // A dead monster's remains sort as one body at its lowest point (M09).
     for (const [enemy, bodies] of remains) {
       const x = bodies.reduce((sum, b) => sum + b.x, 0) / bodies.length,
@@ -617,6 +629,8 @@ export class Renderer {
       }
     }
     this.props.links(ctx, links, time);
+    // M10 living vines over the actors they hold.
+    drawRestraints(ctx, sim, alpha, time);
     // Monster statuses (burning, soaked, oiled, charged) over the actors.
     if (reactions.statuses.size)
       for (const e of sim.adventure.state.enemies) {

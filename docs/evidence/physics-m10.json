@@ -1,0 +1,224 @@
+{
+  "milestone": "M10",
+  "seed": 142,
+  "tickRate": 60,
+  "town": {
+    "policy": "Sanctuary values; market region keeps prop blocking",
+    "assemblies": {
+      "bunting": 1,
+      "lamp": 4,
+      "stall": 3
+    },
+    "looseGoods": 10,
+    "lampSwingRad": 0.35,
+    "lampSettledRad": 0,
+    "pennantTravel120Ticks": 5.3,
+    "destroyedAfterHardStrikes": 0,
+    "serviceFields": [
+      "sanctuary-gate",
+      "sanctuary-iona",
+      "sanctuary-orin",
+      "sanctuary-rest",
+      "sanctuary-rowan"
+    ]
+  },
+  "areas": [
+    {
+      "area": 1,
+      "name": "Brambleburst",
+      "mechanic": "bramble",
+      "extension": "Thornburst",
+      "setPieces": 12,
+      "regions": ["plain", "wild-1", "calm-1"],
+      "measured": {
+        "reactive": {
+          "splinters": 8,
+          "shove": 28.8,
+          "hedgesOpened": 3
+        },
+        "wild": {
+          "splinters": 8,
+          "shove": 47.9,
+          "hedgesOpened": 3
+        },
+        "calm": {
+          "splinters": 0,
+          "shove": 8.9,
+          "hedgesOpened": 0
+        }
+      }
+    },
+    {
+      "area": 2,
+      "name": "Slipstream",
+      "mechanic": "wind",
+      "extension": "Tailwind lanes",
+      "setPieces": 20,
+      "regions": ["plain", "wild-2", "calm-2"],
+      "measured": {
+        "barrelTravel120Ticks": [92.7, 95.2, 0]
+      }
+    },
+    {
+      "area": 3,
+      "name": "Stormglass",
+      "mechanic": "glass",
+      "extension": "Conductor yard",
+      "setPieces": 21,
+      "regions": ["plain", "wild-3", "calm-3"],
+      "measured": {
+        "poolTicks": -1,
+        "arcs": 10,
+        "neighbourDamage": 56
+      }
+    },
+    {
+      "area": 4,
+      "name": "Echo Wells",
+      "mechanic": "echo",
+      "extension": "Resonant echo",
+      "setPieces": 21,
+      "regions": ["plain", "wild-4", "calm-4"],
+      "measured": {
+        "stoneSpeedBeforeEcho": 47.3,
+        "stoneSpeedAfterEcho": 129.6,
+        "cause": "echo:whorl",
+        "extraGoldDrops": 0
+      }
+    },
+    {
+      "area": 5,
+      "name": "Cinderwake",
+      "mechanic": "cinder",
+      "extension": "Vent eruption",
+      "setPieces": 36,
+      "regions": ["plain", "wild-5", "calm-5"],
+      "measured": {
+        "boardsBurntReactive": 4,
+        "boardsBurntCalm": 0
+      }
+    },
+    {
+      "area": 6,
+      "name": "Bloodbloom",
+      "mechanic": "blood",
+      "extension": "Bloom snare",
+      "setPieces": 24,
+      "regions": ["plain", "wild-6", "calm-6"],
+      "measured": {
+        "vines": 6,
+        "pulledIn": [36.2, 47.4, 50.7, 55.5, 65.2, 72.4]
+      }
+    },
+    {
+      "area": 7,
+      "name": "Gravity Knots",
+      "mechanic": "gravity",
+      "extension": "Drifting knot",
+      "setPieces": 22,
+      "regions": ["plain", "wild-7", "calm-7"],
+      "measured": {
+        "materialTravel": 132.1,
+        "packTravel": 117.3,
+        "clusterSpread": 9
+      }
+    },
+    {
+      "area": 8,
+      "name": "Riftstep",
+      "mechanic": "rift",
+      "extension": "Rift freight",
+      "setPieces": 15,
+      "regions": ["plain", "wild-8", "calm-8"],
+      "measured": {
+        "freightCarried": 3,
+        "survivedArrival": 3,
+        "outwardAfter30Ticks": [91.1, 115.2, 116.7]
+      }
+    }
+  ],
+  "wardens": {
+    "windup": 64,
+    "exposed": {
+      "ticks": 180,
+      "damage": 1.5,
+      "cooldown": 300,
+      "stagger": 40
+    },
+    "measured": [
+      {
+        "area": 1,
+        "warden": "Brambleheart",
+        "move": "thornburst",
+        "telegraphTicks": 64,
+        "targetLocked": true,
+        "telegraph": "ring",
+        "exposedBy": "a seedpod bursting beside it"
+      },
+      {
+        "area": 2,
+        "warden": "The Gale Stag",
+        "move": "gale",
+        "telegraphTicks": 64,
+        "targetLocked": true,
+        "telegraph": "lane",
+        "exposedBy": "charging into a solid prop, fence or tree"
+      },
+      {
+        "area": 3,
+        "warden": "Vyr, Glasskeeper",
+        "move": "discharge",
+        "telegraphTicks": 64,
+        "targetLocked": true,
+        "telegraph": "ring",
+        "exposedBy": "a shock reaching it while it is wet"
+      },
+      {
+        "area": 4,
+        "warden": "The Echo Matron",
+        "move": "echo",
+        "telegraphTicks": 64,
+        "targetLocked": true,
+        "telegraph": "ring",
+        "exposedBy": "an Echo Well's repeat striking her"
+      },
+      {
+        "area": 5,
+        "warden": "Cinderjaw",
+        "move": "breath",
+        "telegraphTicks": 64,
+        "targetLocked": true,
+        "telegraph": "line",
+        "exposedBy": "being doused (a cask's splash, a pool or wading)"
+      },
+      {
+        "area": 6,
+        "warden": "The Bloom Tyrant",
+        "move": "lash",
+        "telegraphTicks": 64,
+        "targetLocked": true,
+        "telegraph": "line",
+        "exposedBy": "a traveler dashing free of its lash"
+      },
+      {
+        "area": 7,
+        "warden": "The Hollow Atlas",
+        "move": "collapse",
+        "telegraphTicks": 64,
+        "targetLocked": true,
+        "telegraph": "ring",
+        "exposedBy": "a prop a traveler launched striking it"
+      },
+      {
+        "area": 8,
+        "warden": "The Riftbound King",
+        "move": "blink",
+        "telegraphTicks": 64,
+        "targetLocked": true,
+        "telegraph": "marker",
+        "exposedBy": "a traveler's rift arrival beside it"
+      }
+    ],
+    "exposures": "tests/physics-world.test.ts proves every identity's weakness through its own area's rule"
+  }
+}

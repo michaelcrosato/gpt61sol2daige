@@ -1191,8 +1191,105 @@ remains.</li>
 <p>Captures: <a href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/evidence/physics-m09-whorl.png">Whorl</a>, <a
 href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/evidence/physics-m09-settled.png">settled with ragdolls off</a>,
 <a href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/evidence/physics-m09-town-shove.png">town shove</a>, <a
-href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/evidence/physics-m09-touch-stalker.png">touch
-stalker</a>.</p></main>
+href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/evidence/physics-m09-touch-stalker.png">touch stalker</a>.</p>
+<h2 id="m10-reactive-towns-and-authored-areas-evidence">M10 reactive
+towns and authored areas evidence</h2>
+<p>On 2026-10-06:</p>
+<ul>
+<li><code>npm run check</code> passed <strong>149 headless
+tests</strong> (15 new in <code>tests/physics-world.test.ts</code>), and
+<code>npm run build</code> produced the bundle.</li>
+<li><code>npm run test:e2e</code> passed <strong>41 browser
+scenarios</strong>, including the three new M10 scenarios in
+<code>e2e/physics-world.spec.ts</code> and the preserved WebRTC smoke
+checks (<a href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/physics/DECISIONS.md">D53</a>).</li>
+<li>Both routes cleared all nine areas without a death and visited both
+towns, where the bot rested, sold spares and bought an upgrade:
+<ul>
+<li><code>npm run verify:run</code>, reactions on: level 17, 3,599 gold,
+5,017 area ticks (<a
+href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/evidence/physics-m10-route.jsonl">route</a>).</li>
+<li><code>node tools/adventure.ts playthrough 9 --reactions off</code>,
+with the session master switch off: level 19, 3,729 gold, 4,818 area
+ticks (<a
+href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/evidence/physics-m10-route-reactions-off.jsonl">route</a>).</li>
+</ul></li>
+</ul>
+<p>The numbers below come from the <a
+href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/evidence/physics-m10.json">receipt</a>
+(<code>node tools/physics-world.ts</code>, seed 142).</p>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr>
+<th>M10 acceptance</th>
+<th>Evidence</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Areas 1–8 each show a distinct physical interaction, captured</td>
+<td><a href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/evidence/physics-m10-areas.png">Area sheet</a>: each area’s
+extension triggered by real input in the browser (slash, walking across,
+E, Q). Measured: </td>
+</tr>
+<tr>
+<td>Enter the two following towns and keep the build and loot loop</td>
+<td>Both routes rest, sell and buy in Emberrest and Tideglass Haven. The
+town is tactile (<a href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/evidence/physics-m10-town.png">capture</a>, <a
+href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/evidence/physics-m10-town-lamp.png">lamp</a>): a slash swings a
+lamp 0.35 rad and it settles to 0.000; the bunting travels 5.3 units in
+2 s; hard strikes on all ten goods destroy nothing. A browser scenario
+reaches the hearth, Rowan’s shop and the gate by real keys.</td>
+</tr>
+<tr>
+<td>The route completes with optional reactions off; nothing can block
+progression or a service</td>
+<td>The reactions-off route clears nine areas, so every area clears by
+kills alone. Headless, with the master off in Cinderwake: no fixed
+bramble or cinder set piece sits on the entry → centre → outward-gate
+line, the warden comes when the goal is met, and the outward gate leads
+on. Under a Reactive town with every good piled on the hearth and
+Rowan’s post, the repel rings clear them within 5 s. Set pieces never
+spawn overlapping (seeds 142 and 7).</td>
+</tr>
+<tr>
+<td>Wardens: physical arena interactions with readable telegraphs and
+dodge windows</td>
+<td>All eight telegraph for 64 ticks with the target locked at the start
+(<a href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/evidence/physics-m10-warden-telegraph.png">telegraph</a>).
+Each is exposed by its own area’s rule (pod, crash, wet shock, echo,
+douse, lash dash, launched prop, rift arrival), taking 1.5× damage (<a
+href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/evidence/physics-m10-warden-exposed.png">exposed</a>).</td>
+</tr>
+<tr>
+<td>Late-join replica agrees with the host’s scene and scope labels;
+WebRTC scenarios pass</td>
+<td>Headless: a guest’s portable scene holds the same set pieces,
+restraints and region labels as the host. Raw and portable saves
+round-trip the showcase state, and a real M09 checkpoint migrates. The
+existing WebRTC browser scenarios pass.</td>
+</tr>
+</tbody>
+</table>
+<p>Also covered: - <strong>Calm and wild regions:</strong> the same
+mechanic plays three ways in one area. Calm keeps world reactions on for
+ambient selection. - <strong>Canonical land build:</strong>
+<code>settle()</code> makes a new land’s save equal its own restore (<a
+href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/physics/DECISIONS.md">D76</a>). - <strong>Hinge motor
+fix:</strong> a lamp blow now swings it, 22.5 units/s against 3.3 before
+(<a href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/physics/DECISIONS.md">D77</a>). - <strong>Engine-independent
+trig in per-tick physics</strong> (<a
+href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/physics/DECISIONS.md">D82</a>): PR CI’s lab replay check diverged
+once the town had motor-driven joints. Locally, the old trig code
+diverged in 7 of 12 repeats of that scenario; with
+<code>dsin</code>/<code>dcos</code>, 12 of 12 lab repeats and 8 of 8
+town replay repeats match. The receipt is byte-identical, the
+reactions-off route is unchanged, and the reactions-on route differs
+only in area 9’s clear time.</p></main>
 <footer>Fern · A world engine built for agents · <a href="https://github.com/michaelcrosato/gpt61sol2daige">Source on GitHub</a></footer>
 </body>
 </html>

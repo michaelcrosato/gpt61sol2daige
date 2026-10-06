@@ -1120,7 +1120,90 @@ and flash.</li>
 </ul>
 <p>See <a
 href="ARCHITECTURE.md#m09-physical-rigs-and-expressive-reactions">the
-M09 contract</a>.</p></main>
+M09 contract</a>.</p>
+<h2 id="m10-reactive-towns-and-authored-areas">M10 reactive towns and
+authored areas</h2>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr>
+<th>Command</th>
+<th>Fields and behavior</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>{"op":"actors","action":"showcase"}</code></td>
+<td>Returns, read-only and on guests too: </td>
+</tr>
+<tr>
+<td><code>{"op":"actors","action":"mechanic","id":4}</code></td>
+<td>QA. Uses area mechanic <code>id</code> now, as the caller, through
+the ordinary activation (costs and physical extension included); a
+mechanic that is not ready is refused. Returns the mechanic and the
+showcase state. Host only.</td>
+</tr>
+<tr>
+<td><code>{"op":"actors","action":"warden","id":"enemy-12"}</code></td>
+<td>QA. Makes that living boss’s next attack, due now, its signature
+move: at its next attack it winds up for 64 ticks toward its target,
+which is locked when the telegraph starts. Returns
+<code>{id, name, warden}</code>. Host only.</td>
+</tr>
+</tbody>
+</table>
+<p>Set-piece ids follow
+<code>prop-&lt;family&gt;-&lt;area&gt;-&lt;mechanic&gt;-&lt;instance&gt;-&lt;piece&gt;</code>,
+for example: - <code>prop-hedge-1-bramble-0-1</code> and
+<code>prop-barricade-5-cinder-0-front</code>; -
+<code>prop-crate-8-rift-0-0</code> (rift freight); -
+<code>vane-&lt;area&gt;-wind-&lt;n&gt;</code> (a vane assembly).</p>
+<p>Town fixtures are <code>prop-&lt;family&gt;-town-…</code> in the
+assemblies <code>stall-town-&lt;n&gt;</code>,
+<code>lamp-town-&lt;n&gt;</code> and <code>bunting-town</code>. Other
+ids: - thorn splinters: <code>prop-thorn-&lt;seq&gt;-&lt;k&gt;</code>; -
+fields: <code>tailwind-&lt;area&gt;-&lt;n&gt;</code>,
+<code>gust:&lt;mechanic&gt;</code>, <code>mechanic:&lt;id&gt;</code> (a
+drifting knot), <code>thornburst-&lt;seq&gt;</code>,
+<code>breeze-town</code> and <code>sanctuary-&lt;service&gt;</code>; -
+permanent pools: <code>pool-&lt;area&gt;-&lt;n&gt;</code>; - regions:
+<code>market</code>, <code>wild-&lt;area&gt;</code> and
+<code>calm-&lt;area&gt;</code>.</p>
+<p>Events: - <code>assembly</code> events: <code>snare:grown</code>,
+<code>snare:snapped</code>, <code>snare:withered</code>,
+<code>lash:caught</code>, <code>lash:snapped</code>,
+<code>lash:withered</code> and <code>freight:carried</code> (amount =
+pieces). - <code>mechanic</code> events:
+<code>warden:&lt;move&gt;</code> at the start of a telegraph (amount =
+windup ticks). - <code>rig</code> events:
+<code>warden:exposed:&lt;cause&gt;</code> and <code>warden:crash</code>.
+- Stormglass arcs are <code>reaction</code> events starting
+<code>conduct</code>. Echo repeats instigate with cause
+<code>echo:&lt;ability&gt;</code>.</p>
+<pre class="json"><code>{&quot;op&quot;:&quot;encounter&quot;,&quot;index&quot;:6}
+{&quot;op&quot;:&quot;actors&quot;,&quot;action&quot;:&quot;monster&quot;,&quot;rig&quot;:&quot;crawler&quot;,&quot;x&quot;:2600,&quot;y&quot;:0,&quot;hp&quot;:100000,&quot;boss&quot;:true,&quot;clear&quot;:true}
+{&quot;op&quot;:&quot;actors&quot;,&quot;action&quot;:&quot;warden&quot;,&quot;id&quot;:&quot;enemy-1031&quot;}
+{&quot;op&quot;:&quot;step&quot;,&quot;ticks&quot;:70}
+{&quot;op&quot;:&quot;actors&quot;,&quot;action&quot;:&quot;showcase&quot;}</code></pre>
+<p>That starts the Bloom Tyrant’s lash at the traveler; after the
+telegraph a <code>lash</code> restraint holds them until a dash tears it
+(<code>warden:exposed:lash</code>). Use the boss’s actual id and the
+area’s position from <code>observe</code>.</p>
+<ul>
+<li>No new policy values. Saves write adventure envelope 8 / world 9;
+rooms use protocol 11.</li>
+<li><code>node tools/adventure.ts playthrough 9 --reactions off</code>
+runs the route with the session master switch off and writes
+<code>playthrough-reactions-off.json</code>.</li>
+<li><code>node tools/physics-world.ts</code> prints the M10
+receipt.</li>
+</ul>
+<p>See <a
+href="ARCHITECTURE.md#m10-reactive-towns-and-authored-areas">the M10
+contract</a>.</p></main>
 <footer>Fern · A world engine built for agents · <a href="https://github.com/michaelcrosato/gpt61sol2daige">Source on GitHub</a></footer>
 </body>
 </html>

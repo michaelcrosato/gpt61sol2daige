@@ -10,6 +10,7 @@ import { attackExport } from "../game/interactions.ts";
 import { enemyPose, rigExport } from "../game/rigs.ts";
 import { SKILLS } from "../game/skills.ts";
 import type { AdventureAction } from "../game/types.ts";
+import { wardenExport } from "../game/wardens.ts";
 import { adventureAreaAt } from "../physics/adventure.ts";
 import { blueprintExport } from "../physics/blueprints.ts";
 import { interactPhysics } from "../physics/interaction.ts";
@@ -24,6 +25,7 @@ import {
   type Stimulus,
 } from "../physics/reactions.ts";
 import { createPlayground } from "../physics/runtime.ts";
+import { type ShowcaseState, showcaseExport } from "../physics/showcase.ts";
 import type { AssemblyRecipe, BodyRecipe, JointMotor, JointRecipe } from "../physics/types.ts";
 import { ENGINE_VERSION, idleInput, MAX_NPCS, type SaveState, Simulation } from "./simulation.ts";
 import { LANDMARKS, WORLD_LIMIT } from "./world.ts";
@@ -56,7 +58,7 @@ export const COMMANDS = {
   },
   actors: {
     action:
-      "inspect (default), body, props, recipes, attacks, mechanisms, reactions, rigs, damage, hit, monster, cut, motor, transport, stimulate, field, configure, apply, policy, impulse, place, spawn",
+      "inspect (default), body, props, recipes, attacks, mechanisms, reactions, rigs, showcase, damage, hit, monster, mechanic, warden, cut, motor, transport, stimulate, field, configure, apply, policy, impulse, place, spawn",
     description:
       "Host/solo adventure physical world; guests inspect received bodies, props, destroyed records, assemblies, joints, reactions and policies. Shared tuning, damage, cuts, stimuli and fields are host-only.",
     values:
@@ -71,6 +73,12 @@ export const COMMANDS = {
     hit: "hit: id enemy-<id>, damage 0..100000, optional angle (direction of the blow); the ordinary hit path with the caller's credit: recoil, poise, stagger, knockdown, shed armor, death and remains",
     monster:
       "monster: rig crawler|stalker|brute|wraith|totem|warden at x,y with optional hp, passive (planted and never attacking), boss, and clear (other live monsters leave without reward and the area spawns no more waves or boss); uncounted toward the area goal (QA)",
+    showcase:
+      "showcase: the M10 registry (each mechanic's physical extension and set piece, town services and market, tailwind and pool parameters), the warden registry (signature moves, telegraphs, weaknesses), living-vine restraints, every warden's signature/exposure state, and the area set-piece and town body ids present",
+    mechanic:
+      "mechanic: id (an area mechanic's id from observe) used by the caller through its ordinary activation (it must be ready); QA for the M10 physical extensions",
+    warden:
+      "warden: id enemy-<id> of a living warden; its next attack, due now, is its M10 signature move (QA)",
     mechanisms:
       "mechanisms: the M07 registry (kinds, joint types, strain/cut/motor/policy rules) plus every assembly, joint (intact or broken, load, damage, motor), drawable link and gate/launcher/causeway state",
     cut: "cut: id <assembly>:<joint> (gate-1:hinge, chain-1:anchor, vine-1:pod, bridge-1:south…), optional damage (default: enough to sever); honors jointBreakage",
@@ -169,6 +177,36 @@ export class AgentRuntime {
     this.log.length = 0;
   }
   /** M09 rig registry, living reaction states and poses, remains and foliage (host or guest). */
+  /** M10 registry plus the land's showcase state (host or received). */
+  private showcase(state: ShowcaseState | null) {
+    const sim = this.sim,
+      ids = sim.physical
+        ? sim.physical.world.ids()
+        : (sim.replicaPhysics?.world.bodies.map((b) => b.recipe.id) ?? []);
+    const m10 = (id: string) =>
+      /^prop-[a-z]+-(\d+)-(bramble|wind|glass|echo|cinder|blood|gravity|rift)-\d/.exec(id);
+    const setPieces: Record<string, string[]> = {};
+    for (const id of ids) {
+      const match = m10(id);
+      if (match) (setPieces[`area-${match[1]}`] ??= []).push(id);
+    }
+    return {
+      registry: showcaseExport(),
+      wardens: wardenExport(),
+      restraints: state?.restraints ?? [],
+      events: state?.events ?? [],
+      living: sim.adventure.state.enemies
+        .filter((e) => e.boss && e.hp > 0)
+        .map((e) => ({
+          id: e.id,
+          name: e.name,
+          phase: e.phase,
+          warden: structuredClone(e.warden),
+        })),
+      setPieces,
+      town: ids.filter((id) => id.includes("-town")).sort(),
+    };
+  }
   private rigs() {
     const sim = this.sim,
       props = sim.physicalProps(),
@@ -275,6 +313,7 @@ export class AgentRuntime {
           if (action === "reactions")
             return { registry: reactionExport(), state: snapshot.reactions ?? null };
           if (action === "rigs") return this.rigs();
+          if (action === "showcase") return this.showcase(snapshot.showcase ?? null);
           if (action === "props")
             return { props: this.sim.physicalProps(), destroyed: snapshot.destroyed ?? [] };
           if (action === "recipes") return blueprintExport();
@@ -318,6 +357,7 @@ export class AgentRuntime {
         if (action === "reactions")
           return { registry: reactionExport(), state: physical.reactions.save() };
         if (action === "rigs") return this.rigs();
+        if (action === "showcase") return this.showcase(physical.showcase.save());
         if (action === "body") {
           if (typeof command.id !== "string") throw new Error("Body id required");
           return { ...world.pose(command.id), reaction: physical.reactions.status(command.id) };
@@ -373,6 +413,14 @@ export class AgentRuntime {
             clear: command.clear === true,
           });
           result = { id: e.id, body: `enemy-${e.id}`, rig: e.rig, hp: e.hp };
+        } else if (action === "mechanic") {
+          const m = this.sim.adventure.useMechanic(this.sim, player, num("id"));
+          result = { mechanic: m, showcase: physical.showcase.save() };
+        } else if (action === "warden") {
+          const id = typeof command.id === "string" ? /^enemy-(\d+)$/.exec(command.id) : null;
+          if (!id) throw new Error("warden needs an enemy-<id>");
+          const e = this.sim.adventure.wardenSignature(this.sim, Number(id[1]));
+          result = { id: e.id, name: e.name, warden: structuredClone(e.warden) };
         } else if (action === "cut") {
           if (typeof command.id !== "string") throw new Error("Joint id required");
           const damage = command.damage === undefined ? undefined : num("damage");
