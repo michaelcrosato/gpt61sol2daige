@@ -86,3 +86,5 @@ M10 local gates:
 - `npm run verify:run` (reactions on) and `node tools/adventure.ts playthrough 9 --reactions off` both clear nine areas and visit both towns (rest, sell, buy).
 
 [Handoff](handoffs/M10.md) records recipes, warden interactions, route fallback and the on/off runs. This row is written before commit and merge; the next session reconciles it from Git/GitHub evidence.
+
+M10 release so far: PR #19 passed CI on `65d5d62` and merged at `b96bae6`. Production deployment `dpl_AbAR8TVmGaR8Rks36NCJNejF6ZD6` is READY for that commit (Vercel connector); the live page still cannot be loaded from the container. Main CI on the merge (run 37432079490) failed one M09 browser check, intermittently: in `physics-rigs.spec.ts`, Whorl moved the felled warden's ragdoll 0 units, failing 2 of 6 local repeats. The fight sometimes ends inside M10's `calm-1` region north-east of area 1's trailhead, where calm values freeze ragdolls by design. A follow-up PR runs that scenario's fights west of the trailhead, on open ground with no region (6/6 repeats pass). Check that it merged with green main CI before M11.

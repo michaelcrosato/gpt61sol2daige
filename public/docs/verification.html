@@ -1281,8 +1281,13 @@ ambient selection. - <strong>Canonical land build:</strong>
 <code>settle()</code> makes a new land’s save equal its own restore (<a
 href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/physics/DECISIONS.md">D76</a>). - <strong>Hinge motor
 fix:</strong> a lamp blow now swings it, 22.5 units/s against 3.3 before
-(<a href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/physics/DECISIONS.md">D77</a>). - <strong>Engine-independent
-trig in per-tick physics</strong> (<a
+(<a href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/physics/DECISIONS.md">D77</a>). - <strong>Main CI
+follow-up:</strong> after the merge, the M09 ragdoll scenario sometimes
+felled its warden inside area 1’s new <code>calm-1</code> region (2 of 6
+local repeats), where calm values freeze ragdolls, so Whorl moved it 0.
+The scenario now fights west of the trailhead on open ground with no
+region (6/6 repeats pass). The game behaviour was correct. -
+<strong>Engine-independent trig in per-tick physics</strong> (<a
 href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/physics/DECISIONS.md">D82</a>): PR CI’s lab replay check diverged
 once the town had motor-driven joints. Locally, the old trig code
 diverged in 7 of 12 repeats of that scenario; with

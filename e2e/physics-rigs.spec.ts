@@ -122,10 +122,15 @@ async function fight(page: Page, id: number, timeout = 20000) {
     for (const key of [...held]) await page.keyboard.up(key);
   }
 }
-/** Area 1, the traveler beside one planted monster of a rig (other monsters leave). */
-async function arena(page: Page, rig: RigKind, hp: number, zoom = 2.4) {
+/**
+ * Area 1, the traveler beside one planted monster of a rig (other monsters leave): east of them
+ * by default, or west (`side` -1), where blows drive it into open ground. M10 authored a calm
+ * region north-east of the trailhead, and a body that comes to rest inside it is frozen by
+ * design (calm values turn ragdolls off).
+ */
+async function arena(page: Page, rig: RigKind, hp: number, zoom = 2.4, side = 1) {
   return page.evaluate(
-    ([rig, hp, zoom]) => {
+    ([rig, hp, zoom, side]) => {
       const f = window.fern;
       f.pause(true);
       f.command({ op: "reset", seed: 142, count: 0 });
@@ -140,7 +145,7 @@ async function arena(page: Page, rig: RigKind, hp: number, zoom = 2.4) {
         op: "actors",
         action: "monster",
         rig,
-        x: p.x + 26,
+        x: p.x + 26 * (side as number),
         y: p.y,
         hp,
         passive: true,
@@ -148,9 +153,9 @@ async function arena(page: Page, rig: RigKind, hp: number, zoom = 2.4) {
       }) as { id: number };
       f.command({ op: "step", ticks: 2 });
       f.pause(false);
-      return { id: m.id, x: p.x + 26, y: p.y };
+      return { id: m.id, x: p.x + 26 * (side as number), y: p.y };
     },
-    [rig, hp, zoom] as const,
+    [rig, hp, zoom, side] as const,
   );
 }
 
@@ -174,7 +179,7 @@ test("desktop: real slashes recoil, stagger and fell all six rigs into ragdolls;
   };
   let last: Remains | undefined;
   for (const rig of ["stalker", "crawler", "brute", "wraith", "totem", "warden"] as const) {
-    const m = await arena(page, rig, 110);
+    const m = await arena(page, rig, 110, 2.4, -1);
     await canvas.focus();
     const aim = await screen(page, m.x + 4, m.y - 8);
     await page.mouse.move(aim.x, aim.y);
