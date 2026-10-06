@@ -212,7 +212,25 @@ test("a WebRTC guest throws a vine pod free and a late joiner sees every link an
       guest = await open();
     const room = await host.evaluate(() => window.fern.network.host());
     await guest.evaluate((code) => window.fern.network.join(code), room);
-    await host.evaluate(() => window.fern.command({ op: "encounter", index: 1 }));
+    await host.evaluate(() => {
+      const f = window.fern;
+      f.command({ op: "encounter", index: 1 });
+      // QA isolation: Brambleburst's waves would mob the guest at the vine, and a monster in the
+      // throw's path absorbs the pod (or a blow knocks it loose) before the tether is yanked.
+      // One planted monster away from the mechanisms clears them and stops further waves.
+      const s = (f.command({ op: "save" }) as { adventure: { recipe: { x: number; y: number } } })
+        .adventure;
+      f.command({
+        op: "actors",
+        action: "monster",
+        rig: "stalker",
+        x: s.recipe.x - 200,
+        y: s.recipe.y + 200,
+        hp: 10,
+        passive: true,
+        clear: true,
+      });
+    });
     await expect
       .poll(async () => guest.evaluate(() => window.fern.network.status().baselineReady))
       .toBe(true);
