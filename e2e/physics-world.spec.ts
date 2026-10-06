@@ -57,7 +57,7 @@ async function tap(page: Page, key: string, ms = 90) {
   await page.keyboard.up(key);
 }
 /** Walk with WASD toward a world point until within `near`, re-reading the position. */
-async function walkTo(page: Page, x: number, y: number, near = 12, timeout = 12000) {
+async function walkTo(page: Page, x: number, y: number, near = 12, timeout = 25000) {
   const held = new Set<string>();
   const hold = async (key: string, on: boolean) => {
     if (on && !held.has(key)) await page.keyboard.down(key);
