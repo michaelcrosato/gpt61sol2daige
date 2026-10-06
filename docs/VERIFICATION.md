@@ -292,13 +292,15 @@ On 2026-10-06:
 - `npm run check` passed **160 headless tests**, 11 of them new: 10 in `tests/physics-encounters.test.ts`, and the D91 regression in `tests/physics-world.test.ts`. `npm run build` produced the bundle.
 - `npm run test:e2e` passed **43 browser scenarios**, including the two new M11 scenarios in `e2e/physics-encounters.spec.ts` and the preserved WebRTC smoke checks ([D53](physics/DECISIONS.md)).
 - Both routes cleared all twelve areas, four of them generated, without a death. The bot rested, sold spares and bought an upgrade in all three towns.
-  - **`npm run verify:run`, reactions on:** level 23, 4,743 gold, 5,345 area ticks ([route](evidence/physics-m11-route.jsonl)).
+  - **`npm run verify:run`, reactions on:** level 23, 4,826 gold, 5,350 area ticks ([route](evidence/physics-m11-route.jsonl)).
     - Area 10: walking to the coil and slashing it set off the storm pool: discharge down the rods, then soak, steam and fire chains in the same cluster, with two of its casks broken.
     - Area 12: grabbing an oil jar with V and walking it into the brazier's coals burnt the stockade through (four barricades, five fuse brushes and the cache).
     - Areas 9 and 11 hold only fuse and field combinations (vortex powder, powder trail, rubble maelstrom), which need carried fire or run on their own. They were cleared by combat alone.
-  - **`node tools/adventure.ts playthrough 12 --reactions off`**, with the session master switch off: level 24, 4,832 gold, 4,860 area ticks ([route](evidence/physics-m11-route-reactions-off.jsonl)).
+  - **`node tools/adventure.ts playthrough 12 --reactions off`**, with the session master switch off: level 24, 4,772 gold, 4,850 area ticks ([route](evidence/physics-m11-route-reactions-off.jsonl)).
     - The same coil slash only drives the field rule.
     - The jar grab is refused ("That prop is fixed in place here").
+
+Main-CI follow-up ([D93](physics/DECISIONS.md)): the Burning palisade's fuse now starts within a slick's reach from almost any side of the coals. The receipt is unchanged, both routes were rerun (numbers above), and the browser scenario passed 20 of 20 local repeats.
 
 The numbers below come from the [receipt](evidence/physics-m11.json) (`node tools/physics-encounters.ts`) and `tests/physics-encounters.test.ts`.
 

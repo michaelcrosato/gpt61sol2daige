@@ -619,8 +619,9 @@ export const CLUSTERS: Record<CombinationId, ClusterLayout> = {
     links: [{ from: piece(0, "pylon-1"), to: piece(1, "pool"), reach: 4, rule: "release" }],
   },
   "fire-stockade": {
-    // The fuse starts beyond the brazier's heat reach: only a slick or a burning strike lights it.
-    gaps: [14, 3],
+    // The fuse starts just beyond the brazier's heat reach (edge to edge ≈ 7 > 6): only a slick or
+    // a burning strike lights it, and a jar bursting on almost any side of the coals reaches it.
+    gaps: [5, 3],
     links: [
       { from: piece(0, "@ignition"), to: piece(1, "brush-0"), reach: 24, rule: "flare" },
       { from: piece(1, "brush-4"), to: piece(2, "barricade-front"), reach: 12, rule: "spread" },
