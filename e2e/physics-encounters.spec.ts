@@ -149,18 +149,57 @@ test("desktop: a generated area's Burning palisade by real input — V grabs the
         }
       ).state.history.map((e) => e.text),
     );
+  const holding = () =>
+    page.evaluate(
+      (id) =>
+        (
+          window.fern.command({ op: "actors", action: "inspect" }) as {
+            combat: { holds: { id: string }[] };
+          }
+        ).combat.holds.some((h) => h.id === id),
+      jarId,
+    );
   const held = new Set<string>();
-  const end = Date.now() + 20_000;
+  const end = Date.now() + 25_000;
+  // When a fixed obstacle stops the traveler, step around it at 45° for a moment.
+  let last = { x: 0, y: 0, t: Date.now() },
+    side = false;
   try {
     while (Date.now() < end && !(await reactionTexts()).includes("flare")) {
+      const carried = await page.evaluate((id) => {
+        try {
+          return window.fern.command({ op: "actors", action: "body", id }) as Pose;
+        } catch {
+          return null;
+        }
+      }, jarId);
+      // Gone: it burst against the coals and its slick flares there.
+      if (!carried) break;
+      // A bump can knock the jar loose: pick it up again, as a player would.
+      if (!(await holding())) {
+        for (const key of held) await page.keyboard.up(key);
+        held.clear();
+        await walkTo(page, carried.x - 12, carried.y, 10);
+        await page.keyboard.press("v");
+        await page.waitForTimeout(100);
+        continue;
+      }
       const aim = await screen(page, brazier.x, brazier.y);
       await page.mouse.move(aim.x, aim.y);
       const p = await page.evaluate(() => window.fern.observe().players[0]);
+      if (Math.hypot(p.x - last.x, p.y - last.y) > 3) last = { x: p.x, y: p.y, t: Date.now() };
+      else if (Date.now() - last.t > 700) {
+        side = !side;
+        last = { x: p.x, y: p.y, t: Date.now() };
+      }
+      let dx = brazier.x - p.x,
+        dy = brazier.y - p.y;
+      if (side && Math.hypot(dx, dy) > 40) [dx, dy] = [dx - dy, dy + dx];
       const want = new Set<string>();
-      if (brazier.x - p.x > 3) want.add("d");
-      if (brazier.x - p.x < -3) want.add("a");
-      if (brazier.y - p.y > 3) want.add("s");
-      if (brazier.y - p.y < -3) want.add("w");
+      if (dx > 3) want.add("d");
+      if (dx < -3) want.add("a");
+      if (dy > 3) want.add("s");
+      if (dy < -3) want.add("w");
       for (const key of [...held]) if (!want.has(key)) await page.keyboard.up(key);
       for (const key of want) if (!held.has(key)) await page.keyboard.down(key);
       held.clear();
@@ -170,7 +209,39 @@ test("desktop: a generated area's Burning palisade by real input — V grabs the
   } finally {
     for (const key of held) await page.keyboard.up(key);
   }
-  expect(await reactionTexts()).toEqual(expect.arrayContaining(["heat", "flare"]));
+  if (!(await reactionTexts()).includes("flare")) {
+    await page.screenshot({ path: "artifacts/physics-m11-palisade-noflare.png" });
+    console.log(
+      "palisade: no flare",
+      JSON.stringify(
+        await page.evaluate(
+          ([id, bx, by]) => {
+            const f = window.fern,
+              p = f.observe().players[0];
+            let j: unknown = null;
+            try {
+              const b = f.command({ op: "actors", action: "body", id }) as { x: number; y: number };
+              j = [Math.round(b.x), Math.round(b.y)];
+            } catch {}
+            return {
+              hero: [Math.round(p.x), Math.round(p.y), Math.round(p.vx), Math.round(p.vy)],
+              jar: j,
+              brazier: [Math.round(bx), Math.round(by)],
+              holds: (
+                f.command({ op: "actors", action: "inspect" }) as {
+                  combat: { holds: { id: string }[] };
+                }
+              ).combat.holds.map((h) => h.id),
+            };
+          },
+          [jarId, brazier.x, brazier.y] as const,
+        ),
+      ),
+    );
+  }
+  await expect
+    .poll(reactionTexts, { timeout: 5000 })
+    .toEqual(expect.arrayContaining(["heat", "flare"]));
   // Step back out of the burning slick and watch the fire run the fuse.
   await walkTo(page, jar.x - 60, jar.y, 12, 6000);
   // The jar bursts into a burning slick, the fuse burns and the weakened stockade burns through.
