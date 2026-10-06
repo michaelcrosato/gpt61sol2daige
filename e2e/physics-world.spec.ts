@@ -188,11 +188,27 @@ test("desktop: the Sanctuary town's lamps swing and settle, bunting flutters, no
   ).toBe(0);
   await page.evaluate(() => window.fern.zoom(1.4));
   await canvas.screenshot({ path: "artifacts/physics-m10-town.png" });
-  // The hearth: walk there, press E, rest.
+  // The hearth: walk there clear of Rowan's post (a traveler walking into a townsperson carries
+  // them along, and E then offers their service instead), wait until no townsperson stands
+  // within service reach, press E and rest.
+  expect(await walkTo(page, -60, -70, 14)).toBe(true);
   expect(await walkTo(page, 0, 30, 24)).toBe(true);
+  const nearestFolk = () =>
+    page.evaluate(() => {
+      const p = window.fern.observe().players[0],
+        folk = (
+          window.fern.command({ op: "actors", action: "rigs" }) as {
+            townsfolk: { x: number; y: number }[];
+          }
+        ).townsfolk;
+      return Math.min(...folk.map((f) => Math.hypot(f.x - p.x, f.y - p.y)));
+    });
+  await expect.poll(nearestFolk, { timeout: 10000 }).toBeGreaterThan(50);
   await tap(page, "e");
   await expect
-    .poll(async () => (await events(page)).some((e) => e.text.startsWith("Life, spirit")))
+    .poll(async () => (await events(page)).some((e) => e.text.startsWith("Life, spirit")), {
+      message: `rest at the hearth (nearest townsperson ${(await nearestFolk()).toFixed(0)}; recent ${JSON.stringify((await events(page)).slice(-4))})`,
+    })
     .toBe(true);
   // The quartermaster, wherever a shove has left him.
   const rowan = await page.evaluate(
