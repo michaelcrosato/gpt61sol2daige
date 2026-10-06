@@ -59,7 +59,7 @@ M08 release resolution: PR #14 passed CI, merged at `a53af8d`, and main CI passe
 M09 local gates:
 - `npm run check`: **134 headless** scenarios.
 - `npm run build`.
-- `npm run test:e2e`: **E2E_COUNT browser** scenarios, including three new M09 scenarios:
+- `npm run test:e2e`: **37 browser** scenarios, including three new M09 scenarios:
   - real held-mouse and WASD slashes felling all six rigs into ragdolls, Whorl (Q) throwing one, ragdolls switched off through the Agent lab panel so the body settles, and a page save/restore keeping kills single (recorded video);
   - touch: shoving a townsperson who walks back, a touch Slash felling a stalker the same way, and local shake and flash preferences;
   - a frame-by-frame capture of every rig's hit, knockdown, death and rest.

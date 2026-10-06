@@ -232,7 +232,7 @@ Rendering and simulation cost (informational, D53): with no other load, reaction
 
 On 2026-10-05:
 - `npm run check` passed **134 headless tests** and `npm run build` produced the bundle.
-- `npm run test:e2e` passed **E2E_COUNT browser scenarios**, including three new M09 scenarios and the preserved WebRTC smoke checks ([D53](physics/DECISIONS.md)).
+- `npm run test:e2e` passed **37 browser scenarios**, including three new M09 scenarios and the preserved WebRTC smoke checks ([D53](physics/DECISIONS.md)).
 - `npm run verify:run` cleared all nine areas (level 18, 2,659 gold; [route](evidence/physics-m09-route.jsonl)). Staggers and knockdowns now interrupt monster attacks.
 
 The numbers below come from the [receipt](evidence/physics-m09.json) (`node tools/physics-rigs.ts`; seed 142, area 1, other monsters removed).

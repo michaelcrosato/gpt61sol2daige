@@ -1047,7 +1047,69 @@ spill and steam the debris. Reaction changes appear as
 <code>fieldStrength</code> (0–10). Saves write adventure envelope 6 /
 world 8; rooms use protocol 9. See <a
 href="ARCHITECTURE.md#m08-material-reactions-and-environmental-fields">the
-M08 contract</a>.</p></main>
+M08 contract</a>.</p>
+<h2 id="m09-physical-rigs-and-reactions">M09 physical rigs and
+reactions</h2>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr>
+<th>Command</th>
+<th>Fields and behavior</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>{"op":"actors","action":"rigs"}</code></td>
+<td>Returns, read-only and on guests too: </td>
+</tr>
+<tr>
+<td><code>{"op":"actors","action":"monster","rig":"brute","x":600,"y":0,"hp":400,"passive":true,"clear":true}</code></td>
+<td>QA. Places a monster with the chosen rig in the current area,
+uncounted for the area goal. Options: </td>
+</tr>
+<tr>
+<td><code>{"op":"actors","action":"hit","id":"enemy-12","damage":40,"angle":0}</code></td>
+<td>One blow through the ordinary hit path, credited to the caller, from
+the direction <code>angle</code> (the blow travels along it). Recoil,
+poise, stagger, knockdown, shed armor, the kill, its rewards and the
+remains follow exactly as in play. Host only.</td>
+</tr>
+</tbody>
+</table>
+<p>Remains ids: - <code>prop-remains-&lt;enemy&gt;-&lt;part&gt;</code>
+for each part, in assembly <code>remains-&lt;enemy&gt;</code>; -
+<code>prop-remains-&lt;enemy&gt;-&lt;piece&gt;</code> for loose armor,
+bark and lantern cores.</p>
+<p>Their <code>blueprint.rig</code> tag names the rig, part, theme,
+variant, scale, mirroring, birth tick, fall angle and fall pivot.
+Townsfolk bodies are <code>npc-rowan</code>, <code>npc-iona</code> and
+<code>npc-orin</code>, present in town only.</p>
+<p>Rig events (<code>rig</code> combat events): -
+<code>stagger:&lt;rig&gt;</code> and <code>topple:&lt;rig&gt;</code>; -
+<code>shed:&lt;rig&gt;:&lt;material&gt;</code>; -
+<code>fall:&lt;rig&gt;:&lt;material&gt;</code> when remains reach the
+ground; - <code>npc:bump:&lt;id&gt;</code>.</p>
+<pre class="json"><code>{&quot;op&quot;:&quot;encounter&quot;,&quot;index&quot;:1}
+{&quot;op&quot;:&quot;actors&quot;,&quot;action&quot;:&quot;monster&quot;,&quot;rig&quot;:&quot;stalker&quot;,&quot;x&quot;:520,&quot;y&quot;:-24,&quot;hp&quot;:120,&quot;passive&quot;:true,&quot;clear&quot;:true}
+{&quot;op&quot;:&quot;actors&quot;,&quot;action&quot;:&quot;hit&quot;,&quot;id&quot;:&quot;enemy-12&quot;,&quot;damage&quot;:5000,&quot;angle&quot;:0}
+{&quot;op&quot;:&quot;step&quot;,&quot;ticks&quot;:30}
+{&quot;op&quot;:&quot;actors&quot;,&quot;action&quot;:&quot;rigs&quot;}</code></pre>
+<p>That kills the stalker and leaves a six-body ragdoll lying to the
+east. Use the monster’s actual id from <code>monster</code>’s result. -
+New policy values: <code>ragdolls</code> and <code>foliage</code>
+(booleans) and <code>reactionStrength</code> (0–10). - Saves write
+adventure envelope 7 / world 9; rooms use protocol 10. - Local
+<code>Settings</code> gain <code>cameraShake</code> (0–1) and
+<code>hitFlash</code> (boolean), and
+<code>observe().render.feedback</code> reports the last frame’s shake
+and flash.</p>
+<p>See <a
+href="ARCHITECTURE.md#m09-physical-rigs-and-expressive-reactions">the
+M09 contract</a>.</p></main>
 <footer>Fern · A world engine built for agents · <a href="https://github.com/michaelcrosato/gpt61sol2daige">Source on GitHub</a></footer>
 </body>
 </html>
