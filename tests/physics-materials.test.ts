@@ -345,7 +345,7 @@ test("save/load, replay, recall and late-join replicas preserve the same destruc
     } finally {
       guest.dispose();
     }
-    assert.equal(PROTOCOL_VERSION, 9);
+    assert.equal(PROTOCOL_VERSION, 10);
     assert.ok(encodeSnapshot(sim, "local").byteLength > 0);
     assert.throws(
       () =>
