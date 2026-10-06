@@ -282,4 +282,5 @@ Also covered:
 - **Calm and wild regions:** the same mechanic plays three ways in one area. Calm keeps world reactions on for ambient selection.
 - **Canonical land build:** `settle()` makes a new land's save equal its own restore ([D76](physics/DECISIONS.md)).
 - **Hinge motor fix:** a lamp blow now swings it, 22.5 units/s against 3.3 before ([D77](physics/DECISIONS.md)).
+- **Main CI follow-up:** after the merge, the M09 ragdoll scenario sometimes felled its warden inside area 1's new `calm-1` region (2 of 6 local repeats), where calm values freeze ragdolls, so Whorl moved it 0. The scenario now fights west of the trailhead on open ground with no region (6/6 repeats pass). The game behaviour was correct.
 - **Engine-independent trig in per-tick physics** ([D82](physics/DECISIONS.md)): PR CI's lab replay check diverged once the town had motor-driven joints. Locally, the old trig code diverged in 7 of 12 repeats of that scenario; with `dsin`/`dcos`, 12 of 12 lab repeats and 8 of 8 town replay repeats match. The receipt is byte-identical, the reactions-off route is unchanged, and the reactions-on route differs only in area 9's clear time.
