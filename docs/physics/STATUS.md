@@ -77,7 +77,7 @@ M09 release resolution: PR #17 passed CI on `a069ce0` and merged at `cc8a31ee6e1
 M09 release record: PR #18 merged at `7d1b73c`; main CI run 37412127500 passed on it.
 
 M10 local gates:
-- `npm run check`: **148 headless** scenarios. The 14 new ones are in `tests/physics-world.test.ts`.
+- `npm run check`: **149 headless** scenarios. The 15 new ones are in `tests/physics-world.test.ts`.
 - `npm run build`.
 - `npm run test:e2e`: **41 browser** scenarios, with the existing WebRTC smoke scenarios passing. The three new M10 scenarios in `e2e/physics-world.spec.ts`:
   - the town by real input: lamp swing and settle, bunting, nothing broken, then rest, Rowan's shop and the outward gate;

@@ -1196,8 +1196,8 @@ href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/evidence/p
 towns and authored areas evidence</h2>
 <p>On 2026-10-06:</p>
 <ul>
-<li><code>npm run check</code> passed <strong>148 headless
-tests</strong> (14 new in <code>tests/physics-world.test.ts</code>), and
+<li><code>npm run check</code> passed <strong>149 headless
+tests</strong> (15 new in <code>tests/physics-world.test.ts</code>), and
 <code>npm run build</code> produced the bundle.</li>
 <li><code>npm run test:e2e</code> passed <strong>41 browser
 scenarios</strong>, including the three new M10 scenarios in
@@ -1206,8 +1206,8 @@ checks (<a href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs
 <li>Both routes cleared all nine areas without a death and visited both
 towns, where the bot rested, sold spares and bought an upgrade:
 <ul>
-<li><code>npm run verify:run</code>, reactions on: level 17, 3,617 gold,
-5,174 area ticks (<a
+<li><code>npm run verify:run</code>, reactions on: level 17, 3,599 gold,
+5,017 area ticks (<a
 href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/evidence/physics-m10-route.jsonl">route</a>).</li>
 <li><code>node tools/adventure.ts playthrough 9 --reactions off</code>,
 with the session master switch off: level 19, 3,729 gold, 4,818 area
@@ -1281,7 +1281,15 @@ ambient selection. - <strong>Canonical land build:</strong>
 <code>settle()</code> makes a new land’s save equal its own restore (<a
 href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/physics/DECISIONS.md">D76</a>). - <strong>Hinge motor
 fix:</strong> a lamp blow now swings it, 22.5 units/s against 3.3 before
-(<a href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/physics/DECISIONS.md">D77</a>).</p></main>
+(<a href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/physics/DECISIONS.md">D77</a>). - <strong>Engine-independent
+trig in per-tick physics</strong> (<a
+href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/physics/DECISIONS.md">D82</a>): PR CI’s lab replay check diverged
+once the town had motor-driven joints. Locally, the old trig code
+diverged in 7 of 12 repeats of that scenario; with
+<code>dsin</code>/<code>dcos</code>, 12 of 12 lab repeats and 8 of 8
+town replay repeats match. The receipt is byte-identical, the
+reactions-off route is unchanged, and the reactions-on route differs
+only in area 9’s clear time.</p></main>
 <footer>Fern · A world engine built for agents · <a href="https://github.com/michaelcrosato/gpt61sol2daige">Source on GitHub</a></footer>
 </body>
 </html>

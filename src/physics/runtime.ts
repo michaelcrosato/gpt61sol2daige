@@ -1,5 +1,5 @@
 import type { EventQueue, RigidBody, Vector, World } from "@dimforge/rapier2d-compat";
-import { checksum } from "../engine/math.ts";
+import { checksum, dcos, dsin } from "../engine/math.ts";
 import { WORLD_LIMIT } from "../engine/world.ts";
 import { FAMILIES, validateBlueprint } from "./blueprints.ts";
 import { rapier } from "./bootstrap.ts";
@@ -226,8 +226,8 @@ function actorGroups(entry: BodyEntry): number {
 }
 
 const rotate = (x: number, y: number, angle: number) => ({
-  x: Math.cos(angle) * x - Math.sin(angle) * y,
-  y: Math.sin(angle) * x + Math.cos(angle) * y,
+  x: dcos(angle) * x - dsin(angle) * y,
+  y: dsin(angle) * x + dcos(angle) * y,
 });
 /** Speed along a limited joint coordinate that stops at, and pushes back from, its limits. */
 function limitSpeed(position: number, speed: number, [low, high]: [number, number]): number {
@@ -830,8 +830,8 @@ export class PhysicsWorld {
       const sign = moving === b ? 1 : -1;
       if (r.kind === "hinge") {
         const angle = Math.atan2(
-          Math.sin(b.rotation() - a.rotation()),
-          Math.cos(b.rotation() - a.rotation()),
+          dsin(b.rotation() - a.rotation()),
+          dcos(b.rotation() - a.rotation()),
         );
         // The moving part's turn about the pin from its angular momentum about the pin: its
         // own spin and its linear motion around the pin both count (a blow to the centre of a

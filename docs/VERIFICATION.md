@@ -262,10 +262,10 @@ Captures: [Whorl](evidence/physics-m09-whorl.png), [settled with ragdolls off](e
 
 On 2026-10-06:
 
-- `npm run check` passed **148 headless tests** (14 new in `tests/physics-world.test.ts`), and `npm run build` produced the bundle.
+- `npm run check` passed **149 headless tests** (15 new in `tests/physics-world.test.ts`), and `npm run build` produced the bundle.
 - `npm run test:e2e` passed **41 browser scenarios**, including the three new M10 scenarios in `e2e/physics-world.spec.ts` and the preserved WebRTC smoke checks ([D53](physics/DECISIONS.md)).
 - Both routes cleared all nine areas without a death and visited both towns, where the bot rested, sold spares and bought an upgrade:
-  - `npm run verify:run`, reactions on: level 17, 3,617 gold, 5,174 area ticks ([route](evidence/physics-m10-route.jsonl)).
+  - `npm run verify:run`, reactions on: level 17, 3,599 gold, 5,017 area ticks ([route](evidence/physics-m10-route.jsonl)).
   - `node tools/adventure.ts playthrough 9 --reactions off`, with the session master switch off: level 19, 3,729 gold, 4,818 area ticks ([route](evidence/physics-m10-route-reactions-off.jsonl)).
 
 The numbers below come from the [receipt](evidence/physics-m10.json) (`node tools/physics-world.ts`, seed 142).
@@ -282,3 +282,4 @@ Also covered:
 - **Calm and wild regions:** the same mechanic plays three ways in one area. Calm keeps world reactions on for ambient selection.
 - **Canonical land build:** `settle()` makes a new land's save equal its own restore ([D76](physics/DECISIONS.md)).
 - **Hinge motor fix:** a lamp blow now swings it, 22.5 units/s against 3.3 before ([D77](physics/DECISIONS.md)).
+- **Engine-independent trig in per-tick physics** ([D82](physics/DECISIONS.md)): PR CI's lab replay check diverged once the town had motor-driven joints. Locally, the old trig code diverged in 7 of 12 repeats of that scenario; with `dsin`/`dcos`, 12 of 12 lab repeats and 8 of 8 town replay repeats match. The receipt is byte-identical, the reactions-off route is unchanged, and the reactions-on route differs only in area 9's clear time.

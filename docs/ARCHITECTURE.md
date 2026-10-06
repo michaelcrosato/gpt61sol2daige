@@ -377,6 +377,7 @@ Exposure (`EXPOSED`): 180 ticks of 1.5× damage, a 40-tick stagger and a broken 
 - `PhysicsWorld.settle()` canonicalizes a freshly built land ([D76](physics/DECISIONS.md)).
 - `reauthor` (with `PolicyController.reauthor`) migrates an older layout ([D80](physics/DECISIONS.md)).
 - `driveJoints` reads a hinged part's turn from its angular momentum about the pin ([D77](physics/DECISIONS.md)).
+- Per-tick physics trig that feeds state (`rotate`, the hinge angle, wind fields) uses `dsin`/`dcos` from `src/engine/math.ts`: they agree bit for bit across JavaScript engines, so browser-to-Node replays of the jointed town stay exact ([D82](physics/DECISIONS.md)).
 - New assembly kinds: `stall`, `lamp` and `bunting`.
 - New families: `stall`, `awning`, `lamp`, `pennant`, `basket`, `hedge` (vegetation, thorn pieces) and `barricade` (wood, plank pieces).
 

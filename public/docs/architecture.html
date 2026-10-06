@@ -1310,7 +1310,12 @@ area’s own weakness counts.</p>
 <code>PolicyController.reauthor</code>) migrates an older layout (<a
 href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/physics/DECISIONS.md">D80</a>). - <code>driveJoints</code> reads a
 hinged part’s turn from its angular momentum about the pin (<a
-href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/physics/DECISIONS.md">D77</a>). - New assembly kinds:
+href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/physics/DECISIONS.md">D77</a>). - Per-tick physics trig that feeds
+state (<code>rotate</code>, the hinge angle, wind fields) uses
+<code>dsin</code>/<code>dcos</code> from
+<code>src/engine/math.ts</code>: they agree bit for bit across
+JavaScript engines, so browser-to-Node replays of the jointed town stay
+exact (<a href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/physics/DECISIONS.md">D82</a>). - New assembly kinds:
 <code>stall</code>, <code>lamp</code> and <code>bunting</code>. - New
 families: <code>stall</code>, <code>awning</code>, <code>lamp</code>,
 <code>pennant</code>, <code>basket</code>, <code>hedge</code>

@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 import { gunzipSync } from "node:zlib";
 import { AgentRuntime } from "../src/engine/agent.ts";
+import { dcos, dsin } from "../src/engine/math.ts";
 import { type SaveState, Simulation } from "../src/engine/simulation.ts";
 import { areaRecipe, MECHANICS, mechanicLayout, TOWN_NPCS } from "../src/game/content.ts";
 import type { Enemy } from "../src/game/types.ts";
@@ -966,4 +967,25 @@ test("with every optional reaction off, areas still clear by kills alone and no 
   } finally {
     ctx.sim.dispose();
   }
+});
+
+test("engine-independent sine and cosine stay within one ulp of Math across the physics range", () => {
+  const ulp = (v: number) => 2 ** (Math.floor(Math.log2(Math.abs(v) || 2 ** -1022)) - 52);
+  let worst = 0;
+  for (let i = 0; i < 20000; i++) {
+    const x = (i / 20000 - 0.5) * 4000 + (i % 7) * 1e-3;
+    worst = Math.max(
+      worst,
+      Math.abs(dsin(x) - Math.sin(x)) / ulp(Math.sin(x)),
+      Math.abs(dcos(x) - Math.cos(x)) / ulp(Math.cos(x)),
+    );
+  }
+  assert.ok(worst <= 1, `within ${worst} ulp`);
+  for (const x of [0, 1e-12, 0.5, Math.PI / 4, 1.418, Math.PI, 12345.678, -98765.4321]) {
+    assert.equal(dsin(-x), -dsin(x), "odd");
+    assert.equal(dcos(-x), dcos(x), "even");
+  }
+  assert.equal(dsin(0), 0);
+  assert.equal(dcos(0), 1);
+  assert.ok(Number.isNaN(dsin(Number.POSITIVE_INFINITY)));
 });

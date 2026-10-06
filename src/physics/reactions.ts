@@ -1,4 +1,4 @@
-import { hash } from "../engine/math.ts";
+import { dcos, dsin, hash } from "../engine/math.ts";
 import type { AttackTeam } from "../game/interactions.ts";
 import { FAMILIES, type PropFamily, propRecipe, shapeReach } from "./blueprints.ts";
 import { type CombatPhysics, isPropId } from "./combat.ts";
@@ -1812,12 +1812,12 @@ export function fieldAcceleration(
   if (shape.kind === "lane") {
     const dx = x - shape.x,
       dy = y - shape.y,
-      cos = Math.cos(shape.angle),
-      sin = Math.sin(shape.angle),
+      cos = dcos(shape.angle),
+      sin = dsin(shape.angle),
       along = dx * cos + dy * sin,
       across = -dx * sin + dy * cos;
     if (along < 0 || along > shape.length || Math.abs(across) > shape.width / 2) return null;
-    const gust = 1 + field.gust * Math.sin(tick * 0.05 + shape.x * 0.01),
+    const gust = 1 + field.gust * dsin(tick * 0.05 + shape.x * 0.01),
       strength = field.strength * gust * (1 - 0.5 * (along / shape.length));
     return { x: cos * strength, y: sin * strength };
   }

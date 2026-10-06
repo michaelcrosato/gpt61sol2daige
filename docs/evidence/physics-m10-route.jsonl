@@ -8,4 +8,4 @@
 {"area":7,"name":"Gravity Knots","land":1,"cleared":true,"ticks":577,"dead":false,"level":13,"gold":1842,"items":20,"mechanicUses":37}
 {"area":8,"name":"Riftstep","land":1,"cleared":true,"ticks":745,"dead":false,"level":15,"gold":2261,"items":28,"mechanicUses":45}
 {"town":2,"name":"Tideglass Haven","rested":true,"sold":20,"bought":"Vigorous Briar Sabre","gold":{"before":2261,"after":3150},"fixtures":36}
-{"area":9,"name":"Ravenous Echo Wells","land":2,"cleared":true,"ticks":790,"dead":false,"level":17,"gold":3617,"items":14,"mechanicUses":61}
+{"area":9,"name":"Ravenous Echo Wells","land":2,"cleared":true,"ticks":633,"dead":false,"level":17,"gold":3599,"items":13,"mechanicUses":57}
