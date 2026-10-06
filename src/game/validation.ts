@@ -279,7 +279,9 @@ export function validateAdventure(s: AdventureState): void {
           (enemy.boss &&
             enemy.warden &&
             typeof enemy.warden === "object" &&
-            Object.keys(enemy.warden).length === 7 &&
+            // M11 adds `armor`; wardens saved before it carry seven fields.
+            (Object.keys(enemy.warden).length === 7 ||
+              (Object.keys(enemy.warden).length === 8 && integer(enemy.warden.armor, 0, 4))) &&
             ["", ...WARDEN_MOVES].includes(enemy.warden.move) &&
             ["", ...WARDEN_WEAKNESSES].includes(enemy.warden.exposedBy) &&
             finite(enemy.warden.tx, WORLD_LIMIT + 1024) &&

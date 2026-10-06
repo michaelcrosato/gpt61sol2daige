@@ -1294,7 +1294,126 @@ diverged in 7 of 12 repeats of that scenario; with
 <code>dsin</code>/<code>dcos</code>, 12 of 12 lab repeats and 8 of 8
 town replay repeats match. The receipt is byte-identical, the
 reactions-off route is unchanged, and the reactions-on route differs
-only in area 9’s clear time.</p></main>
+only in area 9’s clear time.</p>
+<h2 id="m11-generated-encounters-evidence">M11 generated encounters
+evidence</h2>
+<p>On 2026-10-06:</p>
+<ul>
+<li><code>npm run check</code> passed <strong>160 headless
+tests</strong>, 11 of them new: 10 in
+<code>tests/physics-encounters.test.ts</code>, and the D91 regression in
+<code>tests/physics-world.test.ts</code>. <code>npm run build</code>
+produced the bundle.</li>
+<li><code>npm run test:e2e</code> passed <strong>43 browser
+scenarios</strong>, including the two new M11 scenarios in
+<code>e2e/physics-encounters.spec.ts</code> and the preserved WebRTC
+smoke checks (<a href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/physics/DECISIONS.md">D53</a>).</li>
+<li>Both routes cleared all twelve areas, four of them generated,
+without a death. The bot rested, sold spares and bought an upgrade in
+all three towns.
+<ul>
+<li><strong><code>npm run verify:run</code>, reactions on:</strong>
+level 23, 4,743 gold, 5,345 area ticks (<a
+href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/evidence/physics-m11-route.jsonl">route</a>).
+<ul>
+<li>Area 10: walking to the coil and slashing it set off the storm pool:
+discharge down the rods, then soak, steam and fire chains in the same
+cluster, with two of its casks broken.</li>
+<li>Area 12: grabbing an oil jar with V and walking it into the
+brazier’s coals burnt the stockade through (four barricades, five fuse
+brushes and the cache).</li>
+<li>Areas 9 and 11 hold only fuse and field combinations (vortex powder,
+powder trail, rubble maelstrom), which need carried fire or run on their
+own. They were cleared by combat alone.</li>
+</ul></li>
+<li><strong><code>node tools/adventure.ts playthrough 12 --reactions off</code></strong>,
+with the session master switch off: level 24, 4,832 gold, 4,860 area
+ticks (<a
+href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/evidence/physics-m11-route-reactions-off.jsonl">route</a>).
+<ul>
+<li>The same coil slash only drives the field rule.</li>
+<li>The jar grab is refused (“That prop is fixed in place here”).</li>
+</ul></li>
+</ul></li>
+</ul>
+<p>The numbers below come from the <a
+href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/evidence/physics-m11.json">receipt</a>
+(<code>node tools/physics-encounters.ts</code>) and
+<code>tests/physics-encounters.test.ts</code>.</p>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr>
+<th>M11 acceptance</th>
+<th>Evidence</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A fixed seed corpus across all five themes and a range of depths
+(with a large index) shows at least twelve distinct meaningful
+combinations and several boss assemblies</td>
+<td>Seeds 142, 7, 2026 and 31337 × areas 9–25, 33, 101, 4001 and
+1,000,001: <strong>84 areas</strong> over glass, dusk, frost, verdant
+and cinder lands. <strong>All 14 combinations</strong> appear, from 2
+(briar blaze) to 28 (rubble maelstrom) times. There are <strong>77
+distinct warden assemblies</strong> (rig, armor, composed moves, arena)
+and all four armor kits. Every area has 0 overlapping bodies, every link
+within reach and every route open. 99 fallbacks are recorded and none
+leaves a planned cluster or filler out. Each combination’s chain fires
+in a real simulation: </td>
+</tr>
+<tr>
+<td>At least three generated areas beyond area eight are completed
+through normal inputs; one shows a multi-system interaction, one
+finishes with reactions disabled</td>
+<td>Both routes above clear generated areas 9–12 with ordinary inputs
+and validated actions only. Multi-system interactions started by
+input:</td>
+</tr>
+<tr>
+<td>Initial recipes reproduce from seed; saved broken and moved state
+stays authoritative; invalid references and impossible placements fail
+validation visibly</td>
+<td>Two simulations of seed 142 build identical module bodies in area 9,
+and a fresh build reproduces the manifest. A broken and a moved piece
+survive raw and portable saves, restore (equal state hash after 20 more
+ticks) and travel to the next land and back. A real M10 checkpoint of
+area 9 keeps its earlier content and its broken crate.
+<code>encounters validate</code> reports
+<code>unknown module trebuchet</code> and a tampered manifest (“does not
+reproduce”). A rift-freight cluster forced into an area without arches
+fails as an impossible placement.</td>
+</tr>
+<tr>
+<td>A generated encounter after save/load and through a late-join
+replica; no hidden body cap or FPS-driven substitution</td>
+<td>The receipt lights a powder trail, saves 30 ticks into the chain and
+restores: the restored run reaches the same state hash 240 ticks later.
+A late-join replica receives every generated body, the cluster regions
+and a warden’s armor mounts, and <code>encounters export</code> on the
+guest reads the manifest. Nothing in placement or play depends on frame
+rate or a body budget. Generated content is a pure function of recipe,
+palette and terrain.</td>
+</tr>
+</tbody>
+</table>
+<p>Composed wardens (receipt, four armor kits):</p>
+<ul>
+<li>Censer-bearer (2 censers) and Stonehide (2 boulders) take 0.76 of
+each blow while armored, Glassmantled (3 shards) and Barkbound (3
+plates) 0.64.</li>
+<li>A shock cracks every glass shard in one tick; a blast breaks the
+boulders and knocks the censers loose; fire burns bark plates one by
+one.</li>
+<li>Stripped of armor, the warden takes the full blow.</li>
+<li>Mount tethers snap under a 900 units/s yank; every mount is released
+when the warden dies.</li>
+<li>With mechanisms off at its ground, the warden spawns unarmored.</li>
+</ul></main>
 <footer>Fern · A world engine built for agents · <a href="https://github.com/michaelcrosato/gpt61sol2daige">Source on GitHub</a></footer>
 </body>
 </html>

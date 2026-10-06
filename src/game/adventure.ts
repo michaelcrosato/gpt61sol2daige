@@ -29,6 +29,7 @@ import {
   TOWN_NPCS,
   townName,
 } from "./content.ts";
+import { bossRig, encounterPlan, pocketPoint } from "./encounters.ts";
 import { ATTACKS, attackRecipe, HARD_MATERIALS } from "./interactions.ts";
 import { type Item, rollItem, SLOTS, starterItems } from "./loot.ts";
 import {
@@ -60,6 +61,7 @@ import {
   freshWarden,
   WARDEN_WINDUP,
   WARDENS,
+  type WardenMove,
   type WardenWeakness,
 } from "./wardens.ts";
 
@@ -1283,7 +1285,12 @@ export class Adventure {
       stats && random(e.id, sim.tick + this.state.nextEvent, this.state.seed) < stats.crit;
     // An exposed warden (M10) takes more damage while its weakness lasts.
     const exposed = (e.warden?.exposedUntil ?? 0) > sim.tick ? EXPOSED.damage : 1;
-    const amount = Math.max(1, Math.round(damage * exposed * (critical ? stats!.critPower : 1)));
+    // M11: a generated warden's mounted armor absorbs part of every blow while it holds.
+    const armor = e.boss && sim.physical ? sim.physical.armorFactor(e) : 1;
+    const amount = Math.max(
+      1,
+      Math.round(damage * exposed * armor * (critical ? stats!.critPower : 1)),
+    );
     e.hp -= amount;
     e.hurtUntil = sim.tick + 7;
     if (!e.boss && e.phase === "windup") {
@@ -1561,10 +1568,14 @@ export class Adventure {
   }
   private spawnWave(sim: Simulation): void {
     const s = this.state,
-      count = Math.min(8 + Math.floor(s.area / 3), s.recipe.killGoal - s.spawned, 18);
+      count = Math.min(8 + Math.floor(s.area / 3), s.recipe.killGoal - s.spawned, 18),
+      plan = encounterPlan(s.recipe);
     for (let i = 0; i < count && s.enemies.filter((e) => e.hp > 0).length < MAX_ENEMIES; i++) {
       const ordinal = s.spawned++,
-        point = encounterPosition(s.recipe, ordinal);
+        // M11: generated areas gather their waves in the plan's combat pockets.
+        point = plan
+          ? pocketPoint(plan, ordinal, (salt) => random(ordinal, 47 + salt, s.recipe.seed))
+          : encounterPosition(s.recipe, ordinal);
       this.spawnEnemy(sim, ordinal, point.x, point.y, false, true);
     }
   }
@@ -1604,15 +1615,15 @@ export class Adventure {
       vy: 0,
       radius: boss ? 22 : behavior === "sentinel" || behavior === "charger" ? 11 : 7,
       rig: boss
-        ? (
-            ["brute", "stalker", "totem", "wraith", "brute", "crawler", "warden", "warden"] as const
-          )[(s.area - 1) % 8]
+        ? bossRig(s.area)
         : s.recipe.procedural
           ? s.recipe.rigs[ordinal % s.recipe.rigs.length]
           : archetype.rig,
       behavior,
       theme: s.recipe.theme,
-      name: boss ? s.recipe.boss : `${elite ? "Elder " : ""}${archetype.name}`,
+      name: boss
+        ? (encounterPlan(s.recipe)?.boss.title ?? s.recipe.boss)
+        : `${elite ? "Elder " : ""}${archetype.name}`,
       boss,
       elite,
       hp,
@@ -1635,7 +1646,10 @@ export class Adventure {
       counted,
       tier: s.area,
       reaction: freshReaction(),
-      ...(boss ? { warden: freshWarden() } : {}),
+      // M11: a generated area's warden mounts its composed armor once its body stands.
+      ...(boss
+        ? { warden: { ...freshWarden(), armor: encounterPlan(s.recipe)?.boss.pieces ?? 0 } }
+        : {}),
     });
     if (boss) this.emit(sim, "boss", x, y, "", s.recipe.boss);
   }
@@ -1684,15 +1698,36 @@ export class Adventure {
           : "charger";
   }
   /**
+   * M11: the current area warden's signature moves in rotation (an authored area: its one
+   * signature; a generated area: the moves composed from its mechanics).
+   */
+  wardenMoves(): WardenMove[] {
+    return (
+      encounterPlan(this.state.recipe)?.boss.moves ?? [WARDENS[this.state.recipe.signature].move]
+    );
+  }
+  /** What exposes this area's warden: the union of its moves' weaknesses (M11). */
+  weaknesses(): WardenWeakness[] {
+    return (
+      encounterPlan(this.state.recipe)?.boss.weaknesses ?? [
+        WARDENS[this.state.recipe.signature].weakness,
+      ]
+    );
+  }
+  /** The move a warden telegraphs next: each slam turn takes the next composed move. */
+  nextMove(e: Enemy): WardenMove {
+    const moves = this.wardenMoves();
+    return moves[Math.floor(e.attacks / 3) % moves.length];
+  }
+  /**
    * M10: a warden about to slam telegraphs its signature move instead, for longer, with a
    * locked target (lanes, lines and markers do not follow the traveler).
    */
   private beginSignature(sim: Simulation, e: Enemy, target: Player): void {
     if (this.bossBehavior(e, e.attacks + 1) !== "sentinel") return;
     const s = this.state,
-      w = (e.warden ??= freshWarden()),
-      recipe = WARDENS[s.recipe.signature];
-    w.move = recipe.move;
+      w = (e.warden ??= freshWarden());
+    w.move = this.nextMove(e);
     e.timer = Math.max(30, Math.round(WARDEN_WINDUP / Math.sqrt(s.tuning.enemySpeed)));
     w.tx = e.x;
     w.ty = e.y;
@@ -1871,6 +1906,8 @@ export class Adventure {
       this.slam(sim, e, e.x, e.y, 125);
       this.wardenField(sim, e, `collapse:${e.id}:burst`, "pressure", e.x, e.y, 140, 1800, 5);
     } else if (move === "blink") {
+      // M11: a generated warden's mounted armor travels with it.
+      sim.physical?.carryArmor(e, w.tx - e.x, w.ty - e.y);
       sim.physical?.teleport(enemyBodyId(e.id), w.tx, w.ty);
       e.x = e.px = w.tx;
       e.y = e.py = w.ty;
@@ -1881,13 +1918,33 @@ export class Adventure {
   /** Each tick: the Echo Matron's pending echo slam, and Cinderjaw being doused. */
   private wardenUpkeep(sim: Simulation, e: Enemy): void {
     const w = e.warden!;
+    // M11: mount pending armor (with mechanisms or dynamic props off it simply never comes).
+    if ((w.armor ?? 0) > 0 && sim.physical?.world.has(enemyBodyId(e.id))) {
+      const plan = encounterPlan(this.state.recipe);
+      if (plan) {
+        const pieces = sim.physical.armBoss(sim, e, { armor: plan.boss.armor, pieces: w.armor });
+        if (pieces.length)
+          this.emit(
+            sim,
+            "rig",
+            e.x,
+            e.y - 26,
+            "",
+            `warden:armored:${plan.boss.armor}`,
+            pieces.length,
+            0,
+            "#d6c5a0",
+          );
+      }
+      w.armor = 0;
+    }
     if (w.echoAt && sim.tick >= w.echoAt) {
       w.echoAt = 0;
       this.slam(sim, e, w.tx, w.ty, 110);
       this.wardenField(sim, e, `echo:${e.id}:${sim.tick}`, "repel", w.tx, w.ty, 120, 1300, 8);
     }
     if (
-      this.state.recipe.signature === "cinder" &&
+      this.weaknesses().includes("water") &&
       (sim.physical?.reactions.status(enemyBodyId(e.id))?.wet ?? 0) > 0
     )
       this.expose(sim, e, "water", "");
@@ -1899,8 +1956,7 @@ export class Adventure {
   private expose(sim: Simulation, e: Enemy, cause: WardenWeakness, owner: string): void {
     const s = this.state,
       tick = sim.tick;
-    if (!e.boss || e.hp <= 0 || s.mode !== "area" || WARDENS[s.recipe.signature].weakness !== cause)
-      return;
+    if (!e.boss || e.hp <= 0 || s.mode !== "area" || !this.weaknesses().includes(cause)) return;
     const w = (e.warden ??= freshWarden());
     if (w.exposedUntil > tick || tick - w.lastExposed < EXPOSED.cooldown) return;
     w.exposedUntil = tick + EXPOSED.ticks;

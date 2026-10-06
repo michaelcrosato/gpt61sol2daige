@@ -351,7 +351,7 @@ test("save/load, replay, recall and late-join replicas preserve the same destruc
     } finally {
       guest.dispose();
     }
-    assert.equal(PROTOCOL_VERSION, 11);
+    assert.equal(PROTOCOL_VERSION, 12);
     assert.ok(encodeSnapshot(sim, "local").byteLength > 0);
     assert.throws(
       () =>
@@ -424,7 +424,7 @@ test("real M04 checkpoints migrate: exact legacy bodies, M05 content added once,
       assert.equal(physical.destroyedRecords().length, 0);
       assert.ok(physical.world.has("prop-tree-5-0"), "M05 scenery joins the active land");
       const saved = sim.save();
-      assert.equal(saved.actorPhysics!.version, 8);
+      assert.equal(saved.actorPhysics!.version, 9);
       assert.equal(saved.actorPhysics!.world.version, 9);
       const archive = saved.actorPhysics!.archives.find((a) => a.id === "land-1-0")!;
       assert.ok(archive.props.some((p) => p.id === "prop-wagon-1-0"));

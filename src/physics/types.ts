@@ -97,7 +97,9 @@ export type AssemblyKind =
   // M10 town fixtures.
   | "stall"
   | "lamp"
-  | "bunting";
+  | "bunting"
+  // M11 generated encounters: an unanchored cargo train.
+  | "cart";
 export interface AssemblyRecipe {
   id: string;
   kind: AssemblyKind;

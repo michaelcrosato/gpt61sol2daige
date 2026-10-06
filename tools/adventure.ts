@@ -6,6 +6,7 @@ import { SKILLS } from "../src/game/skills.ts";
 import { validateArea } from "../src/game/validation.ts";
 import { initializePhysics } from "../src/physics/bootstrap.ts";
 import { type RigRecipe, rigSvg } from "../src/render/rigs.ts";
+import { leadIn, leadResult } from "./lib/encounter-demos.ts";
 import { fightArea } from "./lib/expedition-bot.ts";
 
 await initializePhysics();
@@ -64,7 +65,12 @@ if (args[0] === "area") {
     throw new Error("Playthrough count must be an integer from 1 to 64");
   for (let index = 1; index <= areas; index++) {
     if (sim.adventure.state.mode === "town") sim.adventure.action(sim, "local", { type: "depart" });
+    // M11: in a generated area, first set off one of its combinations with ordinary inputs
+    // (with reactions off the same inputs start nothing).
+    const lead = sim.adventure.state.recipe.procedural ? leadIn(sim) : null;
     const result = fightArea(sim);
+    // The chain ran on while the bot fought: read what it did now.
+    const combo = lead ? leadResult(sim, lead) : null;
     const hero = sim.adventure.hero("local");
     results.push({
       area: sim.adventure.state.area,
@@ -75,6 +81,16 @@ if (args[0] === "area") {
       gold: hero.gold,
       items: hero.inventory.length,
       mechanicUses: sim.adventure.state.mechanicUses,
+      ...(sim.adventure.state.recipe.procedural
+        ? {
+            encounter:
+              sim.physical?.encounters
+                .find((m) => m.index === sim.adventure.state.area)
+                ?.clusters.map((c) => c.combo) ?? [],
+            warden: sim.adventure.state.recipe.procedural ? sim.adventure.state.recipe.boss : null,
+            combo,
+          }
+        : {}),
     });
     console.log(JSON.stringify(results.at(-1)));
     if (!result.cleared) {

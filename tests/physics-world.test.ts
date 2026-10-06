@@ -20,6 +20,7 @@ import {
   SHOWCASE,
   showcaseExport,
   TAILWIND,
+  THORNBURST,
   TOWN_SERVICES,
 } from "../src/physics/showcase.ts";
 import type { BodyPose } from "../src/physics/types.ts";
@@ -915,7 +916,7 @@ test("showcase state survives raw and portable saves; a late-join replica agrees
         id,
       );
     assert.ok(w.has("prop-lamp-town-0") && w.has("prop-stall-town-2"));
-    assert.equal(migrated.save().actorPhysics!.version, 8);
+    assert.equal(migrated.save().actorPhysics!.version, 9);
     const again = Simulation.restore(structuredClone(migrated.save()));
     try {
       assert.deepEqual(again.physical!.world.ids(), w.ids(), "nothing added twice");
@@ -988,4 +989,41 @@ test("engine-independent sine and cosine stay within one ulp of Math across the 
   assert.equal(dsin(0), 0);
   assert.equal(dcos(0), 1);
   assert.ok(Number.isNaN(dsin(Number.POSITIVE_INFINITY)));
+});
+
+test("thorn splinters that land frozen in a calm region still expire, live and after a restore", () => {
+  const ctx = area(1);
+  const { sim, physical, world } = ctx;
+  try {
+    // A burst just outside the calm ring: some splinters land inside (frozen), some outside.
+    const calm = physical.world.regions().find((r) => r.id === "calm-1")!;
+    const shape = calm.shape as { x: number; y: number; radius: number };
+    const ids = physical.thornburst(sim, {
+      x: shape.x + shape.radius + 8,
+      y: shape.y,
+      owner: "local",
+      team: "party",
+      cause: "test",
+    });
+    const all = world.ids().filter((id) => /^prop-thorn-\d+-\d$/.test(id));
+    assert.ok(
+      all.some((id) => world.motionOf(id).frozen),
+      "some land frozen",
+    );
+    assert.ok(ids.length < all.length, "frozen ones are not launched");
+    const restored = Simulation.restore(JSON.parse(JSON.stringify(sim.save())));
+    try {
+      sim.step(THORNBURST.lifetime + 2);
+      restored.step(THORNBURST.lifetime + 2);
+      for (const id of all) {
+        assert.ok(!world.has(id), `${id} expired live`);
+        assert.ok(!restored.physical!.world.has(id), `${id} expired after restore`);
+      }
+      assert.equal(restored.stateHash(), sim.stateHash());
+    } finally {
+      restored.dispose();
+    }
+  } finally {
+    sim.dispose();
+  }
 });

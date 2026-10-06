@@ -123,6 +123,8 @@ export interface WardenState {
   exposedUntil: number;
   exposedBy: WardenWeakness | "";
   lastExposed: number;
+  /** M11: armor pieces still to mount once its body stands in the world (0 when armed). */
+  armor: number;
 }
 export const freshWarden = (): WardenState => ({
   move: "",
@@ -132,6 +134,7 @@ export const freshWarden = (): WardenState => ({
   exposedUntil: 0,
   exposedBy: "",
   lastExposed: -EXPOSED.cooldown,
+  armor: 0,
 });
 export const WARDEN_MOVES = Object.values(WARDENS).map((w) => w.move);
 export const WARDEN_WEAKNESSES = Object.values(WARDENS).map((w) => w.weakness);

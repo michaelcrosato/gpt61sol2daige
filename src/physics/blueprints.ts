@@ -53,6 +53,10 @@ export const PROP_FAMILIES = [
   "basket",
   "hedge",
   "barricade",
+  // M11 modular wardens' armor (bark plates, glass shards) and generated arenas' stone pillars.
+  "plate",
+  "shard",
+  "pillar",
 ] as const;
 export type PropFamily = (typeof PROP_FAMILIES)[number];
 export const PALETTES = 5;
@@ -701,6 +705,55 @@ export const FAMILIES: Record<PropFamily, FamilyRecipe> = {
     toughness: 60,
     reward: 0,
     pieces: [plank(0, 12, 2.5, -6.5, -1.5), plank(1, 12, 2.5, 6.5, -1.5), plank(2, 24, 2, 0, 2)],
+    solid: "gameplay solid",
+  },
+  // M11: armor a generated warden wears on tethers, and the pillars ringing its ground.
+  plate: {
+    name: "Bark plate",
+    variants: [
+      "Mossbark plate",
+      "Charbark plate",
+      "Driftbark plate",
+      "Duskbark plate",
+      "Frostbark plate",
+    ],
+    material: "wood",
+    motion: "dynamic",
+    shape: box(14, 7),
+    massScale: 1.6,
+    toughness: 30,
+    reward: 0,
+    pieces: [plank(0, 6, 6, -3.5, 0, 0.2), plank(1, 6, 6, 3.5, 0, -0.2)],
+    solid: "gameplay solid",
+  },
+  shard: {
+    name: "Ward shard",
+    variants: [
+      "Greenglass shard",
+      "Obsidian shard",
+      "Tideglass shard",
+      "Amethyst shard",
+      "Iceglass shard",
+    ],
+    material: "glass",
+    motion: "dynamic",
+    shape: box(8, 12),
+    massScale: 1.4,
+    toughness: 14,
+    reward: 0,
+    pieces: ring("sliver", 3, box(3, 4), 3.4),
+    solid: "gameplay solid",
+  },
+  pillar: {
+    name: "Stone pillar",
+    variants: ["Mossy pillar", "Basalt pillar", "Coral pillar", "Slate pillar", "Rime pillar"],
+    material: "stone",
+    motion: "fixed",
+    shape: circle(11),
+    massScale: 1,
+    toughness: 80,
+    reward: 0,
+    pieces: ring("block", 3, circle(4.5), 6.2),
     solid: "gameplay solid",
   },
 };

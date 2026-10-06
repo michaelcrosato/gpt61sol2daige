@@ -13,6 +13,7 @@ import {
   validateSemanticTerrain,
 } from "../physics/adventure.ts";
 import { rapier } from "../physics/bootstrap.ts";
+import type { RealizedEncounter } from "../physics/encounters.ts";
 import { type LinkView, linkViews, onDeck, replicaDeckPlanks } from "../physics/mechanisms.ts";
 import type { RegionProfile } from "../physics/policies.ts";
 import { type ReactionView, reactionView } from "../physics/reactions.ts";
@@ -231,6 +232,12 @@ export class Simulation {
     return this.physical
       ? this.physical.showcase.view()
       : (this.replicaPhysics?.showcase?.restraints ?? []);
+  }
+  /** M11: realized manifests of the current land's generated areas (live or received). */
+  physicalEncounters(): readonly RealizedEncounter[] {
+    return this.physical
+      ? this.physical.encounters
+      : (this.replicaPhysics?.encounters?.areas ?? []);
   }
   /** The policy regions of the current land (live world or received scene), for drawing. */
   physicalRegions(): readonly RegionProfile[] {

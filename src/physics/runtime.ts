@@ -320,6 +320,7 @@ export const ASSEMBLY_KINDS = [
   "stall",
   "lamp",
   "bunting",
+  "cart",
 ] as const;
 function plain(value: unknown, allowed: string[], name: string): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value))

@@ -88,6 +88,14 @@ action</td>
 <code>AreaRecipe</code>; changes the party encounter</td>
 </tr>
 <tr>
+<td><code>encounters</code></td>
+<td><code>action?</code>, <code>index?</code>, <code>seed?</code>,
+<code>plan?</code>, <code>manifest?</code></td>
+<td>M11 generated encounters (read-only): <code>catalog</code>,
+<code>preview</code>, <code>validate</code>, <code>export</code> (<a
+href="#m11-generated-encounters">details</a>)</td>
+</tr>
+<tr>
 <td><code>step</code></td>
 <td><code>ticks</code>, 0…36,000</td>
 <td>Advances exactly that many fixed ticks; prefer small batches in the
@@ -1203,7 +1211,103 @@ receipt.</li>
 </ul>
 <p>See <a
 href="ARCHITECTURE.md#m10-reactive-towns-and-authored-areas">the M10
-contract</a>.</p></main>
+contract</a>.</p>
+<h2 id="m11-generated-encounters">M11 generated encounters</h2>
+<p>Areas 9+ are generated from the encounter grammar;
+<code>encounters</code> inspects and checks them without screenshots.
+Every action is read-only, works on guests (export reads the received
+scene) and is never recorded in replays.</p>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr>
+<th>Command</th>
+<th>Fields and behavior</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>{"op":"encounters"}</code></td>
+<td><code>catalog</code>: the module kits (pieces, assembly, fields,
+surfaces, tags, switches), the 14 combinations (roles, chain rules,
+affinity, regional profile, how to start), profiles, warden armor and
+arena kits, slot geometry, route points, the cluster link reaches,
+warden moves and the selection/placement/fallback/persistence
+rules.</td>
+</tr>
+<tr>
+<td><code>{"op":"encounters","action":"preview","index":13,"seed":142}</code></td>
+<td>Builds that area (default: this run’s seed, the current area or 9)
+without a running game and returns its manifest. The manifest holds:
+</td>
+</tr>
+<tr>
+<td><code>{"op":"encounters","action":"validate","seed":142,"plan":{…}}</code>
+or <code>{…,"manifest":{…}}</code></td>
+<td>Returns <code>{ok, errors, warnings, manifest}</code>. Errors: </td>
+</tr>
+<tr>
+<td><code>{"op":"encounters","action":"export","index":10}</code></td>
+<td>The current land’s realized manifest as built (default: the current
+area), the live values of its cluster regions, and
+<code>mutations</code> since the land was built: destroyed module pieces
+(cause, owner, tick), missing ones and those moved more than 1 unit. A
+land saved before M11 answers “saved before generated encounters (M11);
+it keeps its earlier content”.</td>
+</tr>
+</tbody>
+</table>
+<p>Ids in a generated area: - cluster pieces:
+<code>prop-&lt;family&gt;-&lt;area&gt;-c&lt;k&gt;-&lt;n&gt;-&lt;tag&gt;</code>
+(cluster k, module n), for example <code>prop-brazier-12-c0-0-0</code>,
+<code>prop-barricade-12-c0-2-front</code>,
+<code>prop-coil-10-c1-0-0</code>; - filler pieces:
+<code>prop-&lt;family&gt;-&lt;area&gt;-m-&lt;module&gt;-&lt;tag&gt;</code>;
+- arena pieces:
+<code>prop-&lt;family&gt;-&lt;area&gt;-a&lt;n&gt;-&lt;tag&gt;</code>; -
+assemblies: <code>&lt;kind&gt;-&lt;area&gt;-c&lt;k&gt;</code> (cart,
+chain, launcher, vine, vane, gate),
+<code>&lt;kind&gt;-&lt;area&gt;-m</code> and
+<code>chain-&lt;area&gt;-a&lt;n&gt;n</code>; - pools:
+<code>pool-&lt;area&gt;-c&lt;k&gt;-&lt;n&gt;</code>; - fields:
+<code>gale-&lt;area&gt;-c&lt;k&gt;-&lt;n&gt;-lane</code>,
+<code>maelstrom-&lt;area&gt;-c&lt;k&gt;-&lt;n&gt;-eye</code> and
+<code>-pull</code>; - regions:
+<code>combo-&lt;area&gt;-&lt;k&gt;</code>; - warden armor:
+<code>prop-armor-&lt;enemy&gt;-&lt;k&gt;</code>, each held by a
+<code>mount</code> restraint in <code>actors showcase</code> (body,
+anchor <code>enemy-&lt;id&gt;</code>, rest, load).</p>
+<p>Events: <code>assembly</code> <code>mount:armed:&lt;armor&gt;</code>
+(amount = pieces), <code>mount:snapped</code>; <code>rig</code>
+<code>warden:armored:&lt;armor&gt;</code>.</p>
+<pre class="json"><code>{&quot;op&quot;:&quot;reset&quot;,&quot;seed&quot;:142}
+{&quot;op&quot;:&quot;encounters&quot;,&quot;action&quot;:&quot;preview&quot;,&quot;index&quot;:12}
+{&quot;op&quot;:&quot;encounter&quot;,&quot;index&quot;:12}
+{&quot;op&quot;:&quot;actors&quot;,&quot;action&quot;:&quot;monster&quot;,&quot;rig&quot;:&quot;stalker&quot;,&quot;x&quot;:2500,&quot;y&quot;:200,&quot;hp&quot;:10,&quot;passive&quot;:true,&quot;clear&quot;:true}
+{&quot;op&quot;:&quot;adventure&quot;,&quot;action&quot;:{&quot;type&quot;:&quot;grab&quot;,&quot;id&quot;:&quot;prop-jar-12-c0-0-0&quot;}}</code></pre>
+<p>The preview names the Burning palisade cluster
+(<code>fire-stockade</code>) and its pieces; throwing the camp’s oil jar
+into its brazier (<code>adventure release {throw:true}</code> aimed at
+it) starts the chain: <code>heat</code>, <code>ignite</code>,
+<code>spill</code>, <code>coat</code>, <code>flare</code> and
+<code>spread</code>. The stockade burns through in about 150 ticks
+(<code>encounters export</code> lists the destroyed boards). Use the ids
+your preview returns.</p>
+<ul>
+<li>No new policy values; cluster regions use existing ones. Saves write
+adventure envelope 9 / world 9; rooms use protocol 12.</li>
+<li><code>npm run verify:run</code> now runs 12 areas (areas 9–12 are
+generated); in each generated area the bot first sets off one
+combination with ordinary inputs (<code>leadIn</code>).</li>
+<li><code>node tools/physics-encounters.ts</code> prints the M11
+receipt.</li>
+</ul>
+<p>See <a
+href="ARCHITECTURE.md#m11-generated-encounters-and-modular-wardens">the
+M11 contract</a>.</p></main>
 <footer>Fern · A world engine built for agents · <a href="https://github.com/michaelcrosato/gpt61sol2daige">Source on GitHub</a></footer>
 </body>
 </html>
