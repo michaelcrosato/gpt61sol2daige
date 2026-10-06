@@ -66,12 +66,24 @@ async function walkTo(page: Page, x: number, y: number, near = 12, timeout = 250
     else held.delete(key);
   };
   const end = Date.now() + timeout;
+  // A stall, a crate or a passing townsperson can pin a straight walk: when the traveler makes
+  // no progress for a moment, it steps around at 90° (alternating sides) before trying again.
+  let last = { x: Number.NaN, y: Number.NaN, t: Date.now() },
+    around = 0,
+    until = 0;
   try {
     while (Date.now() < end) {
       const p = await page.evaluate(() => window.fern.observe().players[0]);
-      const dx = x - p.x,
+      let dx = x - p.x,
         dy = y - p.y;
       if (Math.hypot(dx, dy) <= near) return true;
+      if (!(Math.hypot(p.x - last.x, p.y - last.y) < 2)) last = { x: p.x, y: p.y, t: Date.now() };
+      else if (Date.now() - last.t > 600 && Date.now() > until) {
+        around = around === 1 ? -1 : 1;
+        until = Date.now() + 500;
+        last = { x: p.x, y: p.y, t: Date.now() };
+      }
+      if (Date.now() < until) [dx, dy] = [-dy * around, dx * around];
       await hold("d", dx > 4);
       await hold("a", dx < -4);
       await hold("s", dy > 4);
