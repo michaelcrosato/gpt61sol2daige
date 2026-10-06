@@ -21,7 +21,7 @@ Use a fresh GPT-6.1 Sol / xhigh session with [START.md](START.md) for M10 after 
 | M06 | Verified and merged (production receipt pending, see above) | [Combat and loot](milestones/M06.md), [handoff](handoffs/M06.md), [evidence](../evidence/physics-m06.json), PR #11 |
 | M07 | Verified and merged (production receipt pending, see above) | [Jointed mechanisms](milestones/M07.md), [handoff](handoffs/M07.md), [evidence](../evidence/physics-m07.json), PR #12 |
 | M08 | Verified and merged (production receipt pending, see above) | [Material reactions and fields](milestones/M08.md), [handoff](handoffs/M08.md), [evidence](../evidence/physics-m08.json), PR #14 |
-| M09 | Implemented; merge verification required | [Physical rigs](milestones/M09.md), [handoff](handoffs/M09.md), [evidence](../evidence/physics-m09.json) |
+| M09 | Merged (PR #15); main CI follow-up in review | [Physical rigs](milestones/M09.md), [handoff](handoffs/M09.md), [evidence](../evidence/physics-m09.json) |
 | M10 | Not started | [Authored world](milestones/M10.md) |
 | M11 | Not started | [Procedural world](milestones/M11.md) |
 | M12 | Not started | [Release](milestones/M12.md) |
@@ -67,3 +67,5 @@ M09 local gates:
 - `npm run verify:run`: nine areas.
 
 [Handoff](handoffs/M09.md) records the rig contracts, death transfer, recovery rules, controls and animation evidence. CI's job limit rose from 20 to 30 minutes (D53: duration is not a gate). This row is written before commit/merge; the next session reconciles it from Git/GitHub evidence.
+
+M09 release so far: PR #15 passed CI on `369e634` and merged at `d6dc35a`. Main CI on the merge (run 37398675225) then failed one M06 browser check: `physics-combat.spec.ts` gave a held attack 2 s of wall-clock time to slash. In area 1 the browser runs about 80 ticks per 2 s on the local container, equal on M08 and M09, but only 24–31 under 3× CPU throttling. That is close to one slash cooldown (up to 22 ticks) plus input latency, and each poll's full save blocks frames. A follow-up PR from `claude/funny-planck-lkv50c` measures the check in simulation time: a new slash (by event id) within 36 ticks of the press, with 15 s of wall-clock allowance. Verify that PR's merge and main CI before M10.

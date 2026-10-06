@@ -64,18 +64,31 @@ test("desktop: V grabs, the mouse throws with ownership, held attacks stay immed
     .toBe("local");
   const thrown = await body(page, held);
   expect(Math.hypot(thrown.vx, thrown.vy) > 60 || thrown.x > view.x + 40).toBe(true);
-  // Held mouse and keyboard attacks still respond at once: slash events within a few frames.
-  const slashCount = async () =>
-    (
-      await page.evaluate(() => window.fern.command({ op: "save" }) as SaveState)
-    ).adventure!.events.filter((e) => e.type === "slash").length;
-  let slashes = await slashCount();
+  // Held mouse and keyboard attacks still respond at once: a new slash within one slash cooldown
+  // (at most 22 ticks) plus input latency, in simulation time. Counting by event id and tick keeps
+  // the check independent of a slow runner's frame rate and of the 96-event ring.
+  const mark = () =>
+    page.evaluate(() => {
+      const events = (window.fern.command({ op: "save" }) as SaveState).adventure!.events;
+      return { id: Math.max(-1, ...events.map((e) => e.id)), tick: window.fern.observe().tick };
+    });
+  const slashAfter = (id: number) =>
+    page.evaluate(
+      (id) =>
+        (window.fern.command({ op: "save" }) as SaveState).adventure!.events.find(
+          (e) => e.type === "slash" && e.id > id,
+        )?.tick ?? null,
+      id,
+    );
+  let pressed = await mark();
   await page.mouse.down();
-  await expect.poll(slashCount, { timeout: 2000 }).toBeGreaterThan(slashes);
+  await expect.poll(() => slashAfter(pressed.id), { timeout: 15000 }).not.toBeNull();
+  expect((await slashAfter(pressed.id))! - pressed.tick).toBeLessThanOrEqual(36);
   await page.mouse.up();
-  slashes = await slashCount();
+  pressed = await mark();
   await page.keyboard.down("j");
-  await expect.poll(slashCount, { timeout: 2000 }).toBeGreaterThan(slashes);
+  await expect.poll(() => slashAfter(pressed.id), { timeout: 15000 }).not.toBeNull();
+  expect((await slashAfter(pressed.id))! - pressed.tick).toBeLessThanOrEqual(36);
   await page.keyboard.up("j");
   // Physical loot: a kill launches drops as loot bodies; they settle and survive save/restore.
   const loot = await page.evaluate(() => {

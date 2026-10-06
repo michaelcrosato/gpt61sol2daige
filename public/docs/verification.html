@@ -1088,7 +1088,11 @@ once. CI exposed that race: on its slower frames, an existing Whorl
 press was lost, and taps are now latched until a tick consumes them.
 <code>FERN_VIDEO=1</code> records the real-input video; recording needs
 Playwright’s ffmpeg, so the default suite runs unrecorded against any
-Chrome.</li>
+Chrome. After the merge, the M06 held-attack check measures
+responsiveness in simulation time: a new slash within 36 ticks of the
+press. Its old 2 s wall-clock window was about 25 ticks on a slow runner
+(local 3× CPU throttling; M08 and M09 run at the same browser tick
+rate), which main CI missed once.</li>
 <li><code>npm run verify:run</code> cleared all nine areas (level 18,
 2,659 gold; <a href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/evidence/physics-m09-route.jsonl">route</a>).
 Staggers and knockdowns now interrupt monster attacks.</li>
