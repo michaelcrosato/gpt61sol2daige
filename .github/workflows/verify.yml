@@ -8,9 +8,9 @@ permissions:
 jobs:
   engine-and-browser:
     runs-on: ubuntu-latest
-    # The full suite grows with each feature milestone (M07 took 11 minutes); duration is not a
-    # gate (D53), so the job limit leaves headroom while every check must still pass.
-    timeout-minutes: 20
+    # The full suite grows with each feature milestone (M08 took 13 minutes; M09 adds about six);
+    # duration is not a gate (D53), so the job limit leaves headroom while every check must pass.
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7.0.1
       - uses: actions/setup-node@v7.0.0

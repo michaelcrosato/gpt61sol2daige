@@ -506,8 +506,8 @@ test("real M07 checkpoints migrate: yards and wind lanes join once, archived lan
     assert.ok(sim.physical!.reactions.hasField("wind-5"));
     assert.deepEqual(sim.physical!.destroyedRecords(), legacy.actorPhysics!.destroyed);
     const saved = sim.save();
-    assert.equal(saved.actorPhysics!.version, 6);
-    assert.equal(saved.actorPhysics!.world.version, 8);
+    assert.equal(saved.actorPhysics!.version, 7);
+    assert.equal(saved.actorPhysics!.world.version, 9);
     const archive = saved.actorPhysics!.archives.find((a) => a.id === "land-1-0")!;
     assert.equal(archive.reactions, undefined, "an archived pre-M08 land stays as it was saved");
     const again = Simulation.restore(structuredClone(saved));

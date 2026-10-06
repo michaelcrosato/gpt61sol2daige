@@ -545,6 +545,37 @@ export class ReactionPhysics {
     const s = this.statuses.get(id);
     return s ? { ...s } : null;
   }
+  /**
+   * M09: a monster's fire, water, oil and charge carry into the bodies of its remains (keeping
+   * the chain, owner and remaining ticks); the creature's own status ends with it.
+   */
+  transfer(from: string, to: string[]): void {
+    const s = this.statuses.get(from);
+    this.statuses.delete(from);
+    if (!s || (!s.burning && !s.wet && !s.oiled && !s.charged)) return;
+    for (const id of to)
+      this.statuses.set(id, {
+        ...s,
+        id,
+        fuse: 0,
+        heat: 0,
+        charred: false,
+      });
+  }
+  /** Sum of every active field's acceleration at a point (wind scaled by `windage`). */
+  accelerationAt(x: number, y: number, tick: number, windage: number): { x: number; y: number } {
+    let ax = 0,
+      ay = 0;
+    for (const field of this.fields.values()) {
+      if (field.ticks === 0) continue;
+      const a = fieldAcceleration(field, x, y, tick);
+      if (!a) continue;
+      const scale = field.kind === "wind" ? windage : 1;
+      ax += a.x * scale;
+      ay += a.y * scale;
+    }
+    return { x: ax, y: ay };
+  }
   statusList(): ReactionStatus[] {
     return this.save().statuses;
   }

@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   MATERIAL_SOUNDS,
   REACTION_SOUNDS,
+  RIG_SOUNDS,
   type SoundName,
   synthesize,
   wav,
@@ -131,6 +132,7 @@ test("every procedural sound is deterministic, non-silent, bounded, and encodes 
     ...MATERIAL_SOUNDS,
     "crumble",
     ...REACTION_SOUNDS,
+    ...RIG_SOUNDS,
   ] as SoundName[]) {
     const samples = synthesize(name),
       bytes = wav(samples),

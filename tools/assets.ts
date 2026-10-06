@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import {
   MATERIAL_SOUNDS,
   REACTION_SOUNDS,
+  RIG_SOUNDS,
   type SoundName,
   synthesize,
   wav,
@@ -108,6 +109,7 @@ if (args[0] === "sprite") {
     ...MATERIAL_SOUNDS,
     "crumble",
     ...REACTION_SOUNDS,
+    ...RIG_SOUNDS,
   ];
   for (const sound of sounds) await writeFile(resolve(out, `${sound}.wav`), wav(synthesize(sound)));
   await writeFile(

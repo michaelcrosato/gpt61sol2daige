@@ -1,4 +1,5 @@
 import { Adventure } from "../game/adventure.ts";
+import { npcPosition, TOWN_NPCS } from "../game/content.ts";
 import type { AdventureState } from "../game/types.ts";
 import { validateAdventure } from "../game/validation.ts";
 import {
@@ -6,6 +7,7 @@ import {
   type AdventurePhysicsSnapshot,
   ambientBodyId,
   enemyBodyId,
+  npcBodyId,
   playerBodyId,
   validateAdventurePhysics,
   validateSemanticTerrain,
@@ -14,7 +16,7 @@ import { rapier } from "../physics/bootstrap.ts";
 import { type LinkView, linkViews, onDeck, replicaDeckPlanks } from "../physics/mechanisms.ts";
 import { type ReactionView, reactionView } from "../physics/reactions.ts";
 import { PhysicsWorld, validatePhysicsSnapshot } from "../physics/runtime.ts";
-import type { PhysicsSnapshot } from "../physics/types.ts";
+import type { JointEntry, PhysicsSnapshot } from "../physics/types.ts";
 import { MAX_NPCS } from "./limits.ts";
 import { checksum, clamp, distance, hash, random } from "./math.ts";
 import { type Body, collideCircles, moveBody, SpatialHash } from "./physics.ts";
@@ -162,16 +164,59 @@ export class Simulation {
         };
       });
   }
-  /** Drawable joints (M07) from the live world or, on guests, the received scene. */
+  /** Drawable joints (M07) from the live world or, on guests, the received scene. Ragdoll
+   * hinges (M09) are hidden inside their parts' art. */
   physicalLinks(alpha = 1): LinkView[] {
+    const visible = (joints: JointEntry[]) =>
+      joints.filter((j) => !j.recipe.assembly.startsWith("remains-"));
     if (this.physical) {
       const world = this.physical.world;
-      return linkViews(world.jointList(), (id) => (world.has(id) ? world.pose(id) : undefined));
+      return linkViews(visible(world.jointList()), (id) =>
+        world.has(id) ? world.pose(id) : undefined,
+      );
     }
-    const joints = this.replicaPhysics?.world.joints;
-    if (!joints?.length) return [];
+    const joints = visible(this.replicaPhysics?.world.joints ?? []);
+    if (!joints.length) return [];
     const props = new Map(this.physicalProps(alpha).map((p) => [p.id, p]));
     return linkViews(joints, (id) => props.get(id));
+  }
+  /**
+   * M09 townsfolk: where each stands and how hard it was shoved (its external motion), from the
+   * live world, the received scene, or (without physics) its authored stroll.
+   */
+  townsfolk(): { x: number; y: number; vx: number; vy: number; pushX: number; pushY: number }[] {
+    return TOWN_NPCS.map((npc) => {
+      const id = npcBodyId(npc.id);
+      if (this.physical?.world.has(id)) {
+        const m = this.physical.world.motionOf(id),
+          motor = this.physical.world.motorOf(id);
+        return {
+          x: m.x,
+          y: m.y,
+          vx: m.vx,
+          vy: m.vy,
+          pushX: motor?.externalX ?? 0,
+          pushY: motor?.externalY ?? 0,
+        };
+      }
+      const entry = this.replicaPhysics?.world.bodies.find((b) => b.recipe.id === id);
+      if (entry?.state)
+        return {
+          x: entry.state.x,
+          y: entry.state.y,
+          vx: entry.state.vx,
+          vy: entry.state.vy,
+          pushX: entry.motor?.externalX ?? 0,
+          pushY: entry.motor?.externalY ?? 0,
+        };
+      const at = npcPosition(npc, this.tick);
+      return { ...at, vx: 0, vy: 0, pushX: 0, pushY: 0 };
+    });
+  }
+  /** M09 foliage bend by plant id (live world or received scene). */
+  physicalFoliage(): Map<string, number> {
+    if (this.physical) return this.physical.rigs.foliageView();
+    return new Map((this.replicaPhysics?.rigs?.foliage ?? []).map((f) => [f.id, f.bend]));
   }
   /** M08 statuses, surfaces and fields from the live world or, on guests, the received scene. */
   physicalReactions(): ReactionView {

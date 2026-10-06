@@ -1074,7 +1074,116 @@ Two pre-existing per-tick and per-frame pose clones were removed:
 terrain synchronization and the renderer now read positions directly.
 The full-population browser clear (64.9 s against 64.1 s on
 <code>main</code> in the same container) was given more wall-clock
-time.</p></main>
+time.</p>
+<h2 id="m09-physical-rigs-evidence">M09 physical rigs evidence</h2>
+<p>On 2026-10-05:</p>
+<ul>
+<li><code>npm run check</code> passed <strong>134 headless
+tests</strong> and <code>npm run build</code> produced the bundle.</li>
+<li><code>npm run test:e2e</code> passed <strong>38 browser
+scenarios</strong>, including four new M09 scenarios and the preserved
+WebRTC smoke checks (<a href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/physics/DECISIONS.md">D53</a>). The fourth
+new scenario checks that a key tap shorter than one frame still casts
+once. CI exposed that race: on its slower frames, an existing Whorl
+press was lost, and taps are now latched until a tick consumes them.
+<code>FERN_VIDEO=1</code> records the real-input video; recording needs
+Playwright’s ffmpeg, so the default suite runs unrecorded against any
+Chrome.</li>
+<li><code>npm run verify:run</code> cleared all nine areas (level 18,
+2,659 gold; <a href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/evidence/physics-m09-route.jsonl">route</a>).
+Staggers and knockdowns now interrupt monster attacks.</li>
+</ul>
+<p>The numbers below come from the <a
+href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/evidence/physics-m09.json">receipt</a>
+(<code>node tools/physics-rigs.ts</code>; seed 142, area 1, other
+monsters removed).</p>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr>
+<th>M09 acceptance</th>
+<th>Evidence</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Six rigs, each with an inspected moving capture of a distinct hit
+and death response</td>
+<td>The <a href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/evidence/physics-m09-steps.png">frame-by-frame
+sheet</a> (idle, hit, recoil, knockdown, recovered, death, falling,
+landed, rest; one row per rig) and a <a
+href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/evidence/physics-m09-rigs.webm">real-input video</a> of held-mouse
+slashes felling each rig. Peak lean from one 20-damage blow: </td>
+</tr>
+<tr>
+<td>A dead body reacts to Whorl or a field, then freezes or settles when
+ragdolls are disabled; saves cannot revive it or repeat its reward</td>
+<td>A settled stalker ragdoll is thrown 90.1 units by Whorl and carried
+103.7 by a wind lane. With ragdolls off (an area override, or the Agent
+lab panel in the browser) every jointed body freezes and another Whorl
+moves it 0. Re-enabling wakes it in place with zero motion, and it
+reacts again. Raw saves continue with an identical state hash. After
+restore, 0 monsters are alive, kills stay 1 → 1 and no new drop exists.
+A page save/restore in the browser keeps kills single. Where ragdolls
+are already off at death, no bodies are made and the authored fall plays
+and fades.</td>
+</tr>
+<tr>
+<td>Limbs stay with their art; interpolation, joint limits and ground
+contact stay legible</td>
+<td>Every part’s collider equals its art bounds (all rigs, all four
+variants, tested). At spawn, each hinge’s two anchors coincide, and the
+root sits where the drawn root was, turned through the fall. After 200
+ticks and a Whorl every hinge’s gap is 0.000 and its relative angle is
+within limits (±0.08). The fall is drawn as a rigid rotation that lands
+on the solved poses. Remains have ground shadows per part, sort as one
+body at their lowest point and fade before their 45 s expiry.</td>
+</tr>
+<tr>
+<td>The player responds immediately; NPC services stay usable; desktop
+and mobile agree; guests receive the same poses and results</td>
+<td>With and without a large injected recoil (lean 0.25, lantern 0.9),
+the wayfarer’s trajectory is identical and a reversal is followed at
+once. In town the traveler shoves Rowan 29.7 units
+(<code>npc:bump:rowan</code>, a startled mark), the shop opens where
+Rowan stands, and Rowan walks back to within 2.1 units in 4 s. A touch
+Slash fells a stalker the same way a mouse does. A guest’s portable
+scene holds identical remains bodies and rig state, and
+<code>enemyPose</code> on a decoded header equals the host’s. Local
+camera shake and flashes set to 0 report 0 in
+<code>observe().render.feedback</code>.</td>
+</tr>
+</tbody>
+</table>
+<p>Also covered:</p>
+<ul>
+<li><strong>Shedding:</strong> brute bark is wood, warden plates are
+metal and totem crowns are wood, never duplicated at death.</li>
+<li><strong>Status transfer:</strong> a burning monster’s remains keep
+burning.</li>
+<li><strong>Expiry:</strong> 2,700 ticks remove the whole assembly, its
+joints and its record.</li>
+<li><strong>Foliage:</strong> a wind lane bends a tree canopy, walking
+through brush bends it, and foliage off returns both to rest and ignores
+blows.</li>
+<li><strong>Reaction strength 0:</strong> no recoil or stagger.</li>
+<li><strong>Master off:</strong> recoil shows, but no stagger, knockdown
+or shedding.</li>
+<li><strong>Determinism:</strong> two runs of the same six-rig fight
+hash equal.</li>
+<li><strong>M08 migration:</strong> a real M08 checkpoint (envelope 6 /
+world 8, from <code>main</code> <code>a53af8d</code>) restores to
+envelope 7 / world 9 with rigs at rest, and its earlier death makes no
+remains.</li>
+</ul>
+<p>Captures: <a href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/evidence/physics-m09-whorl.png">Whorl</a>, <a
+href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/evidence/physics-m09-settled.png">settled with ragdolls off</a>,
+<a href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/evidence/physics-m09-town-shove.png">town shove</a>, <a
+href="https://github.com/michaelcrosato/gpt61sol2daige/blob/main/docs/evidence/physics-m09-touch-stalker.png">touch
+stalker</a>.</p></main>
 <footer>Fern · A world engine built for agents · <a href="https://github.com/michaelcrosato/gpt61sol2daige">Source on GitHub</a></footer>
 </body>
 </html>

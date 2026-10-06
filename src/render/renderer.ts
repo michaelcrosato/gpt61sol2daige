@@ -17,6 +17,7 @@ import type { BodyPose } from "../physics/types.ts";
 import { type AdventureActor, CombatRenderer } from "./combat.ts";
 import { PropRenderer } from "./props.ts";
 import { drawFields, drawStatus, drawSurfaces } from "./reactions.ts";
+import { remainsGroups } from "./rigs.ts";
 import { PALETTE, type SpriteRecipe, spritePixels } from "./sprites.ts";
 
 const GROUND = ["#304f39", "#486747", "#818164", "#34666a", "#294f59", "#8a8766", "#6a7662"];
@@ -33,7 +34,7 @@ const PLAYER_COLORS = [
 ];
 type DrawItem = {
   y: number;
-  kind: "decor" | "npc" | "player" | "landmark" | "adventure" | "physical";
+  kind: "decor" | "npc" | "player" | "landmark" | "adventure" | "physical" | "remains";
   x: number;
   type: number;
   variant: number;
@@ -41,6 +42,8 @@ type DrawItem = {
   id?: string;
   adventure?: AdventureActor;
   physical?: BodyPose;
+  /** M09: one dead monster's remains, drawn together. */
+  remains?: BodyPose[];
 };
 export class Renderer {
   readonly canvas: HTMLCanvasElement;
@@ -56,6 +59,11 @@ export class Renderer {
   debug = false;
   lantern = true;
   daytime = 0.38;
+  /** M09 local screen feedback preferences: shake strength (0–1) and hit/blast flashes. */
+  shake = 1;
+  flash = true;
+  /** Last frame's camera shake and flash (inspection and tests). */
+  feedback = { shake: 0, flash: 0 };
   drawDistance = 4096;
   entityLimit = 8192;
   waypoint: { x: number; y: number } | null = null;
@@ -162,8 +170,14 @@ export class Renderer {
       y: this.y + (y - this.height / 2) / this.zoom,
     };
   }
-  private sprite(kind: SpriteRecipe["kind"], variant = 0, frame = 0, color = 0): HTMLCanvasElement {
-    const key = `${kind}:${variant % 4}:${frame % 8}:${color}`;
+  private sprite(
+    kind: SpriteRecipe["kind"],
+    variant = 0,
+    frame = 0,
+    color = 0,
+    lantern = true,
+  ): HTMLCanvasElement {
+    const key = `${kind}:${variant % 4}:${frame % 8}:${color}:${lantern}`;
     const existing = this.spriteCache.get(key);
     if (existing) return existing;
     const canvas = document.createElement("canvas");
@@ -174,6 +188,7 @@ export class Renderer {
     for (const p of spritePixels(
       { version: 1, kind, seed: (variant % 4) + 142, palette },
       frame % 8,
+      { lantern },
     )) {
       ctx.fillStyle = p.color;
       ctx.fillRect(p.x + 32, p.y + 56, p.w, p.h);
@@ -301,7 +316,8 @@ export class Renderer {
     ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
     ctx.fillStyle = "#233b30";
     ctx.fillRect(0, 0, this.width, this.height);
-    ctx.translate(this.width / 2, this.height / 2);
+    const feedback = this.screenFeedback(sim, localId, renderTick);
+    ctx.translate(this.width / 2 + feedback.dx, this.height / 2 + feedback.dy);
     ctx.scale(this.zoom, this.zoom);
     ctx.translate(-this.x, -this.y);
     const left = this.x - Math.min(this.drawDistance, this.width / (2 * this.zoom) + 60),
@@ -470,9 +486,32 @@ export class Renderer {
         : (sim.replicaPhysics?.combat?.holds ?? [])
       ).map((hold) => hold.id),
     );
-    for (const prop of sim.physicalProps(alpha))
-      if (prop.x > left - 40 && prop.x < right + 40 && prop.y > top - 40 && prop.y < bottom + 70)
+    const physical = sim.physicalProps(alpha),
+      remains = remainsGroups(physical);
+    // A monster is drawn by its remains only once its body is a ragdoll; loose armor knocked
+    // off while it lived (or where ragdolls are off) leaves its death pose to the record.
+    this.combat.remains = new Set(
+      [...remains]
+        .filter(([, bodies]) => bodies.some((b) => !b.blueprint!.rig!.loose))
+        .map(([id]) => id),
+    );
+    this.props.foliage = sim.physicalFoliage();
+    for (const prop of physical)
+      if (
+        !prop.blueprint?.rig &&
+        prop.x > left - 40 &&
+        prop.x < right + 40 &&
+        prop.y > top - 40 &&
+        prop.y < bottom + 70
+      )
         items.push({ kind: "physical", x: prop.x, y: prop.y, type: 0, variant: 0, physical: prop });
+    // A dead monster's remains sort as one body at its lowest point (M09).
+    for (const [enemy, bodies] of remains) {
+      const x = bodies.reduce((sum, b) => sum + b.x, 0) / bodies.length,
+        y = Math.max(...bodies.map((b) => b.y));
+      if (x > left - 60 && x < right + 60 && y > top - 40 && y < bottom + 90)
+        items.push({ kind: "remains", x, y, type: 0, variant: enemy, remains: bodies });
+    }
     items.sort((a, b) => a.y - b.y || a.x - b.x);
     const links = sim
       .physicalLinks(alpha)
@@ -495,7 +534,15 @@ export class Renderer {
           held.has(item.physical!.id),
           reactions.statuses.get(item.physical!.id),
         );
-      else if (item.kind === "adventure")
+      else if (item.kind === "remains") {
+        this.combat.rigs.remains(ctx, item.remains!, renderTick, (x, y, r, color, strength) =>
+          this.combat.light(ctx, x, y, r, color, strength),
+        );
+        for (const body of item.remains!) {
+          const status = reactions.statuses.get(body.id);
+          if (status) drawStatus(ctx, body.x, body.y, 6, status, time);
+        }
+      } else if (item.kind === "adventure")
         this.combat.actor(ctx, item.adventure!, sim, alpha, time, this.zoom);
       else if (item.kind === "landmark") this.drawLandmark(item, sim, time);
       else if (item.kind === "npc") {
@@ -517,29 +564,42 @@ export class Renderer {
         ctx.ellipse(item.x, item.y + 1, 8, 3, 0, 0, Math.PI * 2);
         ctx.fill();
         if (this.lantern) {
-          const glow = ctx.createRadialGradient(
-            item.x + 9,
-            item.y - 6,
-            0,
-            item.x + 9,
-            item.y - 6,
-            25,
-          );
+          const swing = sim.adventure.hero(p.id).recoil.swing,
+            side = Math.cos(p.facing) < -0.3 ? -1 : 1,
+            lx = item.x + side * 9 - Math.sin(swing) * 5,
+            ly = item.y - 6 + (1 - Math.cos(swing)) * 3;
+          const glow = ctx.createRadialGradient(lx, ly, 0, lx, ly, 25);
           glow.addColorStop(0, "#f2d68a24");
           glow.addColorStop(1, "#f2d68a00");
           ctx.fillStyle = glow;
           ctx.fillRect(item.x - 20, item.y - 35, 60, 60);
         }
-        const walk = Math.hypot(p.vx, p.vy) > 5 ? Math.floor(p.steps / 3.5) : 0;
+        const walk = Math.hypot(p.vx, p.vy) > 5 ? Math.floor(p.steps / 3.5) : 0,
+          hero = sim.adventure.hero(p.id),
+          recoil = hero.recoil,
+          mirror = Math.cos(p.facing) < -0.3 ? -1 : 1;
         ctx.save();
         ctx.translate(Math.round(item.x), Math.round(item.y));
-        if (sim.adventure.hero(p.id).dead) {
+        if (hero.dead) {
           ctx.rotate(-Math.PI / 2);
           ctx.scale(1, 0.55);
           ctx.globalAlpha = 0.7;
-        }
-        if (Math.cos(p.facing) < -0.3) ctx.scale(-1, 1);
-        ctx.drawImage(this.sprite("player", 0, walk, p.color), -32, -56);
+        } else ctx.rotate(recoil.lean); // M09 controlled recoil about the feet
+        ctx.scale(mirror, 1);
+        // The cloak's hem trails the body's motion; the silhouette stays the wayfarer's.
+        const trail = clamp(-p.vx * mirror * 0.035, -3, 3);
+        ctx.fillStyle = "#567b70";
+        ctx.fillRect(-7 + Math.min(0, trail), -6, 3 + Math.abs(trail), 4);
+        ctx.drawImage(this.sprite("player", 0, walk, p.color, false), -32, -56);
+        // The lantern hangs from the hand and swings like a pendulum (M09).
+        ctx.save();
+        ctx.translate(9, -9);
+        ctx.rotate(hero.dead ? 0 : recoil.swing * mirror);
+        ctx.fillStyle = "#6e6349";
+        ctx.fillRect(-2, 1, 4, 5);
+        ctx.fillStyle = PALETTE.player[4];
+        ctx.fillRect(-1, 2, 2, 3);
+        ctx.restore();
         ctx.restore();
         this.combat.player(ctx, sim, p, item.x, item.y);
         ctx.fillStyle = PLAYER_COLORS[p.color];
@@ -645,6 +705,12 @@ export class Renderer {
       );
     }
     ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+    if (feedback.flash > 0) {
+      ctx.fillStyle = feedback.color;
+      ctx.globalAlpha = feedback.flash;
+      ctx.fillRect(0, 0, this.width, this.height);
+      ctx.globalAlpha = 1;
+    }
     const vignette = ctx.createRadialGradient(
       this.width / 2,
       this.height / 2,
@@ -664,6 +730,52 @@ export class Renderer {
     if (this.frame++ % 15 === 0) this.drawMinimap(sim, localId);
     this.metrics.terrainCanvases = this.terrainCache.size;
     this.metrics.renderMs = performance.now() - start;
+  }
+  /**
+   * M09 screen feedback from recent events near the camera: heavy falls, knockdowns, blasts and
+   * blows to the local traveler shake the view and big ones flash. Presentation only, scaled by
+   * this device's preferences and never part of the simulation.
+   */
+  private screenFeedback(sim: Simulation, localId: string, tick: number) {
+    let shake = 0,
+      flash = 0,
+      color = "#fff4d6";
+    for (const e of sim.adventure.state.events) {
+      const age = (tick - e.tick) / 60;
+      if (age < 0 || age > 0.5) continue;
+      if (Math.hypot(e.x - this.x, e.y - this.y) > 520) continue;
+      let amplitude = 0,
+        bright = 0;
+      if (e.type === "rig")
+        amplitude = e.text.startsWith("fall:")
+          ? 1.4 * e.amount
+          : e.text.startsWith("topple:")
+            ? 1.2 * e.amount
+            : e.text.startsWith("shed:")
+              ? 0.8
+              : 0;
+      else if (e.type === "reaction" && e.text === "blast") {
+        amplitude = 4.5;
+        bright = 0.32;
+      } else if (e.type === "hurt" && e.owner === localId) {
+        amplitude = 2.2;
+        if (age < 0.2 && 0.22 * (1 - age / 0.2) > flash) color = "#e3725f";
+        bright = 0.22;
+      } else if (e.type === "kill" && e.amount >= 3) {
+        amplitude = 5;
+        bright = 0.25;
+      } else if (e.type === "impact") amplitude = 0.7;
+      shake += amplitude * Math.max(0, 1 - age / 0.4);
+      if (bright > 0 && age < 0.2) flash = Math.max(flash, bright * (1 - age / 0.2));
+    }
+    shake = Math.min(7, shake) * this.shake;
+    this.feedback = { shake, flash: this.flash ? flash : 0 };
+    return {
+      dx: shake ? Math.sin(tick * 1.7) * shake : 0,
+      dy: shake ? Math.cos(tick * 2.3) * shake * 0.7 : 0,
+      flash: this.flash ? flash : 0,
+      color,
+    };
   }
   private drawDecor(item: DrawItem, player: Player | undefined, time: number): void {
     const ctx = this.ctx,

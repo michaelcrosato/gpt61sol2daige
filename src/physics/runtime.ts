@@ -24,6 +24,7 @@ import {
   type JointRecipe,
   MAX_LAB_BODIES,
   MAX_SNAPSHOT_BYTES,
+  type MotorState,
   PHYSICS_STEP,
   type PhysicsSnapshot,
   RAPIER_VERSION,
@@ -141,6 +142,14 @@ export const bodyRole = (recipe: BodyRecipe) =>
 const collisionGroups = (entry: BodyEntry) => {
   if (entry.recipe.actorKind) return actorGroups(entry);
   if (entry.recipe.blueprint && FAMILIES[entry.recipe.blueprint.family].raised) return 2 << 16;
+  // M09 remains meet terrain, props and travelers while they move, never each other. They sit
+  // in a lower dominance group, so everything they touch pushes them and nothing is blocked.
+  if (isRemains(entry.recipe))
+    return (
+      (INTERACTION_GROUPS.remains << 16) |
+      1 |
+      (entry.recipe.motion === "dynamic" && !entry.frozen ? 2 | ACTORS : 0)
+    );
   const role = bodyRole(entry.recipe);
   const membership = role === "terrain" ? 1 : role === "prop" ? 2 : 4;
   // Props always meet terrain, props and physical loot (M06); actors only through prop blocking.
@@ -149,6 +158,7 @@ const collisionGroups = (entry: BodyEntry) => {
     role === "prop"
       ? 3 |
         INTERACTION_GROUPS.loot |
+        INTERACTION_GROUPS.remains |
         (entry.policy?.effective.propBlocking && !passesActors(entry.recipe)
           ? entry.held
             ? ACTORS & ~INTERACTION_GROUPS.player
@@ -158,9 +168,25 @@ const collisionGroups = (entry: BodyEntry) => {
         ? 1 |
           (entry.policy?.effective.crowdContacts ? 4 : 0) |
           (entry.policy?.effective.propBlocking ? 2 : 0)
-        : 511;
+        : 1023;
   return (membership << 16) | filter;
 };
+/** M09 ragdoll remains and their loose pieces. */
+export const isRemains = (recipe: Readonly<BodyRecipe>) => recipe.blueprint?.family === "remains";
+/**
+ * Dynamic props freeze when dynamics are off; jointed members also when mechanisms are off, and
+ * ragdoll members (M09) when ragdolls are off. Loose remains pieces follow dynamic props only.
+ */
+function frozenByPolicy(recipe: Readonly<BodyRecipe>, policy: ResolvedPolicy, jointed: boolean) {
+  return (
+    recipe.motion === "dynamic" &&
+    bodyRole(recipe) === "prop" &&
+    (!policy.effective.dynamicProps ||
+      (recipe.assembly !== undefined && isRemains(recipe)
+        ? !policy.effective.ragdolls
+        : jointed && !policy.effective.mechanisms))
+  );
+}
 
 /** Deck planks and raised vanes never meet actors (travelers walk over or under them). */
 export const passesActors = (recipe: Readonly<BodyRecipe>) =>
@@ -176,6 +202,7 @@ export const INTERACTION_GROUPS = {
   ambient: 64,
   loot: 128,
   sensor: 256,
+  remains: 512,
 } as const;
 const ACTORS = 4 | 8 | 16 | 32 | 64;
 function actorGroups(entry: BodyEntry): number {
@@ -183,7 +210,15 @@ function actorGroups(entry: BodyEntry): number {
   if (entry.recipe.actorKind === "loot") return (member << 16) | 1 | 2;
   const optional = entry.policy!.effective;
   const actors = optional.crowdContacts && !entry.motor?.phaseActors ? ACTORS : 0;
-  const filter = 1 | (optional.propBlocking ? 2 : 0) | actors;
+  // Travelers always kick moving remains aside and shove townsfolk (M09); neither blocks them.
+  const townsfolk =
+    entry.recipe.actorKind === "npc"
+      ? INTERACTION_GROUPS.player
+      : entry.recipe.actorKind === "player" && !entry.motor?.phaseActors
+        ? INTERACTION_GROUPS.npc
+        : 0;
+  const filter =
+    1 | (optional.propBlocking ? 2 : 0) | actors | townsfolk | INTERACTION_GROUPS.remains;
   return (member << 16) | filter;
 }
 
@@ -278,6 +313,7 @@ export const ASSEMBLY_KINDS = [
   "vane",
   "bridge",
   "lab",
+  "remains",
 ] as const;
 function plain(value: unknown, allowed: string[], name: string): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value))
@@ -658,6 +694,11 @@ export class PhysicsWorld {
       frozen: entry.frozen ?? false,
     };
   }
+  /** An actor's motor state (intent, smoothed and external motion), or null. */
+  motorOf(id: string): Readonly<MotorState> | null {
+    const motor = this.registry.get(id)?.motor;
+    return motor ? { ...motor } : null;
+  }
   /** The body's applied policy, read-only and shared; copy before keeping it. */
   policyOf(id: string): ResolvedPolicy {
     const entry = this.registry.get(id);
@@ -873,6 +914,33 @@ export class PhysicsWorld {
       (id) => this.registry.get(id)?.recipe.motion ?? null,
     );
     return this.parts;
+  }
+  /**
+   * Removes a whole assembly at a command boundary: its joints, then every member body. Only
+   * transient assemblies (M09 ragdoll remains) leave the scene; mechanisms are never removed.
+   */
+  removeAssembly(id: string): void {
+    this.alive();
+    const recipe = this.assemblies.get(id);
+    if (!recipe) return;
+    if (recipe.kind !== "remains") throw new Error("Only ragdoll remains can be removed");
+    for (const [jointId, entry] of [...this.joints].sort((a, b) => compareIds(a[0], b[0]))) {
+      if (entry.recipe.assembly !== id) continue;
+      const joint = entry.broken ? null : this.world.getImpulseJoint(entry.handle);
+      if (joint) this.world.removeImpulseJoint(joint, false);
+      this.joints.delete(jointId);
+    }
+    this.broken = this.broken.filter((event) => event.assembly !== id);
+    this.assemblies.delete(id);
+    this.parts = null;
+    for (const member of [...recipe.members].sort(compareIds)) {
+      const entry = this.registry.get(member);
+      if (!entry) continue;
+      this.world.removeRigidBody(this.body(member));
+      this.colliderIds.delete(entry.collider);
+      this.registry.delete(member);
+      this.events = this.events.filter((event) => event.a !== member && event.b !== member);
+    }
   }
   /** Severs a joint at a command boundary or during a step; the bodies keep their motion. */
   breakJoint(id: string, cause: string, load = 0): JointBreak {
@@ -1172,6 +1240,8 @@ export class PhysicsWorld {
       .setAngularDamping(recipe.damping ?? 0.35)
       .setCcdEnabled(recipe.ccd ?? true);
     if (recipe.actorKind) descriptor.lockRotations();
+    // Remains (M09) yield to everything they touch.
+    if (isRemains(recipe)) descriptor.setDominanceGroup(-1);
     const body = this.world.createRigidBody(descriptor);
     try {
       const shape = recipe.shape;
@@ -1622,14 +1692,8 @@ export class PhysicsWorld {
       }
     }
   }
-  /** Dynamic props freeze when dynamics are off; jointed members also when mechanisms are off. */
   private shouldFreeze(entry: BodyEntry, part: AssemblyPart | undefined): boolean {
-    return (
-      entry.recipe.motion === "dynamic" &&
-      bodyRole(entry.recipe) === "prop" &&
-      (!entry.policy!.effective.dynamicProps ||
-        (part !== undefined && part.size > 1 && !entry.policy!.effective.mechanisms))
-    );
+    return frozenByPolicy(entry.recipe, entry.policy!, part !== undefined && part.size > 1);
   }
   private overlapsOutside(entry: BodyEntry, inside: Set<string>): boolean {
     const collider = this.world.getCollider(entry.collider);
@@ -1692,7 +1756,7 @@ export class PhysicsWorld {
     if (this.scene === "lab" && bytes.length > MAX_SNAPSHOT_BYTES)
       throw new Error("Playground checkpoint exceeds its 4 MB binary bound");
     return {
-      version: 8,
+      version: 9,
       scene: this.scene,
       backend: RAPIER_VERSION,
       continuation: portable ? "rebuild" : "snapshot",
@@ -1714,13 +1778,14 @@ export class PhysicsWorld {
   static restore(snapshot: PhysicsSnapshot): PhysicsWorld {
     snapshot = upgradePolicySamples(snapshot);
     validatePhysicsSnapshot(snapshot);
-    // World v6 (M06) changed prop collision filters for loot; older raw bytes carry the old
-    // filters, so their semantic state is rebuilt exactly like an incompatible backend.
+    // World v6 (M06) changed prop collision filters for loot and v9 (M09) every filter for
+    // ragdoll remains; older raw bytes carry the old filters, so their semantic state is
+    // rebuilt exactly like an incompatible backend.
     if (
       snapshot.version >= 4 &&
       (snapshot.backend !== RAPIER_VERSION ||
         snapshot.continuation === "rebuild" ||
-        snapshot.version < 6)
+        snapshot.version < 9)
     )
       return PhysicsWorld.rebuild(snapshot);
     // M02 version-2 saves predate the new registered controls. Import their applied samples
@@ -1857,11 +1922,10 @@ export class PhysicsWorld {
                 ),
               ) ||
             entry.frozen !==
-              (entry.recipe.motion === "dynamic" &&
-                bodyRole(entry.recipe) === "prop" &&
-                (!saved.effective.dynamicProps ||
-                  entry.reactivationBlocked ||
-                  (jointed(entry.recipe.id) && !saved.effective.mechanisms))) ||
+              (frozenByPolicy(entry.recipe, saved, jointed(entry.recipe.id)) ||
+                (entry.recipe.motion === "dynamic" &&
+                  bodyRole(entry.recipe) === "prop" &&
+                  entry.reactivationBlocked === true)) ||
             collider.collisionGroups() !== collisionGroups(entry) ||
             (entry.frozen &&
               (body.linvel().x !== 0 || body.linvel().y !== 0 || body.angvel() !== 0))
@@ -1995,7 +2059,7 @@ export function upgradePolicySamples(snapshot: PhysicsSnapshot): PhysicsSnapshot
     );
   if (
     !snapshot ||
-    ![3, 4, 5, 6, 7].includes(snapshot.version) ||
+    ![3, 4, 5, 6, 7, 8].includes(snapshot.version) ||
     !Array.isArray(snapshot.bodies) ||
     !snapshot.bodies.some((b) => b?.policy?.values && missing(b.policy.values).length)
   )
@@ -2027,7 +2091,7 @@ export function validatePhysicsSnapshot(snapshot: PhysicsSnapshot): void {
   snapshot = upgradePolicySamples(snapshot);
   if (
     !snapshot ||
-    ![1, 2, 3, 4, 5, 6, 7, 8].includes(snapshot.version) ||
+    ![1, 2, 3, 4, 5, 6, 7, 8, 9].includes(snapshot.version) ||
     (snapshot.version === 3 && snapshot.scene !== "adventure") ||
     (snapshot.version < 3 && snapshot.scene !== undefined) ||
     (snapshot.version >= 4 && !["adventure", "lab"].includes(snapshot.scene!)) ||
@@ -2228,12 +2292,14 @@ export function validatePhysicsSnapshot(snapshot: PhysicsSnapshot): void {
         p.frozen !== entry.frozen ||
         p.reactivationBlocked !== entry.reactivationBlocked ||
         entry.frozen !==
-          (entry.recipe.motion === "dynamic" &&
-            bodyRole(entry.recipe) === "prop" &&
-            (!entry.policy!.effective.dynamicProps ||
-              entry.reactivationBlocked ||
-              ((parts.get(entry.recipe.id)?.size ?? 0) > 1 &&
-                !entry.policy!.effective.mechanisms))) ||
+          (frozenByPolicy(
+            entry.recipe,
+            entry.policy!,
+            (parts.get(entry.recipe.id)?.size ?? 0) > 1,
+          ) ||
+            (entry.recipe.motion === "dynamic" &&
+              bodyRole(entry.recipe) === "prop" &&
+              entry.reactivationBlocked === true)) ||
         ((entry.frozen || entry.recipe.motion === "fixed") &&
           (p.vx !== 0 || p.vy !== 0 || p.angularVelocity !== 0)) ||
         (entry.recipe.actorKind && (p.angle !== 0 || p.angularVelocity !== 0)) ||

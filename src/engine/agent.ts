@@ -1,5 +1,13 @@
-import { ARCHETYPES, type AreaRecipe, areaRecipe, MECHANICS, THEMES } from "../game/content.ts";
+import {
+  ARCHETYPES,
+  type AreaRecipe,
+  areaRecipe,
+  MECHANICS,
+  type RigKind,
+  THEMES,
+} from "../game/content.ts";
 import { attackExport } from "../game/interactions.ts";
+import { enemyPose, rigExport } from "../game/rigs.ts";
 import { SKILLS } from "../game/skills.ts";
 import type { AdventureAction } from "../game/types.ts";
 import { adventureAreaAt } from "../physics/adventure.ts";
@@ -48,17 +56,21 @@ export const COMMANDS = {
   },
   actors: {
     action:
-      "inspect (default), body, props, recipes, attacks, mechanisms, reactions, damage, cut, motor, transport, stimulate, field, configure, apply, policy, impulse, place, spawn",
+      "inspect (default), body, props, recipes, attacks, mechanisms, reactions, rigs, damage, hit, monster, cut, motor, transport, stimulate, field, configure, apply, policy, impulse, place, spawn",
     description:
       "Host/solo adventure physical world; guests inspect received bodies, props, destroyed records, assemblies, joints, reactions and policies. Shared tuning, damage, cuts, stimuli and fields are host-only.",
     values:
-      "worldReactions, dynamicProps, propBlocking, crowdContacts, ambientPhysics, sweptCollision, destruction, impactDamage, projectileWorld, physicalLoot, mechanisms, jointBreakage, materialReactions, chainReactions, environmentalForces: booleans; impulseStrength, impactStrength, fieldStrength: 0..10; materialDurability, jointStrength: 0.05..20 (x toughness / break thresholds); debrisLifetime: 0..3600 s (0 = scene lifetime)",
+      "worldReactions, dynamicProps, propBlocking, crowdContacts, ambientPhysics, sweptCollision, destruction, impactDamage, projectileWorld, physicalLoot, mechanisms, jointBreakage, materialReactions, chainReactions, environmentalForces, ragdolls, foliage: booleans; impulseStrength, impactStrength, fieldStrength, reactionStrength: 0..10; materialDurability, jointStrength: 0.05..20 (x toughness / break thresholds); debrisLifetime: 0..3600 s (0 = scene lifetime)",
     reactions:
       "reactions: the M08 registry (stimuli, rules with every parameter, material reactivity, containers, releases, field kinds, yard layout) plus statuses, surfaces, fields, delayed reactions, chains (owner, rules fired, visited targets) and recent events",
     stimulate:
       "stimulate: stimulus fire|water|oil|shock|blast at x,y with optional radius 0..400, id (one body: its prop- or enemy- id; shock and blast start there) and strength 0.1..4; starts a chain owned by the caller; honors materialReactions/chainReactions",
     field:
       "field: {kind wind|pressure|attract|repel|vortex, shape {kind:circle,x,y,radius} or {kind:lane,x,y,angle,length,width}, strength 0..20000 units/s², ticks (-1 permanent), optional id, gust 0..1, actors} or remove: field id",
+    rigs: "rigs: the M09 rig registry (parts, sockets, masses, limits, materials, detachables, geometry, reaction and death rules) plus every living monster's reaction state and drawn part pose, ragdoll remains records with their bodies' poses, and foliage bend",
+    hit: "hit: id enemy-<id>, damage 0..100000, optional angle (direction of the blow); the ordinary hit path with the caller's credit: recoil, poise, stagger, knockdown, shed armor, death and remains",
+    monster:
+      "monster: rig crawler|stalker|brute|wraith|totem|warden at x,y with optional hp, passive (planted and never attacking), boss, and clear (other live monsters leave without reward and the area spawns no more waves or boss); uncounted toward the area goal (QA)",
     mechanisms:
       "mechanisms: the M07 registry (kinds, joint types, strain/cut/motor/policy rules) plus every assembly, joint (intact or broken, load, damage, motor), drawable link and gate/launcher/causeway state",
     cut: "cut: id <assembly>:<joint> (gate-1:hinge, chain-1:anchor, vine-1:pod, bridge-1:south…), optional damage (default: enough to sever); honors jointBreakage",
@@ -156,6 +168,51 @@ export class AgentRuntime {
     this.initial = this.sim.save();
     this.log.length = 0;
   }
+  /** M09 rig registry, living reaction states and poses, remains and foliage (host or guest). */
+  private rigs() {
+    const sim = this.sim,
+      props = sim.physicalProps(),
+      state = sim.physical ? sim.physical.rigs.save() : sim.replicaPhysics?.rigs;
+    return {
+      registry: rigExport(),
+      living: sim.adventure.state.enemies.map((e) => ({
+        id: e.id,
+        rig: e.rig,
+        phase: e.phase,
+        hp: e.hp,
+        reaction: structuredClone(e.reaction),
+        pose: enemyPose(e, sim.tick).parts,
+      })),
+      remains: (state?.remains ?? []).map((record) => ({
+        ...record,
+        bodies: props
+          .filter((p) => record.bodies.includes(p.id))
+          .map((p) => ({
+            id: p.id,
+            x: p.x,
+            y: p.y,
+            angle: p.angle,
+            vx: p.vx,
+            vy: p.vy,
+            frozen: p.frozen,
+            material: p.material,
+            part: p.blueprint?.rig?.part,
+            loose: p.blueprint?.rig?.loose ?? false,
+          })),
+      })),
+      loose: props
+        .filter((p) => p.blueprint?.rig?.loose)
+        .map((p) => ({
+          id: p.id,
+          part: p.blueprint!.rig!.part,
+          x: p.x,
+          y: p.y,
+          material: p.material,
+        })),
+      foliage: state?.foliage ?? [],
+      townsfolk: sim.townsfolk(),
+    };
+  }
   execute(command: Command, record = true): unknown {
     if (
       !command ||
@@ -217,6 +274,7 @@ export class AgentRuntime {
           }
           if (action === "reactions")
             return { registry: reactionExport(), state: snapshot.reactions ?? null };
+          if (action === "rigs") return this.rigs();
           if (action === "props")
             return { props: this.sim.physicalProps(), destroyed: snapshot.destroyed ?? [] };
           if (action === "recipes") return blueprintExport();
@@ -259,6 +317,7 @@ export class AgentRuntime {
           };
         if (action === "reactions")
           return { registry: reactionExport(), state: physical.reactions.save() };
+        if (action === "rigs") return this.rigs();
         if (action === "body") {
           if (typeof command.id !== "string") throw new Error("Body id required");
           return { ...world.pose(command.id), reaction: physical.reactions.status(command.id) };
@@ -290,6 +349,30 @@ export class AgentRuntime {
             damage,
             num("angle", 0),
           );
+        } else if (action === "hit") {
+          const id = typeof command.id === "string" ? /^enemy-(\d+)$/.exec(command.id) : null;
+          if (!id) throw new Error("hit needs an enemy-<id>");
+          const damage = num("damage");
+          if (damage < 0 || damage > 100_000) throw new Error("damage must be 0..100000");
+          const e = this.sim.adventure.strikeEnemy(
+            this.sim,
+            player,
+            Number(id[1]),
+            damage,
+            num("angle", 0),
+          );
+          result = { id: e.id, hp: e.hp, phase: e.phase, reaction: structuredClone(e.reaction) };
+        } else if (action === "monster") {
+          const rig = command.rig as RigKind;
+          const hp = command.hp === undefined ? undefined : num("hp");
+          if (hp !== undefined && (hp < 1 || hp > 1e9)) throw new Error("hp must be 1..1e9");
+          const e = this.sim.adventure.spawnMonster(this.sim, rig, num("x"), num("y"), {
+            ...(hp === undefined ? {} : { hp }),
+            passive: command.passive === true,
+            boss: command.boss === true,
+            clear: command.clear === true,
+          });
+          result = { id: e.id, body: `enemy-${e.id}`, rig: e.rig, hp: e.hp };
         } else if (action === "cut") {
           if (typeof command.id !== "string") throw new Error("Joint id required");
           const damage = command.damage === undefined ? undefined : num("damage");

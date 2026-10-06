@@ -1,6 +1,7 @@
 import type { Body } from "../engine/physics.ts";
 import type { AreaRecipe, BehaviorId, MechanicId, RigKind, ThemeId } from "./content.ts";
 import type { GearSlot, Item } from "./loot.ts";
+import type { HeroRecoil, RigReaction } from "./rigs.ts";
 
 export interface Tuning {
   difficulty: number;
@@ -57,6 +58,8 @@ export interface Hero {
   bought: string[];
   lastAbility: "slash" | "whorl" | "lance" | "nova";
   goldLost: number;
+  /** M09: controlled recoil and the lantern's swing (presentation never changes input). */
+  recoil: HeroRecoil;
 }
 export interface Enemy extends Body {
   id: number;
@@ -87,6 +90,8 @@ export interface Enemy extends Body {
   attacks: number;
   counted: boolean;
   tier: number;
+  /** M09: lean spring, poise, stagger, knockdown, the killing blow and shed armor. */
+  reaction: RigReaction;
 }
 export interface Projectile {
   id: number;
@@ -150,7 +155,8 @@ export interface CombatEvent {
     | "break"
     | "grab"
     | "assembly"
-    | "reaction";
+    | "reaction"
+    | "rig";
   x: number;
   y: number;
   owner: string;

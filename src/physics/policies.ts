@@ -21,6 +21,9 @@ export const POLICY_DEFAULTS = {
   chainReactions: true,
   environmentalForces: true,
   fieldStrength: 1,
+  ragdolls: true,
+  foliage: true,
+  reactionStrength: 1,
 };
 export type PolicyValues = Partial<typeof POLICY_DEFAULTS>;
 export type PolicyScope = "land" | "area" | "region";
@@ -101,6 +104,8 @@ export const POLICY_PRESETS = {
     materialReactions: false,
     chainReactions: false,
     environmentalForces: false,
+    ragdolls: false,
+    foliage: false,
   },
   Reactive: { ...POLICY_DEFAULTS },
   Wild: {
@@ -110,6 +115,7 @@ export const POLICY_PRESETS = {
     impactStrength: 2,
     jointStrength: 0.5,
     fieldStrength: 2,
+    reactionStrength: 2,
   },
   Sanctuary: {
     ...POLICY_DEFAULTS,
@@ -122,6 +128,7 @@ export const POLICY_PRESETS = {
     materialReactions: false,
     chainReactions: false,
     fieldStrength: 0.35,
+    reactionStrength: 0.35,
   },
 };
 export type PresetName = keyof typeof POLICY_PRESETS;
@@ -164,6 +171,8 @@ export function validateValues(values: PolicyValues) {
     "materialReactions",
     "chainReactions",
     "environmentalForces",
+    "ragdolls",
+    "foliage",
   ] as const)
     if (key in values && typeof values[key] !== "boolean")
       throw new Error(`${key} must be boolean`);
@@ -173,6 +182,7 @@ export function validateValues(values: PolicyValues) {
   if ("impactStrength" in values) number(values.impactStrength, 0, 10);
   if ("jointStrength" in values) number(values.jointStrength, 0.05, 20);
   if ("fieldStrength" in values) number(values.fieldStrength, 0, 10);
+  if ("reactionStrength" in values) number(values.reactionStrength, 0, 10);
 }
 const cross = (
   a: { x: number; y: number },
@@ -519,6 +529,8 @@ function composePolicy(
       "materialReactions",
       "chainReactions",
       "environmentalForces",
+      "ragdolls",
+      "foliage",
     ] as const)
       if (patch[key] !== undefined) {
         values[key] = patch[key];
@@ -531,6 +543,7 @@ function composePolicy(
       "impactStrength",
       "jointStrength",
       "fieldStrength",
+      "reactionStrength",
     ] as const)
       if (patch[key] !== undefined) {
         values[key] = patch[key];
@@ -570,6 +583,8 @@ function composePolicy(
       materialReactions: values.worldReactions && values.materialReactions,
       chainReactions: values.worldReactions && values.chainReactions,
       environmentalForces: values.worldReactions && values.environmentalForces,
+      ragdolls: values.worldReactions && values.ragdolls,
+      foliage: values.worldReactions && values.foliage,
     },
     provenance,
     landId: land.id,

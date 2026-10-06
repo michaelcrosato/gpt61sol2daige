@@ -1,0 +1,199 @@
+{
+  "seed": 142,
+  "area": 1,
+  "date": "2026-10-05",
+  "command": "node tools/physics-rigs.ts",
+  "remainsLifetimeTicks": 2700,
+  "rigs": {
+    "crawler": {
+      "locomotion": "grounded",
+      "death": "flip",
+      "parts": 10,
+      "detachables": [],
+      "blow": {
+        "peakLean": 0.32,
+        "displaced": 10.8
+      },
+      "knockdown": {
+        "blows": 8,
+        "staggers": 2,
+        "down": true,
+        "shed": 0
+      },
+      "remains": {
+        "jointedBodies": 10,
+        "hinges": 9,
+        "loose": 0,
+        "fall": 2.979,
+        "landsAfterTicks": 14,
+        "actorSpeedAtDeath": 124.5,
+        "ragdollSpeedAtSpawn": 179.5,
+        "maxHingeGapAfter200Ticks": 0,
+        "fallEvents": ["fall:crawler:vegetation"]
+      }
+    },
+    "stalker": {
+      "locomotion": "grounded",
+      "death": "topple",
+      "parts": 6,
+      "detachables": [],
+      "blow": {
+        "peakLean": 0.561,
+        "displaced": 9.8
+      },
+      "knockdown": {
+        "blows": 8,
+        "staggers": 1,
+        "down": true,
+        "shed": 0
+      },
+      "remains": {
+        "jointedBodies": 6,
+        "hinges": 5,
+        "loose": 0,
+        "fall": 1.688,
+        "landsAfterTicks": 16,
+        "actorSpeedAtDeath": 113.2,
+        "ragdollSpeedAtSpawn": 168.4,
+        "maxHingeGapAfter200Ticks": 0,
+        "fallEvents": ["fall:stalker:vegetation"]
+      }
+    },
+    "brute": {
+      "locomotion": "grounded",
+      "death": "topple",
+      "parts": 10,
+      "detachables": ["plate0:wood", "plate1:wood", "plate2:wood", "plate3:wood"],
+      "blow": {
+        "peakLean": 0.214,
+        "displaced": 7.8
+      },
+      "knockdown": {
+        "blows": 14,
+        "staggers": 3,
+        "down": true,
+        "shed": 15
+      },
+      "remains": {
+        "jointedBodies": 6,
+        "hinges": 5,
+        "loose": 3,
+        "fall": 1.688,
+        "landsAfterTicks": 20,
+        "actorSpeedAtDeath": 90.5,
+        "ragdollSpeedAtSpawn": 147.1,
+        "maxHingeGapAfter200Ticks": 0,
+        "fallEvents": ["fall:brute:wood"]
+      }
+    },
+    "wraith": {
+      "locomotion": "floating",
+      "death": "collapse",
+      "parts": 10,
+      "detachables": ["core:glass"],
+      "blow": {
+        "peakLean": 0.75,
+        "displaced": 11.7
+      },
+      "knockdown": {
+        "blows": 7,
+        "staggers": 1,
+        "down": true,
+        "shed": 0
+      },
+      "remains": {
+        "jointedBodies": 9,
+        "hinges": 8,
+        "loose": 1,
+        "fall": 0.769,
+        "landsAfterTicks": 30,
+        "actorSpeedAtDeath": 135.8,
+        "ragdollSpeedAtSpawn": 199.7,
+        "maxHingeGapAfter200Ticks": 0,
+        "fallEvents": ["fall:wraith:cloth"]
+      }
+    },
+    "totem": {
+      "locomotion": "rooted",
+      "death": "fell",
+      "parts": 7,
+      "detachables": ["crown0:wood", "crown1:wood", "crown2:wood"],
+      "blow": {
+        "peakLean": 0.288,
+        "displaced": 2.4
+      },
+      "knockdown": {
+        "blows": 30,
+        "staggers": 5,
+        "down": false,
+        "shed": 7
+      },
+      "remains": {
+        "jointedBodies": 4,
+        "hinges": 3,
+        "loose": 2,
+        "fall": 1.688,
+        "landsAfterTicks": 26,
+        "actorSpeedAtDeath": 28.3,
+        "ragdollSpeedAtSpawn": 13.4,
+        "rootsFixed": true,
+        "maxHingeGapAfter200Ticks": 0,
+        "fallEvents": ["fall:totem:wood"]
+      }
+    },
+    "warden": {
+      "locomotion": "grounded",
+      "death": "topple",
+      "parts": 11,
+      "detachables": [
+        "plate0:metal",
+        "plate1:metal",
+        "plate2:metal",
+        "plate3:metal",
+        "emblem:metal"
+      ],
+      "blow": {
+        "peakLean": 0.214,
+        "displaced": 7.8
+      },
+      "knockdown": {
+        "blows": 23,
+        "staggers": 5,
+        "down": true,
+        "shed": 31
+      },
+      "remains": {
+        "jointedBodies": 6,
+        "hinges": 5,
+        "loose": 4,
+        "fall": 1.688,
+        "landsAfterTicks": 20,
+        "actorSpeedAtDeath": 90.5,
+        "ragdollSpeedAtSpawn": 147.1,
+        "maxHingeGapAfter200Ticks": 0,
+        "fallEvents": ["fall:warden:vegetation"]
+      }
+    }
+  },
+  "corpse": {
+    "whorlDisplacement": 90.1,
+    "fieldDisplacement": 103.7,
+    "ragdollsOffFrozen": true,
+    "whorlWhileFrozen": 0
+  },
+  "save": {
+    "rawContinuationHashEqual": true,
+    "aliveAfterRestore": 0,
+    "killsBefore": 1,
+    "killsAfter": 1,
+    "newDropsAfterRestore": 0
+  },
+  "expiry": {
+    "remainsAfterLifetime": 0
+  },
+  "townsfolk": {
+    "shovedBy": 29.7,
+    "bumpEvent": true,
+    "distanceFromPostAfter4s": 2.1
+  }
+}

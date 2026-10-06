@@ -1,19 +1,11 @@
 import { clamp, hash, lerp } from "../engine/math.ts";
 import type { Player, Simulation } from "../engine/simulation.ts";
-import {
-  areaRecipe,
-  mechanicOf,
-  npcPosition,
-  THEMES,
-  TOWN_NPCS,
-  themeOf,
-  townName,
-} from "../game/content.ts";
+import { areaRecipe, mechanicOf, THEMES, TOWN_NPCS, themeOf, townName } from "../game/content.ts";
 import { RARITY_COLORS } from "../game/loot.ts";
 import type { Drop, Enemy } from "../game/types.ts";
 import { drawMaterialEvent } from "./props.ts";
 import { drawReactionEvent } from "./reactions.ts";
-import { monsterPixels, type RigPose } from "./rigs.ts";
+import { RigRenderer } from "./rigs.ts";
 import { spritePixels } from "./sprites.ts";
 
 export type AdventureActor =
@@ -24,7 +16,9 @@ export type AdventureActor =
 export class CombatRenderer {
   tick = 0;
   interpolation = 1;
-  private readonly cache = new Map<string, HTMLCanvasElement>();
+  /** Dead monsters whose physical remains are drawn instead of their death pose (M09). */
+  remains = new Set<number>();
+  readonly rigs = new RigRenderer();
   light(
     ctx: CanvasRenderingContext2D,
     x: number,
@@ -281,14 +275,15 @@ export class CombatRenderer {
         y: lerp(enemy.py, enemy.y, alpha),
       }));
     for (const drop of s.drops) actors.push({ type: "drop", drop, x: drop.x, y: drop.y });
-    if (s.mode === "town")
+    if (s.mode === "town") {
+      const folk = sim.townsfolk();
       TOWN_NPCS.forEach((npc, index) => {
-        const point = npcPosition(npc, this.tick);
         actors.push(
           { type: "building", index, x: npc.x, y: npc.y - 9 },
-          { type: "npc", index, ...point },
+          { type: "npc", index, x: folk[index].x, y: folk[index].y },
         );
       });
+    }
     return actors;
   }
   actor(
@@ -301,66 +296,19 @@ export class CombatRenderer {
   ): void {
     const { x, y } = actor;
     if (actor.type === "enemy") {
-      const e = actor.enemy,
-        age = clamp((this.tick - e.deadAt) / 40, 0, 1),
-        scale = e.boss
-          ? 1.65
-          : e.elite
-            ? 0.9
-            : e.rig === "brute" || e.rig === "warden"
-              ? 0.6
-              : 0.74;
+      const e = actor.enemy;
       if (zoom < 0.55) {
+        if (e.hp <= 0) return;
         ctx.fillStyle = e.boss ? "#f4c188" : "#ec9b8b";
         ctx.fillRect(x - 2 / zoom, y - 2 / zoom, 4 / zoom, 4 / zoom);
         return;
       }
-      ctx.save();
-      ctx.translate(x, y);
-      if (e.phase === "dead") {
-        ctx.globalAlpha = Math.max(0, 1 - age);
-        ctx.translate(0, age * 5);
-        ctx.scale(1, 1 - age * 0.4);
-      }
-      ctx.fillStyle = "#11251c88";
-      ctx.beginPath();
-      ctx.ellipse(2, 2, e.radius * 1.4, e.radius * 0.55, -0.2, 0, Math.PI * 2);
-      ctx.fill();
-      let pose: RigPose =
-        e.hurtUntil > this.tick
-          ? "hurt"
-          : e.phase === "windup"
-            ? "windup"
-            : e.phase === "charge"
-              ? "attack"
-              : Math.hypot(e.vx, e.vy) > 3
-                ? "walk"
-                : "idle";
-      if (e.phase === "dead") pose = "hurt";
-      const frame =
-        pose === "windup"
-          ? Math.max(0, Math.min(15, Math.floor((1 - e.timer / 70) * 16)))
-          : Math.floor(time * 16 + (e.id % 16)) % 16;
-      const key = `${e.rig}:${e.theme}:${e.id % 4}:${pose}:${frame}`;
-      let canvas = this.cache.get(key);
-      if (!canvas) {
-        canvas = document.createElement("canvas");
-        canvas.width = canvas.height = 88;
-        const sprite = canvas.getContext("2d")!;
-        for (const pixel of monsterPixels(
-          { version: 1, rig: e.rig, theme: e.theme, seed: e.id % 4 },
-          pose,
-          frame,
-        )) {
-          sprite.fillStyle = pixel.color;
-          sprite.fillRect(pixel.x + 44, pixel.y + 76, pixel.w, pixel.h);
-        }
-        this.cache.set(key, canvas);
-        if (this.cache.size > 512) this.cache.delete(this.cache.keys().next().value!);
-      }
-      ctx.scale(Math.cos(e.facing) < 0 ? -scale : scale, scale);
-      ctx.drawImage(canvas, -44, -76);
-      ctx.restore();
+      const light = (lx: number, ly: number, radius: number, color: string, strength: number) =>
+        this.light(ctx, lx, ly, radius, color, strength);
+      // M09: living rigs pose part by part; the dead are physical remains, or the authored
+      // death pose where ragdolls are off (and until a guest receives the remains).
+      if (e.phase !== "dead") this.rigs.living(ctx, e, x, y, this.tick, light);
+      else if (!this.remains.has(e.id)) this.rigs.dying(ctx, e, x, y, this.tick);
       if (e.hp > 0) {
         const width = e.boss ? 48 : e.elite ? 27 : 20;
         ctx.fillStyle = "#16241d";
@@ -411,40 +359,67 @@ export class CombatRenderer {
         ctx.fillRect(x - 1, y - 4 + bob, 1, 2);
       }
     } else if (actor.type === "npc") {
-      const npc = TOWN_NPCS[actor.index];
+      const npc = TOWN_NPCS[actor.index],
+        folk = _sim.townsfolk()[actor.index],
+        // M09: a shove leans them back (controlled recoil) and swings what they carry.
+        lean = clamp(-folk.pushX * 0.006, -0.32, 0.32),
+        swing = clamp(-folk.vx * 0.012 + lean * 1.6, -0.9, 0.9),
+        startled = Math.hypot(folk.pushX, folk.pushY) > 18;
       ctx.fillStyle = "#192f246f";
       ctx.beginPath();
       ctx.ellipse(x, y + 1, 9, 3, 0, 0, Math.PI * 2);
       ctx.fill();
       const palette = ["#273e35", npc.color, npc.color, "#ddbd8d", "#f1e8b0"];
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(lean);
       for (const p of spritePixels(
         { version: 1, kind: "player", seed: actor.index, palette },
         Math.floor(time * 7 + actor.index),
       )) {
         ctx.fillStyle = p.color;
-        ctx.fillRect(x + p.x, y + p.y + Math.sin(time * 1.5 + actor.index) * 0.5, p.w, p.h);
+        ctx.fillRect(p.x, p.y + Math.sin(time * 1.5 + actor.index) * 0.5, p.w, p.h);
       }
+      // Hem of the apron or robe flutters with the body's motion.
+      ctx.fillStyle = npc.color;
+      ctx.fillRect(-7 - clamp(folk.vx * 0.04, -3, 3), -3, 3, 3);
       if (actor.index === 0) {
         ctx.strokeStyle = "#a1aa83";
         ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.moveTo(x + 9, y - 10);
-        ctx.lineTo(x + 15, y - 13 - Math.sin(time * 2) * 5);
+        ctx.moveTo(9, -10);
+        ctx.lineTo(15, -13 - Math.sin(time * 2) * 5 + swing * 4);
         ctx.stroke();
         ctx.fillStyle = "#adbc9b";
-        ctx.fillRect(x + 12, y - 16 - Math.sin(time * 2) * 5, 7, 4);
+        ctx.fillRect(12, -16 - Math.sin(time * 2) * 5 + swing * 4, 7, 4);
       }
       if (actor.index === 1) {
-        this.light(ctx, x + 9, y - 10, 23, "#aadfcc", 0.12);
+        ctx.save();
+        ctx.translate(10, -12);
+        ctx.rotate(swing);
         ctx.fillStyle = "#b0d9c7";
-        ctx.fillRect(x + 8, y - 14, 4, 6);
+        ctx.fillRect(-2, 0, 4, 6);
+        ctx.restore();
       }
       if (actor.index === 2) {
         ctx.fillStyle = "#6f6746";
-        ctx.fillRect(x + 13, y - 30, 2, 34);
+        ctx.fillRect(13, -30, 2, 34);
+        ctx.save();
+        ctx.translate(14, -31);
+        ctx.rotate(swing);
         ctx.fillStyle = "#e1e6b0";
-        ctx.fillRect(x + 10, y - 32 + Math.sin(time) * 1.5, 7, 5);
-        this.light(ctx, x + 13, y - 28, 35, "#d5e4a3", 0.1);
+        ctx.fillRect(-3, 0 + Math.sin(time) * 1.5, 7, 5);
+        ctx.restore();
+      }
+      ctx.restore();
+      if (actor.index === 1) this.light(ctx, x + 10 + swing * 4, y - 9, 23, "#aadfcc", 0.12);
+      if (actor.index === 2) this.light(ctx, x + 14 + swing * 4, y - 27, 35, "#d5e4a3", 0.1);
+      if (startled) {
+        // Readable contact feedback: a startled mark that fades as they recover.
+        ctx.fillStyle = "#f2e2a6";
+        ctx.font = "8px monospace";
+        ctx.textAlign = "center";
+        ctx.fillText("!", x, y - 26);
       }
       if (zoom > 1) {
         ctx.font = "7px monospace";

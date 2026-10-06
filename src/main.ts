@@ -68,6 +68,8 @@ let activePage = true;
 const renderer = new Renderer(canvas, el<HTMLCanvasElement>("minimap"));
 renderer.drawDistance = preferences.drawDistance;
 renderer.entityLimit = preferences.entityLimit;
+renderer.shake = preferences.cameraShake;
+renderer.flash = preferences.hitFlash;
 const audio = new AudioEngine();
 let started = false,
   paused = false,
@@ -80,6 +82,8 @@ let atlasCenter = { x: 0, y: 0 };
 let inputOverride: Input | null = null;
 let previousNetworkRole = "solo";
 const keys = new Set<string>();
+/** Keys pressed since a tick last consumed input: a tap shorter than one frame still acts once. */
+const tapped = new Set<string>();
 let touchInput = { x: 0, y: 0 },
   pulseUntil = 0,
   dashUntil = 0,
@@ -260,6 +264,8 @@ function setQuality(patch: Partial<Settings>): Settings {
   };
   renderer.drawDistance = next.drawDistance;
   renderer.entityLimit = next.entityLimit;
+  renderer.shake = next.cameraShake;
+  renderer.flash = next.hitFlash;
   try {
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(preferences));
   } catch {
@@ -291,6 +297,9 @@ function fillSettings(values: Settings): void {
     el<HTMLInputElement>(`setting-${field}-value`).value = String(values[key]);
   }
   el<HTMLInputElement>("setting-performance").checked = values.showPerformance;
+  el<HTMLInputElement>("setting-shake").value = String(Math.round(values.cameraShake * 100));
+  el<HTMLInputElement>("setting-shake-value").value = String(Math.round(values.cameraShake * 100));
+  el<HTMLInputElement>("setting-flash").checked = values.hitFlash;
   el("settings-error").hidden = true;
   for (const button of document.querySelectorAll<HTMLButtonElement>("[data-quality]"))
     button.setAttribute("aria-pressed", "false");
@@ -307,6 +316,16 @@ for (const id of ["settings-open", "game-settings"]) el(id).addEventListener("cl
 for (const [field] of settingFields) {
   const slider = el<HTMLInputElement>(`setting-${field}`),
     number = el<HTMLInputElement>(`setting-${field}-value`);
+  slider.addEventListener("input", () => {
+    number.value = slider.value;
+  });
+  number.addEventListener("input", () => {
+    if (number.validity.valid && number.value !== "") slider.value = number.value;
+  });
+}
+{
+  const slider = el<HTMLInputElement>("setting-shake"),
+    number = el<HTMLInputElement>("setting-shake-value");
   slider.addEventListener("input", () => {
     number.value = slider.value;
   });
@@ -337,6 +356,8 @@ el("settings-form").addEventListener("submit", (event) => {
       drawDistance: Number(el<HTMLInputElement>("setting-distance-value").value),
       entityLimit: Number(el<HTMLInputElement>("setting-entities-value").value),
       showPerformance: el<HTMLInputElement>("setting-performance").checked,
+      cameraShake: Number(el<HTMLInputElement>("setting-shake-value").value) / 100,
+      hitFlash: el<HTMLInputElement>("setting-flash").checked,
     };
     if (net.status.role !== "guest")
       patch.population = Number(el<HTMLInputElement>("setting-population-value").value);
@@ -1012,6 +1033,7 @@ document.addEventListener("keydown", (event) => {
     if (!started) begin();
     inputOverride = null;
     keys.add(key);
+    tapped.add(key);
   }
   if (key === "l" && !event.repeat) el("lantern").click();
   if (key === "c") renderer.follow = true;
@@ -1022,6 +1044,7 @@ document.addEventListener("keydown", (event) => {
 document.addEventListener("keyup", (event) => keys.delete(event.key.toLowerCase()));
 window.addEventListener("blur", () => {
   keys.clear();
+  tapped.clear();
   inputOverride = null;
   touchInput = { x: 0, y: 0 };
   attacking = false;
@@ -1029,6 +1052,7 @@ window.addEventListener("blur", () => {
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) {
     keys.clear();
+    tapped.clear();
     touchInput = { x: 0, y: 0 };
   }
   accumulator = 0;
@@ -1036,32 +1060,36 @@ document.addEventListener("visibilitychange", () => {
 });
 function getInput(now: number): Input {
   if (inputOverride) return inputOverride;
-  if (!started || view !== "world" || document.querySelector("dialog[open]")) return idleInput();
+  if (!started || view !== "world" || document.querySelector("dialog[open]")) {
+    tapped.clear();
+    return idleInput();
+  }
+  const down = (key: string) => keys.has(key) || tapped.has(key);
   const player = runtime.sim.players.get(net.localId);
   pointerWorld = renderer.screenToWorld(pointerScreen.x, pointerScreen.y);
   const aimDistance = player ? Math.hypot(pointerWorld.x - player.x, pointerWorld.y - player.y) : 1;
   return {
     x: clamp(
-      (keys.has("d") || keys.has("arrowright") ? 1 : 0) -
-        (keys.has("a") || keys.has("arrowleft") ? 1 : 0) +
+      (down("d") || down("arrowright") ? 1 : 0) -
+        (down("a") || down("arrowleft") ? 1 : 0) +
         touchInput.x,
       -1,
       1,
     ),
     y: clamp(
-      (keys.has("s") || keys.has("arrowdown") ? 1 : 0) -
-        (keys.has("w") || keys.has("arrowup") ? 1 : 0) +
+      (down("s") || down("arrowdown") ? 1 : 0) -
+        (down("w") || down("arrowup") ? 1 : 0) +
         touchInput.y,
       -1,
       1,
     ),
-    dash: keys.has("shift") || keys.has(" ") || now < dashUntil,
-    pulse: keys.has("q") || keys.has("2") || now < pulseUntil,
-    interact: keys.has("e") || now < interactUntil,
-    attack: !heldProp() && (attacking || keys.has("j") || now < attackUntil),
-    lance: keys.has("r") || keys.has("3") || now < lanceUntil,
-    nova: keys.has("f") || keys.has("4") || now < novaUntil,
-    potion: keys.has("1") || now < potionUntil,
+    dash: down("shift") || down(" ") || now < dashUntil,
+    pulse: down("q") || down("2") || now < pulseUntil,
+    interact: down("e") || now < interactUntil,
+    attack: !heldProp() && (attacking || down("j") || now < attackUntil),
+    lance: down("r") || down("3") || now < lanceUntil,
+    nova: down("f") || down("4") || now < novaUntil,
+    potion: down("1") || now < potionUntil,
     aimX: pointerAim && player ? (pointerWorld.x - player.x) / Math.max(1, aimDistance) : 0,
     aimY: pointerAim && player ? (pointerWorld.y - player.y) / Math.max(1, aimDistance) : 0,
   };
@@ -1199,6 +1227,16 @@ function processEvents(): void {
       else if (rule === "field") audio.play("gust");
       else if (rule === "detonate") audio.play("metal");
       else if (event.text === "burnout:ash") audio.play("crumble");
+    } else if (event.type === "rig") {
+      // M09: bodies hit the ground, armor and bark clatter by material, shrouds unravel.
+      const [kind, , material] = event.text.split(":");
+      if (kind === "fall") {
+        if (material === "cloth") audio.play("flutter");
+        else audio.play("thud");
+      } else if (kind === "topple") audio.play("thud");
+      else if (kind === "shed" && (MATERIAL_SOUNDS as readonly string[]).includes(material))
+        audio.play(material as MaterialSound);
+      else if (kind === "npc") audio.play("cloth");
     }
   }
   if (runtime.sim.adventure.state.events.length)
@@ -1213,6 +1251,7 @@ function loop(now: number): void {
   fps = 1000 / Math.max(frameMs, 1);
   const input = getInput(now),
     encoded = JSON.stringify(input);
+  let consumed = paused;
   if (net.status.role !== "guest") {
     if (!paused && encoded !== lastInput) {
       runtime.sim.setInput(net.localId, input);
@@ -1226,6 +1265,7 @@ function loop(now: number): void {
       const tickBudget = Math.max(1, Math.min(5, Math.floor(12 / Math.max(stepMs, 0.1))));
       const ticks = Math.min(Math.floor(accumulator / STEP), tickBudget);
       if (ticks > 0) {
+        consumed = true;
         runtime.sim.step(ticks);
         accumulator = Math.max(0, accumulator - ticks * STEP);
         stepMs = stepMs * 0.9 + runtime.sim.metrics.stepMs * 0.1;
@@ -1238,7 +1278,7 @@ function loop(now: number): void {
       }
     }
   }
-  net.update(delta, input, {
+  const sent = net.update(delta, input, {
     x: renderer.x,
     y: renderer.y,
     radius: Math.min(
@@ -1247,6 +1287,9 @@ function loop(now: number): void {
     ),
     entityLimit: renderer.entityLimit,
   });
+  // A tap is held until a tick has consumed it or, for a guest, until it was sent to the host.
+  if (consumed || sent || (net.status.role === "guest" && net.status.state !== "connected"))
+    tapped.clear();
   const alpha =
     net.status.role === "guest"
       ? clamp((now - net.lastSnapshot) / 100, 0, 1)
@@ -1293,6 +1336,8 @@ const api = {
       simulationHz: tickRate,
       cameraX: renderer.x,
       cameraY: renderer.y,
+      /** M09 local screen feedback of the last frame (presentation only). */
+      feedback: { ...renderer.feedback },
     },
     settings: quality(),
     display: display.observe(),

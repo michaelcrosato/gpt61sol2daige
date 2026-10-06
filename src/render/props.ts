@@ -90,6 +90,8 @@ export class PropRenderer {
   }
   /** Fans blowing this frame (an active `fan:<id>` field); set by the renderer. */
   activeFans = new Set<string>();
+  /** M09 foliage bend (rad) by plant id, from the simulation; set by the renderer. */
+  foliage = new Map<string, number>();
   draw(
     ctx: Ctx,
     prop: BodyPose,
@@ -102,7 +104,11 @@ export class PropRenderer {
       family = blueprint?.family ?? (prop.shape.kind === "circle" ? "wheel" : "crate"),
       material = prop.material ?? FAMILIES[family].material,
       // Foliage/cloth response follows the body's effective world reactions: off rests in place.
-      reactive = prop.policy?.effective.worldReactions ?? true,
+      // Trees and brush (M09) follow their effective foliage response and simulated bend.
+      plant = family === "tree" || family === "brush",
+      reactive = plant
+        ? (prop.policy?.effective.foliage ?? true)
+        : (prop.policy?.effective.worldReactions ?? true),
       shake = reactive ? this.response(prop, time) : 0,
       seed = seedOf(prop.id);
     const look: Look = {
@@ -114,9 +120,12 @@ export class PropRenderer {
       seed,
       time,
       shake,
-      sway: reactive
-        ? Math.sin(time * 1.4 + (seed % 628) / 100) + Math.max(-1, Math.min(1, prop.vx / 120))
-        : 0,
+      sway: plant
+        ? (reactive ? Math.sin(time * 1.4 + (seed % 628) / 100) * 0.35 : 0) +
+          (this.foliage.get(prop.id) ?? 0) * (family === "tree" ? 4.5 : 3)
+        : reactive
+          ? Math.sin(time * 1.4 + (seed % 628) / 100) + Math.max(-1, Math.min(1, prop.vx / 120))
+          : 0,
       active:
         family === "brazier"
           ? (prop.policy?.effective.materialReactions ?? true)

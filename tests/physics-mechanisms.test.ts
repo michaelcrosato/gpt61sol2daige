@@ -644,8 +644,8 @@ test("real M06 checkpoints migrate: mechanisms join once, archived lands gain th
     assert.equal(world.assemblyList().length, 24);
     assert.ok(world.has("prop-gate-5-leaf"));
     const saved = sim.save();
-    assert.equal(saved.actorPhysics!.version, 6);
-    assert.equal(saved.actorPhysics!.world.version, 8);
+    assert.equal(saved.actorPhysics!.version, 7);
+    assert.equal(saved.actorPhysics!.world.version, 9);
     const archive = saved.actorPhysics!.archives.find((a) => a.id === "land-1-0")!;
     assert.equal(archive.assemblies, undefined, "an archived pre-M07 land stays as it was saved");
     const again = Simulation.restore(structuredClone(saved));
