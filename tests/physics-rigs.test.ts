@@ -567,7 +567,13 @@ test("the wayfarer recoils and its lantern swings without touching input or move
     sim.step(12);
     sim.setInput("local", { x: -1, y: 0, dash: false, pulse: false, interact: false });
     sim.step(6);
-    const out = { x: p.x, y: p.y, vx: p.vx, recoil: { ...sim.adventure.hero("local").recoil } };
+    const out = {
+      x: p.x,
+      y: p.y,
+      vx: p.vx,
+      recoil: { ...sim.adventure.hero("local").recoil },
+      hash: sim.stateHash(),
+    };
     sim.dispose();
     return out;
   };
@@ -575,6 +581,9 @@ test("the wayfarer recoils and its lantern swings without touching input or move
     shaken = run(true);
   assert.equal(shaken.x, calm.x);
   assert.equal(shaken.y, calm.y);
+  // Presentation-only: recoil stays out of the replay hash (its Math.sin differs across engines).
+  assert.notDeepEqual(shaken.recoil, calm.recoil);
+  assert.equal(shaken.hash, calm.hash);
   assert.ok(calm.vx < 0, "the reversal is followed at once");
   assert.ok(Math.abs(calm.recoil.swing) > 0.02, "starting and turning swing the lantern");
   // A blow leans the traveler away from it and swings the lantern; it settles again.
@@ -663,6 +672,12 @@ test("foliage bends to wind, passing bodies and blows; switched off it only retu
     physical.rigs.save().foliage.some((f) => f.id === brush.id),
     "bend is saved state",
   );
+  // Saved and replicated for display, but presentation-only: it stays out of the replay hash.
+  const hash = sim.stateHash();
+  physical.rigs.restore({ ...physical.rigs.save(), foliage: [] });
+  assert.equal(sim.stateHash(), hash);
+  assert.equal(physical.rigs.bendOf(brush.id), 0);
+  sim.step(22);
   edit(sim, [area({ foliage: false })]);
   sim.step(240);
   assert.ok(Math.abs(physical.rigs.bendOf(tree.id)) < 0.002, "off: it returns to rest");

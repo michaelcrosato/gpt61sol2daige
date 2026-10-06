@@ -303,7 +303,7 @@ Remains are `remains` family props with a validated `RemainsTag` (rig, part, the
 
 **Wayfarer and townsfolk.**
 
-- `Hero.recoil` holds a lean and a lantern pendulum stepped from the traveler's acceleration and blows. It is presentation-only in effect: input and movement are untouched.
+- `Hero.recoil` holds a lean and a lantern pendulum stepped from the traveler's acceleration and blows. It is presentation-only in effect: input and movement are untouched. It is saved and replicated but, like foliage bend, stays out of `stateHash` ([D69](physics/DECISIONS.md)): its `Math.sin` differs in the last bits between browser and Node engines.
 - In town, each townsperson is a physical actor (`npc-<id>`, mass 0.8). Travelers always touch them, whatever the town's crowd contacts. A motor walks them back along their authored stroll, and a traveler's shove emits `npc:bump:<id>`.
 - Services are offered where the townsperson stands now.
 
